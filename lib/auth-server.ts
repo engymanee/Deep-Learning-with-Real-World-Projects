@@ -25,13 +25,17 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     data: { user },
   } = await supabase.auth.getUser()
 
+  console.log('[v0] getCurrentUser: auth user id =', user?.id ?? 'null')
+
   if (!user) return null
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('id, full_name, email, title, avatar_url, role, school_id, deactivated_at')
     .eq('id', user.id)
     .maybeSingle<ProfileRow>()
+
+  console.log('[v0] getCurrentUser: profile =', profile, 'error =', profileError)
 
   // If there's an auth user but no profile row yet (edge case: trigger
   // didn't fire, or profile was deleted), fall back to minimal identity
@@ -50,11 +54,12 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   let schoolName = ''
   if (profile.school_id) {
-    const { data: school } = await supabase
+    const { data: school, error: schoolError } = await supabase
       .from('schools')
       .select('name')
       .eq('id', profile.school_id)
       .maybeSingle<{ name: string }>()
+    console.log('[v0] getCurrentUser: school =', school, 'error =', schoolError)
     schoolName = school?.name ?? ''
   }
 
