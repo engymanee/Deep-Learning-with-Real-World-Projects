@@ -1,0 +1,197 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { requireAdmin } from '@/lib/auth-server'
+import type { Role } from '@/lib/roles'
+
+const ROLES: readonly Role[] = ['fellow', 'facilitator', 'admin'] as const
+
+/**
+ * Returns the absolute URL the Supabase invite email should redirect to.
+ * Prefers NEXT_PUBLIC_SITE_URL, falls back to the request origin so this
+ * keeps working in preview deployments without extra config.
+ */
+async function inviteRedirectUrl(): Promise<string | undefined> {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL
+  if (configured) {
+    return `${configured.replace(/\/$/, '')}/auth/callback?next=/auth/set-password`
+  }
+  try {
+    const h = await headers()
+    const host = h.get('x-forwarded-host') ?? h.get('host')
+    const proto = h.get('x-forwarded-proto') ?? 'https'
+    if (host) return `${proto}://${host}/auth/callback?next=/auth/set-password`
+  } catch {
+    // headers() may not be available in all contexts; fall through.
+  }
+  return undefined
+}
+
+function ok(message: string) {
+  return { ok: true as const, message }
+}
+function fail(message: string) {
+  return { ok: false as const, message }
+}
+
+export type ActionResult = { ok: true; message: string } | { ok: false; message: string }
+
+function assertRole(value: unknown): asserts value is Role {
+  if (!ROLES.includes(value as Role)) {
+    throw new Error(`Invalid role: ${String(value)}`)
+  }
+}
+
+export async function inviteUserAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+
+    const email = String(formData.get('email') ?? '').trim().toLowerCase()
+    const fullName = String(formData.get('fullName') ?? '').trim()
+    const title = String(formData.get('title') ?? '').trim()
+    const role = String(formData.get('role') ?? 'fellow')
+    const cohortId = String(formData.get('cohortId') ?? '')
+
+    if (!email) return fail('Email is required')
+    if (!fullName) return fail('Full name is required')
+    assertRole(role)
+
+    const admin = createAdminClient()
+
+    // Invite (sends email; the link runs /auth/callback to exchange the
+    // code for a session, then sends the user to /auth/set-password).
+    const redirectTo = await inviteRedirectUrl()
+
+    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName, role },
+      redirectTo,
+    })
+
+    if (error || !data.user) {
+      return fail(error?.message ?? 'Failed to send invite')
+    }
+
+    const userId = data.user.id
+
+    // The handle_new_user trigger created a profile row. Enrich it.
+    const { error: profErr } = await admin
+      .from('profiles')
+      .update({
+        full_name: fullName,
+        title: title || null,
+        role,
+      })
+      .eq('id', userId)
+
+    if (profErr) return fail(`Invited, but failed to save profile: ${profErr.message}`)
+
+    if (cohortId) {
+      const { error: memErr } = await admin
+        .from('cohort_members')
+        .insert({ cohort_id: cohortId, profile_id: userId })
+      if (memErr && !memErr.message.includes('duplicate')) {
+        return fail(`Invited, but failed to add to cohort: ${memErr.message}`)
+      }
+    }
+
+    revalidatePath('/admin/users')
+    return ok(`Invite sent to ${email}`)
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export async function updateRoleAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const userId = String(formData.get('userId') ?? '')
+    const role = String(formData.get('role') ?? '')
+    if (!userId) return fail('Missing user id')
+    assertRole(role)
+
+    const admin = createAdminClient()
+    const { error } = await admin.from('profiles').update({ role }).eq('id', userId)
+    if (error) return fail(error.message)
+
+    revalidatePath('/admin/users')
+    return ok('Role updated')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export async function updateCohortAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const userId = String(formData.get('userId') ?? '')
+    const cohortId = String(formData.get('cohortId') ?? '')
+    if (!userId) return fail('Missing user id')
+
+    const admin = createAdminClient()
+
+    // Simple model: a user belongs to at most one cohort at a time.
+    const { error: delErr } = await admin.from('cohort_members').delete().eq('profile_id', userId)
+    if (delErr) return fail(delErr.message)
+
+    if (cohortId) {
+      const { error: insErr } = await admin
+        .from('cohort_members')
+        .insert({ cohort_id: cohortId, profile_id: userId })
+      if (insErr) return fail(insErr.message)
+    }
+
+    revalidatePath('/admin/users')
+    return ok(cohortId ? 'Cohort updated' : 'Removed from cohort')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export async function resendInviteAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const email = String(formData.get('email') ?? '').trim().toLowerCase()
+    if (!email) return fail('Missing email')
+
+    const admin = createAdminClient()
+    const redirectTo = await inviteRedirectUrl()
+
+    const { error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo })
+    if (error) return fail(error.message)
+
+    return ok(`Invite resent to ${email}`)
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export async function toggleDeactivateAction(formData: FormData): Promise<ActionResult> {
+  try {
+    const me = await requireAdmin()
+    const userId = String(formData.get('userId') ?? '')
+    const deactivate = String(formData.get('deactivate') ?? '') === 'true'
+    if (!userId) return fail('Missing user id')
+    if (userId === me.id && deactivate) return fail('You cannot deactivate yourself')
+
+    const admin = createAdminClient()
+
+    const { error: profErr } = await admin
+      .from('profiles')
+      .update({ deactivated_at: deactivate ? new Date().toISOString() : null })
+      .eq('id', userId)
+    if (profErr) return fail(profErr.message)
+
+    // Also ban/unban in auth so the user can't actually sign in.
+    const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
+      ban_duration: deactivate ? '876000h' : 'none', // ~100y for "permanent" lockout
+    })
+    if (authErr) return fail(authErr.message)
+
+    revalidatePath('/admin/users')
+    return ok(deactivate ? 'User deactivated' : 'User reactivated')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
