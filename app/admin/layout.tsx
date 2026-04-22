@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { requireUser } from '@/lib/auth-server'
-import { Users, LayoutDashboard, ArrowLeft, Building2 } from 'lucide-react'
+import { Users, LayoutDashboard, ArrowLeft, Building2, MessagesSquare } from 'lucide-react'
 import { TopBar } from '@/components/top-bar'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
@@ -37,6 +37,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <AdminTab href="/admin" icon={<LayoutDashboard className="h-4 w-4" />} label="Overview" />
           <AdminTab href="/admin/users" icon={<Users className="h-4 w-4" />} label="Users" />
           <AdminTab href="/admin/schools" icon={<Building2 className="h-4 w-4" />} label="Schools" />
+          <AdminTab
+            href="/admin/community"
+            icon={<MessagesSquare className="h-4 w-4" />}
+            label="Community"
+          />
         </nav>
 
         <main>{children}</main>
