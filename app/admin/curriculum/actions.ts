@@ -79,7 +79,66 @@ export async function updateYear(formData: FormData): Promise<ActionResult> {
     if (error) return fail(error.message)
 
     revalidatePath('/admin/curriculum')
+    revalidatePath('/dashboard')
     return ok('Year updated')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+/**
+ * Admins can create brand-new curriculum labels (a Year row) from the
+ * sidebar. Slug is derived from the title so fellows don't have to think
+ * about DB ids. Placed at the end of the curriculum list.
+ */
+export async function createYear(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const title = String(formData.get('title') ?? '').trim()
+    const description = nullable(formData.get('description'))
+    if (!title) return fail('Title is required')
+
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40)
+    if (!slug) return fail('Title must contain letters or numbers')
+
+    const supabase = await createClient()
+
+    // Place at the end.
+    const { data: last } = await supabase
+      .from('years')
+      .select('order_index')
+      .order('order_index', { ascending: false })
+      .limit(1)
+      .maybeSingle<{ order_index: number }>()
+    const nextIndex = (last?.order_index ?? 0) + 1
+
+    // Resolve any slug collision ("deep-learning", "deep-learning-2", ...).
+    let candidate = slug
+    let suffix = 1
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data: existing } = await supabase
+        .from('years')
+        .select('id')
+        .eq('id', candidate)
+        .maybeSingle<{ id: string }>()
+      if (!existing) break
+      suffix += 1
+      candidate = `${slug}-${suffix}`
+    }
+
+    const { error } = await supabase
+      .from('years')
+      .insert({ id: candidate, title, description, order_index: nextIndex })
+    if (error) return fail(error.message)
+
+    revalidatePath('/admin/curriculum')
+    revalidatePath('/dashboard')
+    return ok('Label created')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
