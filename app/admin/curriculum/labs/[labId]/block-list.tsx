@@ -92,15 +92,11 @@ const EMPTY_CREATE_DEFAULTS = (labId: string, phase: Phase): BlockFormValues => 
 export function BlockList({
   labId,
   phase,
-  phaseTitle,
-  phaseDescription,
   blocks,
   sessions,
 }: {
   labId: string
   phase: Phase
-  phaseTitle: string
-  phaseDescription: string
   blocks: Block[]
   sessions: SessionRow[]
 }) {
@@ -167,18 +163,12 @@ export function BlockList({
 
   return (
     <section className="bg-card border border-border rounded-lg">
-      <header className="px-6 py-4 border-b border-border flex items-start justify-between gap-4">
-        <div>
-          <h2 className="font-serif text-xl text-foreground">{phaseTitle}</h2>
-          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{phaseDescription}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {toast && <span className="text-xs text-muted-foreground">{toast}</span>}
-          <Button onClick={openCreate} size="sm" variant="outline">
-            <Plus className="w-4 h-4" />
-            Add block
-          </Button>
-        </div>
+      <header className="flex items-center justify-end gap-3 px-6 py-4 border-b border-border">
+        {toast && <span className="text-xs text-muted-foreground">{toast}</span>}
+        <Button onClick={openCreate} size="sm" variant="outline">
+          <Plus className="w-4 h-4" />
+          Add block
+        </Button>
       </header>
 
       {blocks.length === 0 ? (
@@ -188,9 +178,9 @@ export function BlockList({
               <EmptyMedia variant="icon">
                 <Plus className="w-5 h-5" />
               </EmptyMedia>
-              <EmptyTitle>No {phase}-lab blocks yet</EmptyTitle>
+              <EmptyTitle>No content yet</EmptyTitle>
               <EmptyDescription>
-                Add the first block to start authoring this phase of the lab.
+                Add the first block to start authoring content for this phase.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>

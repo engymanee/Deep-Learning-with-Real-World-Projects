@@ -9,22 +9,13 @@ import { BlockList } from './block-list'
 
 export const dynamic = 'force-dynamic'
 
-const PHASES: { key: 'before' | 'during' | 'after'; title: string; description: string }[] = [
-  {
-    key: 'before',
-    title: 'Before the lab',
-    description: 'Pre-work: readings, videos, and reflection prompts the Fellow completes before joining the live session.',
-  },
-  {
-    key: 'during',
-    title: 'During the lab',
-    description: 'Live session content: the Zoom link, facilitator protocols, and any in-session tools.',
-  },
-  {
-    key: 'after',
-    title: 'After the lab',
-    description: 'Follow-up: slides, surveys, and between-lab practice tasks.',
-  },
+// Phases are preserved as data (each content block still belongs to one),
+// but we no longer render their descriptive header copy - the admin UI
+// shows only the Add block affordance per phase per product spec.
+const PHASES: { key: 'before' | 'during' | 'after' }[] = [
+  { key: 'before' },
+  { key: 'during' },
+  { key: 'after' },
 ]
 
 export default async function CurriculumLabEditorPage({
@@ -98,8 +89,6 @@ export default async function CurriculumLabEditorPage({
               key={phase.key}
               labId={lab.id}
               phase={phase.key}
-              phaseTitle={phase.title}
-              phaseDescription={phase.description}
               blocks={phaseBlocks}
               sessions={sessions ?? []}
             />
