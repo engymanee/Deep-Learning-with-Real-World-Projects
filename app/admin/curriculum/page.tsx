@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 import { YearSection } from './year-section'
+import { AddYearDialog } from './add-year-dialog'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,12 +53,15 @@ export default async function AdminCurriculumPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-serif text-xl text-foreground">Curriculum</h2>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          The three-year program structure. Add labs under each year, then click &ldquo;Edit content&rdquo;
-          to build out the before / during / after flow for each lab.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-serif text-xl text-foreground">Curriculum</h2>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            The full program structure. Add labels, add labs under each label, then click
+            &ldquo;Edit content&rdquo; to build out the before / during / after flow for each lab.
+          </p>
+        </div>
+        <AddYearDialog />
       </div>
 
       {yearsList.map((year, i) => {
@@ -82,7 +86,7 @@ export default async function AdminCurriculumPage() {
 
       {yearsList.length === 0 && (
         <p className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No years found. Run the curriculum seed script to populate the three-year structure.
+          No labels yet. Click &ldquo;Add label&rdquo; above to create the first one.
         </p>
       )}
     </div>
