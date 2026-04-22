@@ -167,6 +167,43 @@ export async function resendInviteAction(formData: FormData): Promise<ActionResu
   }
 }
 
+/**
+ * Permanently removes a user. We delete the Supabase Auth record first
+ * (which triggers the ON DELETE CASCADE on profiles.id -> auth.users.id);
+ * if no such cascade exists we follow up with an explicit profile delete
+ * so the /admin/users list is always consistent. Cohort memberships,
+ * progress rows, etc. are wiped by the FKs that reference profile_id.
+ *
+ * Admins cannot delete themselves - they'd lock themselves out of the
+ * admin panel and there's no self-service recovery.
+ */
+export async function deleteUserAction(formData: FormData): Promise<ActionResult> {
+  try {
+    const me = await requireAdmin()
+    const userId = String(formData.get('userId') ?? '').trim()
+    if (!userId) return fail('Missing user id')
+    if (userId === me.id) return fail('You cannot delete your own account')
+
+    const admin = createAdminClient()
+
+    // Auth deletion. If the user was already removed from auth.users
+    // (e.g. manual DB surgery) we continue to the profile cleanup.
+    const { error: authErr } = await admin.auth.admin.deleteUser(userId)
+    if (authErr && !/user.*not found/i.test(authErr.message)) {
+      return fail(authErr.message)
+    }
+
+    // Best-effort explicit profile cleanup. Ignored if the auth delete
+    // already cascaded it away.
+    await admin.from('profiles').delete().eq('id', userId)
+
+    revalidatePath('/admin/users')
+    return ok('User deleted')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
 export async function toggleDeactivateAction(formData: FormData): Promise<ActionResult> {
   try {
     const me = await requireAdmin()

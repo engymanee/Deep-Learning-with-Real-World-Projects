@@ -12,16 +12,29 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
-import { MoreHorizontal, Mail, UserX, UserCheck } from 'lucide-react'
+import { MoreHorizontal, Mail, Trash2, UserX, UserCheck } from 'lucide-react'
 import { ROLE_LABELS, type Role } from '@/lib/roles'
 import {
+  deleteUserAction,
   resendInviteAction,
   toggleDeactivateAction,
   updateCohortAction,
@@ -51,6 +64,9 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
   const [toast, setToast] = useState<string | null>(null)
   const [role, setRole] = useState<Role>(user.role)
   const [cohortId, setCohortId] = useState<string>(user.cohort_id ?? NONE_COHORT)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteErr, setDeleteErr] = useState<string | null>(null)
 
   function run(action: () => Promise<{ ok: boolean; message: string }>) {
     setToast(null)
@@ -89,6 +105,29 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
     fd.set('userId', user.id)
     fd.set('deactivate', String(deactivate))
     run(() => toggleDeactivateAction(fd))
+  }
+
+  // Require the admin to retype the email so a permanent delete is
+  // never a single mis-click. Falls back to the name if no email on file.
+  const deleteMatchToken = (user.email ?? user.full_name ?? '').trim()
+  const canConfirmDelete = deleteConfirmText.trim() === deleteMatchToken
+
+  function handleDelete() {
+    if (!canConfirmDelete) return
+    setDeleteErr(null)
+    const fd = new FormData()
+    fd.set('userId', user.id)
+    startTransition(async () => {
+      const res = await deleteUserAction(fd)
+      if (res.ok) {
+        setDeleteOpen(false)
+        setDeleteConfirmText('')
+        setToast(res.message)
+        setTimeout(() => setToast(null), 2500)
+      } else {
+        setDeleteErr(res.message)
+      }
+    })
   }
 
   const initials = (user.full_name ?? user.email ?? '?')
@@ -198,10 +237,83 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
                   Deactivate
                 </DropdownMenuItem>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  // Keep the dropdown's focus-return from racing the dialog open.
+                  e.preventDefault()
+                  setDeleteErr(null)
+                  setDeleteConfirmText('')
+                  setDeleteOpen(true)
+                }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete user
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
+
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(v) => {
+          setDeleteOpen(v)
+          if (!v) {
+            setDeleteConfirmText('')
+            setDeleteErr(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {user.full_name ?? user.email ?? 'this user'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the account, their profile, cohort membership,
+              and all progress records. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deleteMatchToken ? (
+            <div className="grid gap-2">
+              <Label htmlFor={`confirm-del-${user.id}`}>
+                Type <span className="font-mono">{deleteMatchToken}</span> to confirm
+              </Label>
+              <Input
+                id={`confirm-del-${user.id}`}
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                autoComplete="off"
+                placeholder={deleteMatchToken}
+              />
+            </div>
+          ) : null}
+
+          {deleteErr && (
+            <p role="alert" className="text-sm text-destructive">
+              {deleteErr}
+            </p>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              disabled={!canConfirmDelete || pending}
+              className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20"
+            >
+              {pending && <Spinner className="h-4 w-4" />}
+              Delete user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </li>
   )
 }
