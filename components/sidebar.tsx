@@ -2,9 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronRight, Lock, Check } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Lock,
+  Check,
+  ShieldCheck,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { stripYearPrefix } from '@/lib/year-labels'
 
 interface YearRow {
   id: string
@@ -24,7 +31,13 @@ interface LabProgressRow {
   completed_at: string | null
 }
 
+interface YearProgressRow {
+  year_id: string
+  status: 'locked' | 'in_progress' | 'complete'
+}
+
 type LabStatus = 'complete' | 'in_progress' | 'not_started'
+type Role = 'fellow' | 'facilitator' | 'admin' | null
 
 function CompletionDot({ status }: { status: LabStatus }) {
   switch (status) {
@@ -62,6 +75,14 @@ interface SidebarProps {
   currentLabId?: string
 }
 
+/**
+ * Dashboard / lab curriculum sidebar.
+ *
+ * Display only - no admin editing lives here. Fellows see a lock icon on
+ * years that haven't been unlocked yet; admins and facilitators see every
+ * year as open. All curriculum editing (rename, create new labels, reorder,
+ * etc.) happens on /admin/curriculum.
+ */
 export function Sidebar({
   isOpen = true,
   onClose,
@@ -71,10 +92,11 @@ export function Sidebar({
   const [years, setYears] = useState<YearRow[]>([])
   const [labs, setLabs] = useState<LabRow[]>([])
   const [completed, setCompleted] = useState<Set<string>>(new Set())
+  const [unlockedYears, setUnlockedYears] = useState<Set<string>>(new Set())
+  const [role, setRole] = useState<Role>(null)
   const [expandedYear, setExpandedYear] = useState<string | null>(currentYearId ?? null)
   const [loading, setLoading] = useState(true)
 
-  // Keep the current year expanded when navigation changes it.
   useEffect(() => {
     if (currentYearId) setExpandedYear(currentYearId)
   }, [currentYearId])
@@ -84,6 +106,10 @@ export function Sidebar({
     const supabase = createClient()
 
     async function load() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
       const [{ data: yearsData }, { data: labsData }] = await Promise.all([
         supabase
           .from('years')
@@ -95,22 +121,63 @@ export function Sidebar({
           .order('order_index', { ascending: true }),
       ])
 
-      // Completion status comes from user_lab_progress; if the user isn't
-      // signed in or hasn't started anything, this simply stays empty.
-      const { data: progressData } = await supabase
-        .from('user_lab_progress')
-        .select('lab_id, completed_at')
+      let currentRole: Role = null
+      let yearProgress: YearProgressRow[] = []
+      let labProgress: LabProgressRow[] = []
+
+      if (user) {
+        const [{ data: profileRow }, { data: yp }, { data: lp }] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle<{ role: Role }>(),
+          supabase
+            .from('user_year_progress')
+            .select('year_id, status')
+            .eq('profile_id', user.id),
+          supabase
+            .from('user_lab_progress')
+            .select('lab_id, completed_at')
+            .eq('profile_id', user.id),
+        ])
+        currentRole = profileRow?.role ?? null
+        yearProgress = (yp ?? []) as YearProgressRow[]
+        labProgress = (lp ?? []) as LabProgressRow[]
+      }
 
       if (cancelled) return
-      setYears(yearsData ?? [])
+
+      const allYears = yearsData ?? []
+      setYears(allYears)
       setLabs(labsData ?? [])
+      setRole(currentRole)
       setCompleted(
         new Set(
-          ((progressData ?? []) as LabProgressRow[])
-            .filter((p) => p.completed_at != null)
-            .map((p) => p.lab_id),
+          labProgress.filter((p) => p.completed_at != null).map((p) => p.lab_id),
         ),
       )
+
+      // Admins / facilitators get everything unlocked. Fellows unlock the
+      // first year automatically, and each subsequent year only once the
+      // preceding one is marked complete (or they already have a
+      // non-locked row for it).
+      const unlocked = new Set<string>()
+      if (currentRole === 'admin' || currentRole === 'facilitator') {
+        allYears.forEach((y) => unlocked.add(y.id))
+      } else {
+        const progressByYear = new Map(yearProgress.map((p) => [p.year_id, p.status]))
+        let previousComplete = true
+        for (const y of allYears) {
+          const status = progressByYear.get(y.id)
+          const isUnlocked =
+            previousComplete || status === 'in_progress' || status === 'complete'
+          if (isUnlocked) unlocked.add(y.id)
+          previousComplete = status === 'complete'
+        }
+      }
+      setUnlockedYears(unlocked)
+
       setLoading(false)
     }
 
@@ -124,6 +191,8 @@ export function Sidebar({
     setExpandedYear(expandedYear === yearId ? null : yearId)
   }
 
+  const isAdmin = role === 'admin'
+
   return (
     <aside
       className={cn(
@@ -133,9 +202,20 @@ export function Sidebar({
       aria-label="Program curriculum"
     >
       <div className="space-y-2 p-6">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-text">
-          Program curriculum
-        </h3>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-text">
+            Program curriculum
+          </h3>
+          {isAdmin && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent"
+              title="Admin privileges active"
+            >
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+              Admin
+            </span>
+          )}
+        </div>
 
         {loading && (
           <div className="space-y-2" aria-hidden="true">
@@ -149,9 +229,9 @@ export function Sidebar({
           years.map((year) => {
             const yearLabs = labs.filter((l) => l.year_id === year.id)
             const isExpanded = expandedYear === year.id
-            // Lock years 2+ for now; they have placeholder content but we
-            // want the curriculum flow to feel intentional.
-            const isLocked = year.order_index > 1
+            const isUnlocked = unlockedYears.has(year.id)
+            const isLocked = !isUnlocked
+            const displayTitle = stripYearPrefix(year.title) || year.title
 
             return (
               <div key={year.id} className="mb-3">
@@ -168,7 +248,7 @@ export function Sidebar({
                     isLocked && 'cursor-not-allowed opacity-60',
                   )}
                 >
-                  <span className="truncate pr-2 text-left">{year.title}</span>
+                  <span className="truncate pr-2 text-left">{displayTitle}</span>
                   {isLocked ? (
                     <Lock className="h-4 w-4 text-text-muted" aria-hidden="true" />
                   ) : isExpanded ? (
@@ -216,6 +296,17 @@ export function Sidebar({
               </div>
             )
           })}
+
+        {!loading && isAdmin && (
+          <div className="pt-2">
+            <Link
+              href="/admin/curriculum"
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-accent hover:bg-accent/5 hover:text-accent"
+            >
+              Manage curriculum
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 border-t border-border p-4">

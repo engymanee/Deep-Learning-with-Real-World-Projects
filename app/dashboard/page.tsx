@@ -6,16 +6,11 @@ import { LiveSessionCard } from '@/components/dashboard/live-session-card'
 import { ProgressColumn } from '@/components/dashboard/progress-column'
 import { TeamColumn } from '@/components/dashboard/team-column'
 import { AnnouncementsFeed } from '@/components/dashboard/announcements-feed'
+import { stripYearPrefix } from '@/lib/year-labels'
 
 // Always fetch fresh dashboard data per request - progress, sessions, and
 // announcements all change frequently and should never be statically cached.
 export const dynamic = 'force-dynamic'
-
-const YEAR_WORDS: Record<number, string> = {
-  1: 'One',
-  2: 'Two',
-  3: 'Three',
-}
 
 /**
  * Renders the dashboard welcome subtitle for a learner's current stage.
@@ -37,8 +32,7 @@ function getWelcomeSubtitle(
   }
 
   const currentYear = years.find((y) => y.orderIndex === position.year)
-  const yearWord = YEAR_WORDS[position.year] ?? String(position.year)
-  const yearLabel = currentYear ? currentYear.title : `Year ${yearWord}`
+  const yearLabel = stripYearPrefix(currentYear?.title) || 'your current lab'
 
   return `You're in ${yearLabel}, Lab ${position.currentLab} of ${position.totalLabs}`
 }
@@ -64,7 +58,7 @@ export default async function DashboardPage() {
           <ResumeCard resume={data.resume} />
         ) : (
           <StartYearCard
-            yearTitle={data.years[0]?.title ?? 'Year One'}
+            yearTitle={stripYearPrefix(data.years[0]?.title) || 'your first lab'}
             startLabId={data.startLabId}
           />
         )}

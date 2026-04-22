@@ -37,9 +37,9 @@ export default function ProgramsPage() {
   }, [])
 
   const yearLabels: Record<string, string> = {
-    year_one: 'Year One: Deep Learning',
-    year_two: 'Year Two: Wisdom Coaching',
-    year_three: 'Year Three: Community of Practice',
+    year_one: 'Deep Learning',
+    year_two: 'Wisdom Coaching',
+    year_three: 'Community of Practice',
   }
 
   if (loading) {
