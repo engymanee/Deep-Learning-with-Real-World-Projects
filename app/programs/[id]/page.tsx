@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { BookOpen, Clock, Users } from 'lucide-react'
+import { TopBar } from '@/components/top-bar'
 
 interface Module {
   id: string
@@ -123,8 +124,11 @@ export default function ProgramDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50">
+        <TopBar />
+        <div className="flex items-center justify-center py-24">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
       </div>
     )
   }
@@ -132,6 +136,7 @@ export default function ProgramDetailPage() {
   if (!program) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <TopBar />
         <div className="max-w-7xl mx-auto px-4 py-12">
           <Link href="/programs">
             <Button variant="outline" className="mb-4">
@@ -146,6 +151,7 @@ export default function ProgramDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <TopBar />
       <div className="max-w-4xl mx-auto px-4 py-12">
         <Link href="/programs">
           <Button variant="outline" className="mb-6">

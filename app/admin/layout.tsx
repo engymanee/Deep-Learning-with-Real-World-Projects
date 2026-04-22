@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { requireUser } from '@/lib/auth-server'
 import { Users, LayoutDashboard, ArrowLeft, Building2 } from 'lucide-react'
+import { TopBar } from '@/components/top-bar'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await requireUser()
@@ -12,6 +13,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   return (
     <div className="min-h-screen bg-background">
+      <TopBar />
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:py-12">
         <header className="flex flex-col gap-2">
           <Link
