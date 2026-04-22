@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
-import { YearSection } from './year-section'
+import { CurriculumBoard } from './curriculum-board'
 import { AddYearDialog } from './add-year-dialog'
 
 export const dynamic = 'force-dynamic'
@@ -36,7 +36,7 @@ export default async function AdminCurriculumPage() {
     supabase.from('lab_content_blocks').select('lab_id'),
   ])
 
-  // Count blocks per lab so each row can show how populated it is.
+  // Count blocks per item so each row can show how populated it is.
   const blockCountByLab = new Map<string, number>()
   for (const row of blockCounts ?? []) {
     blockCountByLab.set(row.lab_id, (blockCountByLab.get(row.lab_id) ?? 0) + 1)
@@ -51,43 +51,39 @@ export default async function AdminCurriculumPage() {
 
   const yearsList = (years ?? []) as YearRow[]
 
+  const initialPhases = yearsList.map((year) => ({
+    id: year.id,
+    title: year.title,
+    description: year.description,
+    items: (labsByYear.get(year.id) ?? []).map((lab) => ({
+      id: lab.id,
+      year_id: lab.year_id,
+      title: lab.title,
+      description: lab.description,
+      block_count: blockCountByLab.get(lab.id) ?? 0,
+    })),
+  }))
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="font-serif text-xl text-foreground">Curriculum</h2>
+          <h2 className="font-serif text-xl text-foreground">Phases</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            The full program structure. Add labels, add labs under each label, then click
-            &ldquo;Edit content&rdquo; to build out the before / during / after flow for each lab.
+            Full program structure: add phases, add contents under each phase, and then
+            click Edit Content to build out the before, during, and after flow for each
+            section.
           </p>
         </div>
         <AddYearDialog />
       </div>
 
-      {yearsList.map((year, i) => {
-        const yearLabs = (labsByYear.get(year.id) ?? []).map((lab) => ({
-          id: lab.id,
-          year_id: lab.year_id,
-          title: lab.title,
-          description: lab.description,
-          order_index: lab.order_index,
-          block_count: blockCountByLab.get(lab.id) ?? 0,
-        }))
-        return (
-          <YearSection
-            key={year.id}
-            year={{ id: year.id, title: year.title, description: year.description }}
-            labs={yearLabs}
-            isFirst={i === 0}
-            isLast={i === yearsList.length - 1}
-          />
-        )
-      })}
-
-      {yearsList.length === 0 && (
+      {yearsList.length === 0 ? (
         <p className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No labels yet. Click &ldquo;Add label&rdquo; above to create the first one.
+          No phases yet. Click &ldquo;Add phase&rdquo; above to create the first one.
         </p>
+      ) : (
+        <CurriculumBoard initialPhases={initialPhases} />
       )}
     </div>
   )

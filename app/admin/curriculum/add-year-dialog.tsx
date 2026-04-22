@@ -56,23 +56,23 @@ export function AddYearDialog() {
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="h-4 w-4" />
-          Add label
+          Add phase
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add a curriculum label</DialogTitle>
+          <DialogTitle>Add a phase</DialogTitle>
           <DialogDescription>
-            Labels appear in the sidebar and on the dashboard. Each label groups a set of
-            labs (like &ldquo;Deep Learning&rdquo; or &ldquo;Wisdom Coaching&rdquo;).
+            Phases appear in the sidebar and on the dashboard. Each phase groups a set of
+            items (like &ldquo;Deep Learning&rdquo; or &ldquo;Wisdom Coaching&rdquo;).
           </DialogDescription>
         </DialogHeader>
         <form action={onSubmit}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="new-year-title">Title</FieldLabel>
+              <FieldLabel htmlFor="new-phase-title">Title</FieldLabel>
               <Input
-                id="new-year-title"
+                id="new-phase-title"
                 name="title"
                 required
                 placeholder="e.g. Community of Practice"
@@ -83,12 +83,12 @@ export function AddYearDialog() {
               </FieldDescription>
             </Field>
             <Field>
-              <FieldLabel htmlFor="new-year-desc">Description (optional)</FieldLabel>
+              <FieldLabel htmlFor="new-phase-desc">Description (optional)</FieldLabel>
               <Textarea
-                id="new-year-desc"
+                id="new-phase-desc"
                 name="description"
                 rows={3}
-                placeholder="A short summary fellows will see on the curriculum landing page."
+                placeholder="A short summary fellows will see on the program overview."
               />
             </Field>
             {msg && (
@@ -108,7 +108,7 @@ export function AddYearDialog() {
             </Button>
             <Button type="submit" disabled={pending}>
               {pending && <Spinner className="h-4 w-4" />}
-              Create label
+              Create phase
             </Button>
           </DialogFooter>
         </form>

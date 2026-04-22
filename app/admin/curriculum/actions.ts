@@ -80,7 +80,7 @@ export async function updateYear(formData: FormData): Promise<ActionResult> {
 
     revalidatePath('/admin/curriculum')
     revalidatePath('/dashboard')
-    return ok('Year updated')
+    return ok('Phase updated')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
@@ -138,7 +138,7 @@ export async function createYear(formData: FormData): Promise<ActionResult> {
 
     revalidatePath('/admin/curriculum')
     revalidatePath('/dashboard')
-    return ok('Label created')
+    return ok('Phase created')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
@@ -177,7 +177,7 @@ export async function createLab(formData: FormData): Promise<ActionResult> {
     if (error) return fail(error.message)
 
     revalidatePath('/admin/curriculum')
-    return ok('Lab created')
+    return ok('Item created')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
@@ -202,7 +202,7 @@ export async function updateLab(formData: FormData): Promise<ActionResult> {
     revalidatePath('/admin/curriculum')
     revalidatePath(`/admin/curriculum/labs/${id}`)
     revalidatePath(`/labs/${id}`)
-    return ok('Lab updated')
+    return ok('Item updated')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
@@ -219,7 +219,62 @@ export async function deleteLab(formData: FormData): Promise<ActionResult> {
     if (error) return fail(error.message)
 
     revalidatePath('/admin/curriculum')
-    return ok('Lab deleted')
+    return ok('Item deleted')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+/**
+ * Persist a full drag-and-drop reordering. The client sends one entry per
+ * phase whose contents changed, each with the canonical ordered list of
+ * item ids. We write in two passes to side-step the UNIQUE
+ * (year_id, order_index) constraint: first park every affected row on a
+ * unique negative index (also moving it to its new phase), then assign
+ * its final positive index. Any id that came in but doesn't exist in the
+ * DB is silently ignored so stale client state never 500s the request.
+ */
+export async function reorderLabs(
+  orderings: { year_id: string; lab_ids: string[] }[],
+): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    if (!Array.isArray(orderings) || orderings.length === 0) {
+      return ok('Nothing to save')
+    }
+
+    const supabase = await createClient()
+    let temp = -1
+
+    // Pass 1 - stash every row on a temporary negative index so we can freely
+    // rewrite the destination phase's final indexes without colliding.
+    for (const o of orderings) {
+      if (!o?.year_id || !Array.isArray(o.lab_ids)) continue
+      for (const labId of o.lab_ids) {
+        const { error } = await supabase
+          .from('labs')
+          .update({ year_id: o.year_id, order_index: temp })
+          .eq('id', labId)
+        if (error) return fail(error.message)
+        temp -= 1
+      }
+    }
+
+    // Pass 2 - apply the final 1..N ordering per phase.
+    for (const o of orderings) {
+      if (!o?.year_id || !Array.isArray(o.lab_ids)) continue
+      for (let i = 0; i < o.lab_ids.length; i++) {
+        const { error } = await supabase
+          .from('labs')
+          .update({ order_index: i + 1 })
+          .eq('id', o.lab_ids[i])
+        if (error) return fail(error.message)
+      }
+    }
+
+    revalidatePath('/admin/curriculum')
+    revalidatePath('/dashboard')
+    return ok('Order saved')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
