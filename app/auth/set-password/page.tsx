@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -14,12 +14,51 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+/**
+ * Landing page after an invitee clicks their email link. By the time
+ * this component mounts, `/auth/callback` has already exchanged the
+ * invite code for a real session cookie, so updateUser({ password })
+ * will attach the new password to the already-authenticated user.
+ *
+ * We read the invited user's name off `auth.user_metadata.full_name`
+ * (set by inviteUserByEmail in `actions.ts`) to personalise the greeting.
+ */
 export default function SetPasswordPage() {
+  const [firstName, setFirstName] = useState<string | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [bootstrapped, setBootstrapped] = useState(false)
   const router = useRouter()
+
+  // Check the invite session exists before the user fills the form. If
+  // the cookie is missing (expired / already used link) we surface the
+  // problem up front instead of on submit.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const supabase = createClient()
+      const { data } = await supabase.auth.getUser()
+      if (cancelled) return
+      if (!data.user) {
+        setError(
+          'Your invite link is no longer valid. Ask your program admin to resend it.',
+        )
+        setBootstrapped(true)
+        return
+      }
+      const meta = (data.user.user_metadata ?? {}) as { full_name?: string }
+      const first = meta.full_name?.trim().split(/\s+/)[0] ?? null
+      setFirstName(first)
+      setEmail(data.user.email ?? null)
+      setBootstrapped(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,23 +77,12 @@ export default function SetPasswordPage() {
     const supabase = createClient()
 
     try {
-      const { data: session } = await supabase.auth.getSession()
-      if (!session.session) {
-        setError(
-          'Your invite link has expired. Ask your program admin to resend it.',
-        )
-        setIsLoading(false)
-        return
-      }
-
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
       router.push('/dashboard')
       router.refresh()
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : 'Unable to set password',
-      )
+      setError(err instanceof Error ? err.message : 'Unable to set password')
     } finally {
       setIsLoading(false)
     }
@@ -66,10 +94,17 @@ export default function SetPasswordPage() {
         <Card>
           <CardHeader className="space-y-2">
             <CardTitle className="font-serif text-2xl">
-              Welcome to Wisdom At Work
+              {firstName ? `Welcome, ${firstName}` : 'Welcome to Wisdom At Work'}
             </CardTitle>
             <CardDescription>
-              Set a password to finish activating your Fellow account.
+              {email ? (
+                <>
+                  Set a password for <span className="font-medium">{email}</span> to finish
+                  activating your account.
+                </>
+              ) : (
+                'Set a password to finish activating your account.'
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -85,9 +120,7 @@ export default function SetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <p className="text-xs text-text-muted">
-                  At least 8 characters.
-                </p>
+                <p className="text-xs text-muted-foreground">At least 8 characters.</p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="confirm">Confirm password</Label>
@@ -101,8 +134,16 @@ export default function SetPasswordPage() {
                   onChange={(e) => setConfirm(e.target.value)}
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading || !bootstrapped || !!error}
+              >
                 {isLoading ? 'Saving...' : 'Set password and continue'}
               </Button>
             </form>
