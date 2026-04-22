@@ -21,6 +21,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -48,8 +58,10 @@ export type CurriculumItem = {
  */
 export function LabRow({ item }: { item: CurriculumItem }) {
   const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
+  const [deleteErr, setDeleteErr] = useState<string | null>(null)
 
   const {
     attributes,
@@ -66,19 +78,19 @@ export function LabRow({ item }: { item: CurriculumItem }) {
   }
 
   function handleDelete() {
-    if (
-      !confirm(
-        `Delete "${item.title}"? This removes the item and all of its content blocks. This cannot be undone.`,
-      )
-    )
-      return
     const fd = new FormData()
     fd.set('id', item.id)
+    setDeleteErr(null)
     setToast(null)
     startTransition(async () => {
       const r = await deleteLab(fd)
-      setToast(r.message)
-      setTimeout(() => setToast(null), 2500)
+      if (r.ok) {
+        setDeleteOpen(false)
+        setToast(r.message)
+        setTimeout(() => setToast(null), 2500)
+      } else {
+        setDeleteErr(r.message)
+      }
     })
   }
 
@@ -134,7 +146,11 @@ export function LabRow({ item }: { item: CurriculumItem }) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onSelect={handleDelete}
+                onSelect={(e) => {
+                  // Prevent the menu's focus-return from eating the dialog open.
+                  e.preventDefault()
+                  setDeleteOpen(true)
+                }}
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
@@ -146,6 +162,47 @@ export function LabRow({ item }: { item: CurriculumItem }) {
       </div>
 
       <EditLabDialog item={item} open={editOpen} onOpenChange={setEditOpen} />
+
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(v) => {
+          setDeleteOpen(v)
+          if (!v) setDeleteErr(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{item.title}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the item along with all{' '}
+              <strong className="text-foreground">
+                {item.block_count} content {item.block_count === 1 ? 'block' : 'blocks'}
+              </strong>{' '}
+              inside it. Fellows&apos; progress for this item will also be lost. This cannot
+              be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteErr && (
+            <p role="alert" className="text-sm text-destructive">
+              {deleteErr}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              disabled={pending}
+              className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20"
+            >
+              {pending && <Spinner className="h-4 w-4" />}
+              Delete item
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </li>
   )
 }

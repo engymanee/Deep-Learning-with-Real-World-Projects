@@ -144,6 +144,57 @@ export async function createYear(formData: FormData): Promise<ActionResult> {
   }
 }
 
+/**
+ * Delete a phase (row in `years`) along with every item and content block
+ * inside it. We explicitly cascade in code so behavior is identical
+ * regardless of the FK's ON DELETE setting, and so we can surface a
+ * single error message to the admin if any step fails.
+ */
+export async function deleteYear(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const id = String(formData.get('id') ?? '').trim()
+    if (!id) return fail('Missing phase id')
+
+    const supabase = await createClient()
+
+    // 1) Find every item in the phase so we can clean up its content blocks.
+    const { data: labs, error: labsErr } = await supabase
+      .from('labs')
+      .select('id')
+      .eq('year_id', id)
+    if (labsErr) return fail(labsErr.message)
+
+    const labIds = (labs ?? []).map((l) => l.id)
+
+    // 2) Delete content blocks belonging to those items.
+    if (labIds.length > 0) {
+      const { error: blocksErr } = await supabase
+        .from('lab_content_blocks')
+        .delete()
+        .in('lab_id', labIds)
+      if (blocksErr) return fail(blocksErr.message)
+    }
+
+    // 3) Delete the items themselves.
+    const { error: labDelErr } = await supabase
+      .from('labs')
+      .delete()
+      .eq('year_id', id)
+    if (labDelErr) return fail(labDelErr.message)
+
+    // 4) Delete the phase row.
+    const { error: yearDelErr } = await supabase.from('years').delete().eq('id', id)
+    if (yearDelErr) return fail(yearDelErr.message)
+
+    revalidatePath('/admin/curriculum')
+    revalidatePath('/dashboard')
+    return ok('Phase deleted')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
 // ============================================================================
 // LABS
 // ============================================================================

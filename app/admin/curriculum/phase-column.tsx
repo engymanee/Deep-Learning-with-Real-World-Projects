@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Pencil, Plus } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,12 +14,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Field, FieldGroup, FieldLabel, FieldDescription } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { LabRow, type CurriculumItem } from './lab-row'
-import { createLab, updateYear, type ActionResult } from './actions'
+import { createLab, deleteYear, updateYear, type ActionResult } from './actions'
 
 export type Phase = {
   id: string
@@ -50,8 +61,9 @@ export function PhaseColumn({ phase, items }: { phase: Phase; items: CurriculumI
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <EditPhaseDialog phase={phase} />
+          <DeletePhaseDialog phase={phase} itemCount={items.length} />
           <AddItemDialog phaseId={phase.id} />
         </div>
       </header>
@@ -168,6 +180,115 @@ function EditPhaseDialog({ phase }: { phase: Phase }) {
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Destructive confirmation for removing a phase. We require the admin to
+ * type the phase title to confirm when the phase still has items in it,
+ * so deleting a populated phase is never a single mis-click. If the
+ * phase is empty we still surface the confirm dialog, but don't gate on
+ * the text match.
+ */
+function DeletePhaseDialog({ phase, itemCount }: { phase: Phase; itemCount: number }) {
+  const [open, setOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [pending, startTransition] = useTransition()
+  const [err, setErr] = useState<string | null>(null)
+
+  const needsTypedConfirm = itemCount > 0
+  const canSubmit = !needsTypedConfirm || confirmText.trim() === phase.title
+
+  function onConfirm() {
+    if (!canSubmit) return
+    setErr(null)
+    const fd = new FormData()
+    fd.set('id', phase.id)
+    startTransition(async () => {
+      const r = await deleteYear(fd)
+      if (r.ok) {
+        setOpen(false)
+      } else {
+        setErr(r.message)
+      }
+    })
+  }
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) {
+          setConfirmText('')
+          setErr(null)
+        }
+      }}
+    >
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+          <Trash2 className="h-4 w-4" />
+          Delete phase
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete &ldquo;{phase.title}&rdquo;?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {itemCount === 0 ? (
+              <>This phase has no items. Deleting it cannot be undone.</>
+            ) : (
+              <>
+                This will permanently delete the phase along with its{' '}
+                <strong className="text-foreground">
+                  {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                </strong>{' '}
+                and every content block inside them. Fellows&apos; progress records for
+                those items will also be removed. This cannot be undone.
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        {needsTypedConfirm && (
+          <Field>
+            <FieldLabel htmlFor={`confirm-delete-${phase.id}`}>
+              Type <span className="font-mono">{phase.title}</span> to confirm
+            </FieldLabel>
+            <Input
+              id={`confirm-delete-${phase.id}`}
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoComplete="off"
+              placeholder={phase.title}
+            />
+          </Field>
+        )}
+
+        {err && (
+          <p role="alert" className="text-sm text-destructive">
+            {err}
+          </p>
+        )}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault()
+              onConfirm()
+            }}
+            disabled={!canSubmit || pending}
+            className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20"
+          >
+            {pending && <Spinner className="h-4 w-4" />}
+            Delete phase
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 
