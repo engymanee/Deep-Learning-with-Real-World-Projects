@@ -5,7 +5,6 @@ import { AppShell } from '@/components/app-shell'
 import { LabBlockCard, type BlockType } from '@/components/lab-block-card'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
-import { stripYearPrefix } from '@/lib/year-labels'
 
 type Phase = 'before' | 'during' | 'after'
 
@@ -100,7 +99,7 @@ export default async function LabPage({
   ).length
   const pct = totalRequired === 0 ? 0 : Math.round((completedRequired / totalRequired) * 100)
 
-  const yearTitle = stripYearPrefix(lab.years?.title) || lab.years?.title || ''
+  const yearTitle = lab.years?.title ?? ''
   const yearId = lab.years?.id ?? lab.year_id
 
   return (

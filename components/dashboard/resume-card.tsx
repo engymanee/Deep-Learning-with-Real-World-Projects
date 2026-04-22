@@ -3,7 +3,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import type { DashboardResume } from '@/lib/dashboard-data'
-import { stripYearPrefix } from '@/lib/year-labels'
 
 function formatTimeRemaining(minutes: number): string {
   if (minutes <= 0) return 'almost done'
@@ -29,7 +28,7 @@ export function ResumeCard({ resume }: { resume: DashboardResume }) {
               {resume.labTitle}
             </h2>
             <p className="text-sm text-text-muted">
-              {stripYearPrefix(resume.yearTitle) || resume.yearTitle} ·{' '}
+              {resume.yearTitle} ·{' '}
               {formatTimeRemaining(resume.estimatedMinutesRemaining)} remaining
             </p>
             <div className="pt-2">

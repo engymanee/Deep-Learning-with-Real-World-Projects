@@ -6,7 +6,6 @@ import { LiveSessionCard } from '@/components/dashboard/live-session-card'
 import { ProgressColumn } from '@/components/dashboard/progress-column'
 import { TeamColumn } from '@/components/dashboard/team-column'
 import { AnnouncementsFeed } from '@/components/dashboard/announcements-feed'
-import { stripYearPrefix } from '@/lib/year-labels'
 
 // Always fetch fresh dashboard data per request - progress, sessions, and
 // announcements all change frequently and should never be statically cached.
@@ -32,7 +31,7 @@ function getWelcomeSubtitle(
   }
 
   const currentYear = years.find((y) => y.orderIndex === position.year)
-  const yearLabel = stripYearPrefix(currentYear?.title) || 'your current lab'
+  const yearLabel = currentYear?.title || 'your current lab'
 
   return `You're in ${yearLabel}, Lab ${position.currentLab} of ${position.totalLabs}`
 }
@@ -58,7 +57,7 @@ export default async function DashboardPage() {
           <ResumeCard resume={data.resume} />
         ) : (
           <StartYearCard
-            yearTitle={stripYearPrefix(data.years[0]?.title) || 'your first lab'}
+            yearTitle={data.years[0]?.title ?? 'your first lab'}
             startLabId={data.startLabId}
           />
         )}

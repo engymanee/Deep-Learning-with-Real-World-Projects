@@ -1,7 +1,6 @@
 import { Progress } from '@/components/ui/progress'
 import { Lock } from 'lucide-react'
 import type { DashboardYear } from '@/lib/dashboard-data'
-import { stripYearPrefix } from '@/lib/year-labels'
 
 export function ProgressColumn({ years }: { years: DashboardYear[] }) {
   return (
@@ -20,7 +19,7 @@ export function ProgressColumn({ years }: { years: DashboardYear[] }) {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="font-serif font-semibold text-primary">
-                  {stripYearPrefix(year.title) || year.title}
+                  {year.title}
                 </span>
                 {year.isLocked && (
                   <Lock className="w-4 h-4 text-text-muted" aria-label="Locked" />

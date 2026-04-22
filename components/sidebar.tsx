@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { stripYearPrefix } from '@/lib/year-labels'
 
 interface YearRow {
   id: string
@@ -231,7 +230,7 @@ export function Sidebar({
             const isExpanded = expandedYear === year.id
             const isUnlocked = unlockedYears.has(year.id)
             const isLocked = !isUnlocked
-            const displayTitle = stripYearPrefix(year.title) || year.title
+            const displayTitle = year.title
 
             return (
               <div key={year.id} className="mb-3">
