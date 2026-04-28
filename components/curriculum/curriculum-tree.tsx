@@ -205,12 +205,15 @@ export function CurriculumTree({ phases }: Props) {
                     Not yet assigned to your cohort.
                   </p>
                 </div>
+                {/* Icon-only lock affordance. The label "Locked"
+                    is exposed to screen readers via aria-label /
+                    title - sighted users just see the icon. */}
                 <span
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                  className="inline-flex shrink-0 items-center justify-center rounded-md bg-muted p-1.5 text-muted-foreground"
                   title="Locked"
+                  aria-label="Locked"
                 >
-                  <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-                  Locked
+                  <Lock className="h-4 w-4" aria-hidden="true" />
                 </span>
               </div>
             </section>
