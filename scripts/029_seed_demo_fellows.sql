@@ -6,16 +6,18 @@
 --   teammate1@school.edu   - Jordan Patel
 --   teammate2@school.edu   - Sam Okafor
 --
--- All three sit in the "Lincoln High Leadership Team" cohort so the
--- dashboard's per-phase team-progress meter has cohort peers to
--- aggregate. Re-running the script just bumps password and profile
--- fields; it doesn't duplicate users.
+-- All three sit in cohort 'A' (a short text label - public.profiles
+-- .cohort is NOT a FK to public.cohorts.id, it's a checked text
+-- column whose accepted values today are 'A'/'B') so the dashboard's
+-- per-phase team-progress meter has cohort peers to aggregate.
+-- Re-running the script just refreshes the password hash and profile
+-- fields; it never duplicates users or breaks foreign keys.
 
 create extension if not exists pgcrypto;
 
 do $$
 declare
-  cohort_lincoln constant uuid := '22222222-2222-2222-2222-222222222222';
+  cohort_label   constant text := 'A';
   password_hash  text := crypt('password123', gen_salt('bf'));
 
   -- (email, full name) tuples we want to (re)seed.
@@ -25,22 +27,28 @@ declare
     array['teammate2@school.edu', 'Sam Okafor']
   ];
 
-  email     text;
-  full_name text;
-  user_id   uuid;
-  i         int;
+  -- Locals are prefixed `v_` so they don't collide with column names
+  -- inside the embedded inserts/updates (the unprefixed `email` had
+  -- previously matched `auth.users.email` and broke the do-block).
+  v_email     text;
+  v_full_name text;
+  v_user_id   uuid;
+  i           int;
 begin
   for i in 1 .. array_length(demo_users, 1) loop
-    email     := demo_users[i][1];
-    full_name := demo_users[i][2];
+    v_email     := demo_users[i][1];
+    v_full_name := demo_users[i][2];
 
     -- Create the auth.users row only if missing - we never overwrite
     -- an id that already has FK references hanging off it (profiles,
     -- completions, reflections, etc).
-    select id into user_id from auth.users where lower(email) = lower(demo_users[i][1]);
+    select u.id
+      into v_user_id
+      from auth.users u
+     where lower(u.email) = lower(v_email);
 
-    if user_id is null then
-      user_id := gen_random_uuid();
+    if v_user_id is null then
+      v_user_id := gen_random_uuid();
       insert into auth.users (
         id,
         instance_id,
@@ -58,15 +66,15 @@ begin
         email_change_token_new,
         email_change
       ) values (
-        user_id,
+        v_user_id,
         '00000000-0000-0000-0000-000000000000',
         'authenticated',
         'authenticated',
-        email,
+        v_email,
         password_hash,
         now(),
         jsonb_build_object('provider', 'email', 'providers', array['email']),
-        jsonb_build_object('full_name', full_name),
+        jsonb_build_object('full_name', v_full_name),
         now(),
         now(),
         '',
@@ -77,11 +85,11 @@ begin
     else
       -- Existing user - just refresh the password hash and confirm
       -- the email so login always works after a re-run.
-      update auth.users
+      update auth.users u
          set encrypted_password = password_hash,
-             email_confirmed_at = coalesce(email_confirmed_at, now()),
+             email_confirmed_at = coalesce(u.email_confirmed_at, now()),
              updated_at         = now()
-       where id = user_id;
+       where u.id = v_user_id;
     end if;
 
     -- Mirror auth identity (some Supabase versions require an
@@ -97,10 +105,10 @@ begin
       updated_at
     ) values (
       gen_random_uuid(),
-      user_id,
-      user_id::text,
+      v_user_id,
+      v_user_id::text,
       'email',
-      jsonb_build_object('sub', user_id::text, 'email', email),
+      jsonb_build_object('sub', v_user_id::text, 'email', v_email),
       now(),
       now(),
       now()
@@ -112,9 +120,9 @@ begin
 
     -- Profile row: a trigger usually auto-inserts on auth.users
     -- creation, but we upsert the role + cohort + name explicitly
-    -- so the dashboard knows this is a fellow in Lincoln High.
+    -- so the dashboard knows this is a fellow in cohort 'A'.
     insert into public.profiles (id, email, full_name, role, cohort)
-    values (user_id, email, full_name, 'fellow', cohort_lincoln)
+    values (v_user_id, v_email, v_full_name, 'fellow', cohort_label)
     on conflict (id) do update
       set email     = excluded.email,
           full_name = excluded.full_name,
