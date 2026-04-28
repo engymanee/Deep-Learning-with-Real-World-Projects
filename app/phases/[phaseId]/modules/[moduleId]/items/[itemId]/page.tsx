@@ -157,13 +157,18 @@ export default async function ContentItemPage({
           </div>
         )}
 
-        {/* External resource CTA */}
+        {/* External resource CTA. Live sessions get specialised copy
+            so the join button is unambiguous to fellows. */}
         {hasUrl && (
           <div className="rounded-lg border border-border bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">
-                  {hasBody ? 'Linked resource' : 'Open this resource'}
+                  {item.resource_type === 'live_session'
+                    ? 'Live session link'
+                    : hasBody
+                      ? 'Linked resource'
+                      : 'Open this resource'}
                 </p>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   {item.url}
@@ -176,7 +181,7 @@ export default async function ContentItemPage({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5"
                 >
-                  Open
+                  {item.resource_type === 'live_session' ? 'Join now' : 'Open'}
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
               </Button>

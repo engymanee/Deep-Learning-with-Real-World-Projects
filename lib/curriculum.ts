@@ -102,6 +102,9 @@ export const RESOURCE_TYPES = [
   { value: 'protocol', label: 'Protocol' },
   { value: 'companion_guide', label: 'Companion guide' },
   { value: 'assignment', label: 'Assignment' },
+  // Live session always carries a join URL (Zoom, Meet, etc.). The
+  // form/validator below treat its `url` field as required.
+  { value: 'live_session', label: 'Live session' },
   { value: 'other', label: 'Other' },
 ] as const
 

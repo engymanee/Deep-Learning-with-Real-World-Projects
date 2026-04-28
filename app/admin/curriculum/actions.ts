@@ -354,6 +354,11 @@ function readContentInputs(formData: FormData): ContentInputs | string {
   if (url && !/^https?:\/\//i.test(url)) {
     return 'URL must start with http:// or https://'
   }
+  // Live sessions need somewhere to join - require the URL up-front so
+  // fellows never land on a session page with nothing actionable.
+  if (resourceType === 'live_session' && !url) {
+    return 'Add a join link (Zoom, Google Meet, etc.) for live sessions'
+  }
 
   let durationMinutes: number | null = null
   if (durationRaw !== null) {

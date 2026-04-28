@@ -201,18 +201,31 @@ export function ContentItemForm({
 
       <div className="grid gap-4 md:grid-cols-[1fr_140px]">
         <div className="space-y-2">
-          <Label htmlFor={urlId}>Link / URL (optional)</Label>
+          <Label htmlFor={urlId}>
+            {resourceType === 'live_session'
+              ? 'Join link (required)'
+              : 'Link / URL (optional)'}
+          </Label>
           <Input
             id={urlId}
             name="url"
             type="url"
             inputMode="url"
+            // The server still does the authoritative check, but
+            // surfacing required-ness in the UI gives admins instant
+            // feedback for live sessions.
+            required={resourceType === 'live_session'}
             defaultValue={initial?.url ?? ''}
-            placeholder="https://..."
+            placeholder={
+              resourceType === 'live_session'
+                ? 'https://zoom.us/j/... or https://meet.google.com/...'
+                : 'https://...'
+            }
           />
           <p className="text-xs text-muted-foreground">
-            Use for videos, slide decks, PDFs, surveys, or any link-based
-            resource.
+            {resourceType === 'live_session'
+              ? 'Paste the Zoom, Google Meet, or other meeting URL fellows will use to join.'
+              : 'Use for videos, slide decks, PDFs, surveys, or any link-based resource.'}
           </p>
         </div>
 
