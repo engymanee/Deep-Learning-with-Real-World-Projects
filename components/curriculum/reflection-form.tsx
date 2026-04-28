@@ -6,7 +6,10 @@ import { Check, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { submitReflection } from '@/app/(curriculum)/phases/actions'
+import {
+  deleteReflection,
+  submitReflection,
+} from '@/app/(curriculum)/phases/actions'
 import { MIN_REFLECTION_WORDS, countWords } from '@/lib/reflections'
 
 interface Props {
@@ -46,6 +49,28 @@ export function ReflectionForm({
   // disabled state. Server enforces the same rule on save.
   const wordCount = countWords(response)
   const meetsMinimum = wordCount >= MIN_REFLECTION_WORDS
+
+  // When the fellow blurs the textarea while it's empty AND a
+  // reflection had been saved before, wipe the saved row from the
+  // database. Clearing the box has to "count" - we want them to
+  // re-write the reflection from scratch and the completion gate
+  // to re-engage. Server-side the same call also drops any
+  // dependent completion row.
+  function handleBlur() {
+    if (!savedResponse) return
+    if (response.trim().length > 0) return
+    setError(null)
+    startTransition(async () => {
+      const res = await deleteReflection(contentId)
+      if (!res.ok) {
+        setError(res.message)
+        return
+      }
+      setSavedResponse(null)
+      setEditing(true)
+      router.refresh()
+    })
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -124,6 +149,7 @@ export function ReflectionForm({
             rows={6}
             value={response}
             onChange={(e) => setResponse(e.target.value)}
+            onBlur={handleBlur}
             placeholder={`Write at least ${MIN_REFLECTION_WORDS} words in response to the prompt above.`}
             disabled={pending}
           />

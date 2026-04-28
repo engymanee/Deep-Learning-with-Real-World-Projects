@@ -299,3 +299,55 @@ export async function submitReflection(
     }
   }
 }
+
+/**
+ * Wipe the current user's reflection for a content item AND any
+ * completion row that depended on it. Triggered when the fellow
+ * clears the reflection textbox - they have to re-submit a fresh
+ * reflection (>= MIN_REFLECTION_WORDS) before the lesson can be
+ * marked complete again.
+ *
+ * Idempotent: deleting a row that doesn't exist is a no-op.
+ */
+export async function deleteReflection(
+  contentId: string,
+): Promise<ReflectionResult> {
+  try {
+    const user = await requireUser()
+    const supabase = await createClient()
+    if (!contentId) return { ok: false, message: 'Missing content id' }
+
+    const visible = await loadVisibleItem(supabase, contentId, user)
+    if (!visible.ok) return { ok: false, message: visible.message }
+    const { item } = visible
+
+    const { error: refErr } = await supabase
+      .from('user_content_reflections')
+      .delete()
+      .eq('profile_id', user.id)
+      .eq('content_id', contentId)
+    if (refErr) return { ok: false, message: refErr.message }
+
+    // A completion that was only valid because of the reflection
+    // shouldn't outlive it - drop it too so the gate re-engages.
+    if (item.reflection_enabled) {
+      const { error: compErr } = await supabase
+        .from('user_content_completions')
+        .delete()
+        .eq('profile_id', user.id)
+        .eq('content_id', contentId)
+      if (compErr) return { ok: false, message: compErr.message }
+    }
+
+    revalidatePath('/dashboard')
+    revalidatePath(
+      `/phases/${item.year_id}/modules/${item.module_id}/items/${contentId}`,
+    )
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Unknown error',
+    }
+  }
+}
