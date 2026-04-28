@@ -83,7 +83,10 @@ export function LessonFooter({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Buttons sit next to each other, end-aligned, so the
+          "Mark as complete -> Continue" pairing reads as a single
+          CTA cluster at the bottom of the lesson. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
           type="button"
           variant={optimistic ? 'outline' : 'default'}
