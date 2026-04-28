@@ -2,29 +2,27 @@ import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/proxy'
 
 /**
- * Next.js 16 proxy (the successor to middleware.ts). Runs on every
- * request matched by `config.matcher` and refreshes the Supabase session
- * cookies at the edge so that downstream Server Components don't have
- * to round-trip to Supabase Auth every render. This is the single
- * biggest perf lever for protected-page navigation latency.
+ * Next.js 16 root proxy. This is the modern replacement for
+ * `middleware.ts` and runs on every request matched by `config.matcher`.
  *
- * It also enforces auth on protected paths so we don't depend solely
- * on `requireUser()` redirects inside each page (those still run as a
- * second line of defense).
+ * Responsibility: refresh the Supabase auth-session cookies at the edge
+ * so downstream Server Components don't have to round-trip to Supabase
+ * Auth on every render. That's the single biggest lever for shaving
+ * click-to-content latency on protected pages.
+ *
+ * Auth enforcement still also happens inside `requireUser()` per page
+ * as a second line of defense - the proxy is for performance, not
+ * primary authorization.
  */
-export async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest): Promise<Response> {
   return await updateSession(request)
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon and common image extensions
-     * - any file with a "." (static asset hint)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    // Run on every request except static assets and the Next.js
+    // internal files. Anything with a literal "." is treated as a
+    // static asset hint and skipped.
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
   ],
 }
