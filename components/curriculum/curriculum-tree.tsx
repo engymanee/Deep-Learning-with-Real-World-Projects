@@ -319,7 +319,9 @@ function ModuleBody({
     <div id={`module-${moduleId}`} className="flex flex-col gap-3 pb-2 pt-1">
       {labGroups.map((group) => (
         <div key={group.category} className="flex flex-col">
-          <p className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {/* Use the rose accent (`#bb4658`) so the lab phases pop
+              against the otherwise navy/neutral tree. */}
+          <p className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
             {getCategory(group.category).label}
           </p>
           <ul className="flex flex-col">

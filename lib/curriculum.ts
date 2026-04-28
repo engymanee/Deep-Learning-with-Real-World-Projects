@@ -37,19 +37,19 @@ import { fellowCanAccess, type Cohort } from '@/lib/cohorts'
 export const CONTENT_CATEGORIES = [
   {
     value: 'before_lab',
-    label: 'Before Lab',
+    label: 'Before the Lab',
     short: 'Before',
     description: 'Preparation - readings, reflections, and context to do before the live session.',
   },
   {
     value: 'during_lab',
-    label: 'During Lab',
+    label: 'During the Lab',
     short: 'During',
     description: 'Materials used live in session: agenda, protocols, slides, join links.',
   },
   {
     value: 'after_lab',
-    label: 'After Lab',
+    label: 'After the Lab',
     short: 'After',
     description: 'Integration and follow-through: reflection prompts, surveys, follow-up practice.',
   },
