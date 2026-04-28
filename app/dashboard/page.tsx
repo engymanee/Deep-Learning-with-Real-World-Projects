@@ -57,8 +57,8 @@ export default async function DashboardPage() {
           <ResumeCard resume={data.resume} />
         ) : (
           <StartYearCard
-            yearTitle={data.years[0]?.title ?? 'your first lab'}
-            startLabId={data.startLabId}
+            yearTitle={data.years[0]?.title ?? 'your first phase'}
+            startPhaseId={data.startPhaseId}
           />
         )}
 

@@ -10,17 +10,14 @@ import { cn } from '@/lib/utils'
 interface AppShellProps {
   children: React.ReactNode
   showSidebar?: boolean
-  /** ID of the currently-viewed year, used to expand the sidebar section. */
+  /** ID of the currently-viewed phase, used to highlight the sidebar row. */
   currentYearId?: string
-  /** ID of the currently-viewed lab, used to highlight the sidebar link. */
-  currentLabId?: string
 }
 
 export function AppShell({
   children,
   showSidebar = false,
   currentYearId,
-  currentLabId,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -53,7 +50,6 @@ export function AppShell({
               isOpen={sidebarOpen}
               onClose={() => setSidebarOpen(false)}
               currentYearId={currentYearId}
-              currentLabId={currentLabId}
             />
           </>
         )}

@@ -26,11 +26,13 @@ export interface DashboardPosition {
 }
 
 export interface DashboardResume {
-  labId: string
-  labTitle: string
-  yearTitle: string
-  progress: number // 0-100
-  estimatedMinutesRemaining: number
+  /** Phase the fellow should land in to keep going. */
+  phaseId: string
+  phaseTitle: string
+  /** Title of the next incomplete content item inside that phase. */
+  nextItemTitle: string
+  /** 0-100, derived from items completed in the phase. */
+  progress: number
 }
 
 export interface DashboardSessionFacilitator {
@@ -74,10 +76,10 @@ export interface DashboardData {
   user: CurrentUser
   position: DashboardPosition
   isNewLearner: boolean
-  /** Populated when there's an in-progress / resumable lab. */
+  /** Populated when there's an in-progress / resumable phase. */
   resume: DashboardResume | null
-  /** First lab of the first unlocked year, for "Get Started". */
-  startLabId: string | null
+  /** First unlocked phase, for the brand-new-learner "Get Started" CTA. */
+  startPhaseId: string | null
   years: DashboardYear[]
   upcomingSession: DashboardSession | null
   team: DashboardTeam | null
@@ -200,10 +202,13 @@ export async function getDashboardData(): Promise<DashboardData> {
   const currentYear = years.find((y) => !y.isLocked && y.progress < 100)
   const completedAllYears = !currentYear && years.every((y) => y.progress >= 100)
 
-  // Within currentYear, find the current lab: first incomplete lab by order.
+  // Within currentYear, find the next incomplete content item by
+  // order. We don't navigate to it directly anymore (items live inline
+  // inside the phase view) but we still need its index/title to drive
+  // the dashboard's position + resume copy.
   let currentLabEntry: { lab: (typeof allLabs)[number]; index: number } | null =
     null
-  let startLabId: string | null = null
+  let startPhaseId: string | null = null
   if (currentYear) {
     const labsInYear = labsByYear.get(currentYear.id) ?? []
     for (let i = 0; i < labsInYear.length; i++) {
@@ -215,8 +220,10 @@ export async function getDashboardData(): Promise<DashboardData> {
         break
       }
     }
-    // For the "Start" CTA on a brand-new learner, point at the first lab.
-    startLabId = labsInYear[0]?.id ?? null
+    // The "Get Started" CTA always drops the fellow into the current
+    // phase itself; from there they can pick whichever item they
+    // want to start with.
+    startPhaseId = currentYear.id
   }
 
   const position: DashboardPosition = (() => {
@@ -233,34 +240,20 @@ export async function getDashboardData(): Promise<DashboardData> {
     }
   })()
 
-  // Resume card: only shown when there's an in-progress lab with progress > 0.
+  // Resume card: shown whenever the fellow has *any* completed item in
+  // the current phase. It deep-links them back to the phase view (no
+  // per-item detail page exists in the new content model) and labels
+  // the CTA with the next incomplete item's title so they know what
+  // they'll pick up.
   let resume: DashboardResume | null = null
   if (currentYear && currentLabEntry) {
-    const lab = currentLabEntry.lab
-    const lp = labProgressByLab.get(lab.id)
-    const progress = lp?.progress ?? 0
-    if (progress > 0) {
-      // Estimate remaining minutes from incomplete blocks.
-      const [{ data: blockRows }, { data: completedRows }] = await Promise.all([
-        supabase
-          .from('lab_content_blocks')
-          .select('id, duration_minutes')
-          .eq('lab_id', lab.id),
-        supabase
-          .from('user_block_completions')
-          .select('block_id')
-          .eq('profile_id', user.id),
-      ])
-      const completedIds = new Set((completedRows ?? []).map((r) => r.block_id))
-      const remainingMinutes = (blockRows ?? [])
-        .filter((b) => !completedIds.has(b.id))
-        .reduce((sum, b) => sum + (b.duration_minutes ?? 0), 0)
+    const phaseProgress = currentYear.progress
+    if (phaseProgress > 0 && phaseProgress < 100) {
       resume = {
-        labId: lab.id,
-        labTitle: lab.title,
-        yearTitle: currentYear.title,
-        progress,
-        estimatedMinutesRemaining: remainingMinutes,
+        phaseId: currentYear.id,
+        phaseTitle: currentYear.title,
+        nextItemTitle: currentLabEntry.lab.title,
+        progress: phaseProgress,
       }
     }
   }
@@ -409,7 +402,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     position,
     isNewLearner,
     resume,
-    startLabId,
+    startPhaseId,
     years,
     upcomingSession,
     team,
