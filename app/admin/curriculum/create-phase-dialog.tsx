@@ -66,7 +66,7 @@ export function CreatePhaseDialog() {
               name="title"
               required
               autoFocus
-              placeholder="e.g. Year 1 - Foundations"
+              placeholder="e.g. Year One: Deep Learning"
             />
           </div>
 
