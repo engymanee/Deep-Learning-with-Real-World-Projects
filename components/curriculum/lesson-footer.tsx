@@ -58,11 +58,13 @@ export function LessonFooter({
   }
 
   const blocked = !optimistic && (needsLinkClick || needsReflection)
+  // The link gate is enforced silently - the button is just disabled
+  // until the fellow opens the resource, with no inline hint. The
+  // reflection gate still surfaces a hint because the textarea sits
+  // right above the footer and a nudge there is helpful.
   const blockMessage = needsReflection
     ? 'Submit your reflection above before you can mark this complete.'
-    : needsLinkClick
-      ? 'Open the linked resource above before you can mark this complete.'
-      : null
+    : null
 
   function handleMarkComplete() {
     setError(null)
