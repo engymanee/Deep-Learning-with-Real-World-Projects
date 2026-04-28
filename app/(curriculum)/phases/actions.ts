@@ -8,6 +8,11 @@ import {
   canFellowSeeModule,
   canFellowSeePhase,
 } from '@/lib/curriculum'
+import {
+  MIN_REFLECTION_WORDS,
+  countWords,
+  reflectionMeetsMinimum,
+} from '@/lib/reflections'
 
 // ----------------------------------------------------------------------------
 // Visibility helper
@@ -117,18 +122,26 @@ export async function toggleContentCompletion(
           }
         }
       }
-      // Gate 2: reflection submitted (if required).
+      // Gate 2: reflection submitted AND long enough (if required).
+      // Mirrors the client-side disable on the combined CTA so a
+      // motivated tab-clicker can't bypass the word-count rule.
       if (item.reflection_enabled) {
         const { data: reflectionRow } = await supabase
           .from('user_content_reflections')
-          .select('content_id')
+          .select('response')
           .eq('profile_id', user.id)
           .eq('content_id', contentId)
-          .maybeSingle<{ content_id: string }>()
+          .maybeSingle<{ response: string }>()
         if (!reflectionRow) {
           return {
             ok: false,
             message: 'Submit your reflection before marking complete.',
+          }
+        }
+        if (!reflectionMeetsMinimum(reflectionRow.response)) {
+          return {
+            ok: false,
+            message: `Your reflection needs at least ${MIN_REFLECTION_WORDS} words before you can mark this complete.`,
           }
         }
       }
@@ -241,6 +254,13 @@ export async function submitReflection(
       return {
         ok: false,
         message: `Reflection is too long (max ${MAX_REFLECTION_LENGTH} characters)`,
+      }
+    }
+    const words = countWords(trimmed)
+    if (words < MIN_REFLECTION_WORDS) {
+      return {
+        ok: false,
+        message: `Reflection needs at least ${MIN_REFLECTION_WORDS} words (you have ${words}).`,
       }
     }
 

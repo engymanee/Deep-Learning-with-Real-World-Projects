@@ -16,6 +16,7 @@ import {
   findAdjacentItems,
   loadFullCurriculum,
 } from '@/lib/curriculum-tree'
+import { reflectionMeetsMinimum } from '@/lib/reflections'
 
 export const dynamic = 'force-dynamic'
 
@@ -154,11 +155,15 @@ export default async function ContentItemPage({
 
   const { next } = findAdjacentItems(curriculum, item.id)
 
-  // Gate states: only block the FIRST completion - once an item is
-  // already complete the fellow can freely uncheck without having to
-  // re-open the link or re-submit the reflection.
+  // Gate states. Only block the FIRST completion - once an item is
+  // already complete the fellow can freely uncheck/redo. Reflection
+  // gate uses the shared 50-word rule so client-side disabled state
+  // matches server-side validation.
   const needsLinkClick = !isCompleted && hasUrl && !linkClicked
-  const needsReflection = !isCompleted && reflectionRequired && !reflectionResponse
+  const needsReflection =
+    !isCompleted &&
+    reflectionRequired &&
+    !reflectionMeetsMinimum(reflectionResponse)
 
   return (
     <article className="mx-auto max-w-2xl space-y-8">

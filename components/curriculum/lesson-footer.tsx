@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { toggleContentCompletion } from '@/app/(curriculum)/phases/actions'
 
 interface Props {
@@ -12,19 +11,32 @@ interface Props {
   isCompleted: boolean
   /** Server-rendered: link present but user hasn't opened it yet. */
   needsLinkClick: boolean
-  /** Server-rendered: reflection required but not yet submitted. */
+  /**
+   * Server-rendered: reflection required AND not yet submitted at
+   * the minimum word count. Mirrors the rule the server action
+   * enforces on toggle.
+   */
   needsReflection: boolean
   /** Next item href, or null when this is the last item. */
   nextHref: string | null
 }
 
 /**
- * Sticky-ish footer that pairs a "Mark as complete" toggle with a
- * "Continue" CTA pointing at the next visible content item.
+ * Single combined CTA at the bottom of every lesson.
  *
- * The mark-complete button is gated by the same prereqs the server
- * action enforces (link click, reflection submit), and shows an
- * inline hint when blocked so the fellow knows what's missing.
+ *  - Not yet completed + has next      -> "Mark as complete and continue"
+ *    Toggles completion on the server, then routes to the next item.
+ *  - Not yet completed + no next       -> "Mark as complete"
+ *    Toggle only; nothing to navigate to.
+ *  - Already completed + has next      -> "Continue"
+ *    Pure navigation; no server call.
+ *  - Already completed + no next       -> A small "Completed" badge.
+ *    The fellow has finished the curriculum; nothing to continue to.
+ *
+ * The button is disabled (with an inline hint) until the per-item
+ * gates pass: the fellow has opened the link (when there is one) and
+ * submitted a reflection meeting the minimum word count (when
+ * required).
  */
 export function LessonFooter({
   contentId,
@@ -38,39 +50,68 @@ export function LessonFooter({
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  // Sync server state on refresh. Only flip back from optimistic
-  // when there isn't a pending request in flight.
+  // Sync server state when the page revalidates, but never clobber
+  // an in-flight optimistic update.
   if (!pending && optimistic !== isCompleted) {
     setOptimistic(isCompleted)
   }
 
-  // The gate only blocks completing - unchecking is always allowed.
   const blocked = !optimistic && (needsLinkClick || needsReflection)
   const blockMessage = needsReflection
-    ? 'Submit your reflection above before marking complete.'
+    ? 'Submit your reflection above before you can mark this complete.'
     : needsLinkClick
-      ? 'Open the linked resource above before marking complete.'
+      ? 'Open the linked resource above before you can mark this complete.'
       : null
 
-  function handleToggle() {
+  function handleClick() {
     setError(null)
-    const next = !optimistic
-    setOptimistic(next)
+
+    // Already completed: this is a pure "Continue" navigation.
+    if (optimistic) {
+      if (nextHref) router.push(nextHref)
+      return
+    }
+
+    // Not completed yet: toggle to complete, then continue if we
+    // have somewhere to go.
+    setOptimistic(true)
     startTransition(async () => {
-      const res = await toggleContentCompletion(contentId, next)
+      const res = await toggleContentCompletion(contentId, true)
       if (!res.ok) {
-        setOptimistic(!next)
+        setOptimistic(false)
         setError(res.message)
         return
       }
-      router.refresh()
+      if (nextHref) {
+        router.push(nextHref)
+      } else {
+        router.refresh()
+      }
     })
   }
 
+  // Terminal state: completed and nothing to continue to.
+  if (optimistic && !nextHref) {
+    return (
+      <div className="flex flex-col gap-3 border-t border-border pt-6">
+        <div className="flex justify-end">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1.5 text-sm font-medium text-success">
+            <Check className="h-4 w-4" aria-hidden="true" />
+            Completed
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  const label = optimistic
+    ? 'Continue'
+    : nextHref
+      ? 'Mark as complete and continue'
+      : 'Mark as complete'
+
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-6">
-      {/* Inline gate hint. Stays present so the fellow always knows
-          what's blocking them, not just on a click. */}
       {blocked && blockMessage && (
         <p className="text-sm text-muted-foreground" role="status">
           {blockMessage}
@@ -83,50 +124,16 @@ export function LessonFooter({
         </p>
       )}
 
-      {/* Buttons sit next to each other, end-aligned, so the
-          "Mark as complete -> Continue" pairing reads as a single
-          CTA cluster at the bottom of the lesson. */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex justify-end">
         <Button
           type="button"
-          variant={optimistic ? 'outline' : 'default'}
-          onClick={handleToggle}
+          onClick={handleClick}
           disabled={pending || blocked}
-          aria-pressed={optimistic}
           className="inline-flex items-center gap-1.5"
         >
-          {optimistic ? (
-            <>
-              <Check className="h-4 w-4" aria-hidden="true" />
-              Completed
-            </>
-          ) : (
-            'Mark as complete'
-          )}
-        </Button>
-
-        {/* Continue is always available when there's a next item -
-            fellows can revisit a lesson without being forced to
-            mark complete. Greys out on the last item. */}
-        <Button
-          asChild={!!nextHref}
-          variant={optimistic ? 'default' : 'outline'}
-          disabled={!nextHref}
-          className={cn(
-            'inline-flex items-center gap-1.5',
-            !nextHref && 'pointer-events-none opacity-60',
-          )}
-        >
-          {nextHref ? (
-            <a href={nextHref}>
-              Continue
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </a>
-          ) : (
-            <span>
-              Continue
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </span>
+          {label}
+          {nextHref && (
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           )}
         </Button>
       </div>

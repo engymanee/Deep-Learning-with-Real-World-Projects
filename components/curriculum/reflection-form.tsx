@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { submitReflection } from '@/app/(curriculum)/phases/actions'
+import { MIN_REFLECTION_WORDS, countWords } from '@/lib/reflections'
 
 interface Props {
   contentId: string
@@ -41,12 +42,23 @@ export function ReflectionForm({
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
+  // Live word count drives both the helper text and the Submit
+  // disabled state. Server enforces the same rule on save.
+  const wordCount = countWords(response)
+  const meetsMinimum = wordCount >= MIN_REFLECTION_WORDS
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
     const value = response.trim()
     if (!value) {
       setError('Please write a short response before saving.')
+      return
+    }
+    if (!meetsMinimum) {
+      setError(
+        `Reflection needs at least ${MIN_REFLECTION_WORDS} words (you have ${wordCount}).`,
+      )
       return
     }
     startTransition(async () => {
@@ -109,12 +121,26 @@ export function ReflectionForm({
           </Label>
           <Textarea
             id={inputId}
-            rows={5}
+            rows={6}
             value={response}
             onChange={(e) => setResponse(e.target.value)}
-            placeholder="Write a short response to the prompt above."
+            placeholder={`Write at least ${MIN_REFLECTION_WORDS} words in response to the prompt above.`}
             disabled={pending}
           />
+          {/* Counter + helper text. Switches to a quiet success
+              tone once the fellow has cleared the bar. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span
+              className={
+                meetsMinimum ? 'text-success' : 'text-muted-foreground'
+              }
+              aria-live="polite"
+            >
+              {meetsMinimum
+                ? `${wordCount} words - ready to submit`
+                : `${wordCount} / ${MIN_REFLECTION_WORDS} words minimum`}
+            </span>
+          </div>
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}
@@ -135,7 +161,7 @@ export function ReflectionForm({
                 Cancel
               </Button>
             )}
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || !meetsMinimum}>
               {pending ? 'Saving...' : savedResponse ? 'Save changes' : 'Submit reflection'}
             </Button>
           </div>
