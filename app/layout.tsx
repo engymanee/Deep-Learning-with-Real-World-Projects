@@ -49,7 +49,14 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className="bg-background">
+      {/* `suppressHydrationWarning` here is scoped to <body> only -
+          it silences the false-positive caused by browser extensions
+          (Grammarly, LastPass, etc.) that inject `data-gr-*` /
+          `data-lastpass-*` attributes after the server HTML is
+          delivered. Real hydration mismatches anywhere else in the
+          tree still surface as warnings. */}
       <body
+        suppressHydrationWarning
         className={`${_sans.variable} ${_serif.variable} font-sans antialiased`}
       >
         <UserProvider initialUser={user}>
