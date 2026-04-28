@@ -99,26 +99,52 @@ export function ContentItemForm({
 
   return (
     <form action={onSubmit} className="flex flex-col gap-5">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Category</Label>
-          <Select
-            value={category}
-            onValueChange={(v) => setCategory(v as ContentCategory)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CONTENT_CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* Category is only chooseable on create. On edit, the previously
+          assigned category is preserved silently and never surfaced -
+          per the policy that category UI lives only inside the create
+          dialog. The value still flows back to the server via the
+          formData.set('category', ...) call below. */}
+      {!isEdit ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Select
+              value={category}
+              onValueChange={(v) => setCategory(v as ContentCategory)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CONTENT_CATEGORIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
+          <div className="space-y-2">
+            <Label>Resource type</Label>
+            <Select
+              value={resourceType}
+              onValueChange={(v) => setResourceType(v as ResourceType)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RESOURCE_TYPES.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      ) : (
         <div className="space-y-2">
           <Label>Resource type</Label>
           <Select
@@ -137,7 +163,7 @@ export function ContentItemForm({
             </SelectContent>
           </Select>
         </div>
-      </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor={titleId}>Title</Label>

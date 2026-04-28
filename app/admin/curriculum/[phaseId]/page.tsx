@@ -3,13 +3,9 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
-import {
-  CONTENT_CATEGORIES,
-  type ContentCategory,
-  type ResourceType,
-} from '@/lib/curriculum'
+import type { ContentCategory, ResourceType } from '@/lib/curriculum'
 import { PhaseDetailsForm } from './phase-details-form'
-import { CategorySection } from './category-section'
+import { ContentList } from './content-list'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,12 +56,6 @@ export default async function AdminPhaseDetailPage({
 
   if (!phase) notFound()
 
-  const itemsByCategory = new Map<ContentCategory, ContentRow[]>()
-  for (const cat of CONTENT_CATEGORIES) itemsByCategory.set(cat.value, [])
-  for (const item of items ?? []) {
-    if (item.category) itemsByCategory.get(item.category)?.push(item)
-  }
-
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -87,29 +77,11 @@ export default async function AdminPhaseDetailPage({
         }}
       />
 
-      <section className="flex flex-col gap-8">
-        <div>
-          <h2 className="font-serif text-xl text-foreground">Content</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Add content under any of the categories below. Each piece of
-            content has a resource type (reading, video, slide deck, etc.)
-            and either a body or a URL. By default, content inherits cohort
-            access from the phase - you can override per item if needed.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-8">
-          {CONTENT_CATEGORIES.map((cat) => (
-            <CategorySection
-              key={cat.value}
-              category={cat.value}
-              phaseId={phase.id}
-              phaseCohorts={phase.cohorts ?? []}
-              items={itemsByCategory.get(cat.value) ?? []}
-            />
-          ))}
-        </div>
-      </section>
+      <ContentList
+        phaseId={phase.id}
+        phaseCohorts={phase.cohorts ?? []}
+        items={items ?? []}
+      />
     </div>
   )
 }

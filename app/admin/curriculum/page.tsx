@@ -3,7 +3,6 @@ import { ArrowRight, Layers } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 import { CohortBadge } from '@/components/admin/cohort-access-field'
-import { CONTENT_CATEGORIES, type ContentCategory } from '@/lib/curriculum'
 import { CreatePhaseDialog } from './create-phase-dialog'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +17,6 @@ type PhaseRow = {
 
 type ContentCountRow = {
   year_id: string
-  category: ContentCategory | null
 }
 
 export default async function AdminCurriculumPage() {
@@ -33,21 +31,17 @@ export default async function AdminCurriculumPage() {
       .returns<PhaseRow[]>(),
     supabase
       .from('labs')
-      .select('year_id, category')
+      .select('year_id')
       .returns<ContentCountRow[]>(),
   ])
 
-  // Tally content count per phase + breakdown per category.
+  // Tally content count per phase. Categories deliberately aren't
+  // surfaced anywhere outside the create dialog, so we don't compute a
+  // per-category breakdown here.
   const totals = new Map<string, number>()
-  const byCategory = new Map<string, Map<ContentCategory, number>>()
   for (const row of contents ?? []) {
     if (!row.year_id) continue
     totals.set(row.year_id, (totals.get(row.year_id) ?? 0) + 1)
-    if (row.category) {
-      const inner = byCategory.get(row.year_id) ?? new Map<ContentCategory, number>()
-      inner.set(row.category, (inner.get(row.category) ?? 0) + 1)
-      byCategory.set(row.year_id, inner)
-    }
   }
 
   const phaseList = phases ?? []
@@ -58,9 +52,9 @@ export default async function AdminCurriculumPage() {
         <div className="flex flex-col gap-1">
           <h2 className="font-serif text-xl text-foreground">Phases</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            A phase is a top-level grouping of content (e.g. &ldquo;Year 1 -
-            Foundations&rdquo;). Create phases here, then click into one to add
-            content items grouped by category.
+            A phase is a top-level grouping of content (e.g. &ldquo;Year One:
+            Deep Learning&rdquo;). Create phases here, then click into one to
+            add content.
           </p>
         </div>
         <CreatePhaseDialog />
@@ -82,7 +76,6 @@ export default async function AdminCurriculumPage() {
         <ol className="flex flex-col gap-3">
           {phaseList.map((phase, idx) => {
             const count = totals.get(phase.id) ?? 0
-            const cats = byCategory.get(phase.id) ?? new Map()
             return (
               <li key={phase.id}>
                 <Link
@@ -117,20 +110,6 @@ export default async function AdminCurriculumPage() {
                     </div>
                   </div>
 
-                  {count > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-                      {CONTENT_CATEGORIES.map((c) => {
-                        const n = cats.get(c.value) ?? 0
-                        if (n === 0) return null
-                        return (
-                          <span key={c.value} className="inline-flex items-center gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-foreground/40" />
-                            {c.short}: {n}
-                          </span>
-                        )
-                      })}
-                    </div>
-                  )}
                 </Link>
               </li>
             )

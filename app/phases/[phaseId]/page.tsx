@@ -5,10 +5,8 @@ import { AppShell } from '@/components/app-shell'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
-  CONTENT_CATEGORIES,
   canFellowSeeContent,
   canFellowSeePhase,
-  getCategory,
   getResourceType,
   type ContentCategory,
   type ResourceType,
@@ -67,17 +65,15 @@ export default async function PhasePage({
   const userCohort = user.cohort ?? null
   if (isFellow && !canFellowSeePhase(phase.cohorts, userCohort)) notFound()
 
-  // Filter items by visibility, then group by category.
+  // Filter items by visibility - they still need a category in the
+  // database (it's a non-nullable column for new rows) but we never
+  // surface that grouping to fellows; everything renders as one list
+  // in display order.
   const visibleItems = (items ?? []).filter((item) => {
     if (!item.category) return false
     if (!isFellow) return true
     return canFellowSeeContent(item.cohorts, phase.cohorts, userCohort)
   })
-  const itemsByCategory = new Map<ContentCategory, ContentRow[]>()
-  for (const cat of CONTENT_CATEGORIES) itemsByCategory.set(cat.value, [])
-  for (const item of visibleItems) {
-    if (item.category) itemsByCategory.get(item.category)!.push(item)
-  }
 
   const totalVisible = visibleItems.length
 
@@ -116,7 +112,7 @@ export default async function PhasePage({
           </p>
         </header>
 
-        {/* Categories */}
+        {/* Content */}
         {totalVisible === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-10 text-center">
             <p className="text-sm text-text-muted">
@@ -125,100 +121,55 @@ export default async function PhasePage({
             </p>
           </div>
         ) : (
-          <div className="space-y-12">
-            {CONTENT_CATEGORIES.map((cat) => {
-              const list = itemsByCategory.get(cat.value) ?? []
-              if (list.length === 0) return null
+          <ul className="flex flex-col gap-2">
+            {visibleItems.map((item) => {
+              const resource = item.resource_type
+                ? getResourceType(item.resource_type)
+                : null
               return (
-                <CategoryBlock
-                  key={cat.value}
-                  category={cat.value}
-                  phaseId={phase.id}
-                  items={list}
-                />
+                <li key={item.id}>
+                  <Link
+                    href={`/phases/${phase.id}/items/${item.id}`}
+                    className="group flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40"
+                  >
+                    <span
+                      className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-md bg-bg-muted text-primary"
+                      aria-hidden="true"
+                    >
+                      {item.url ? (
+                        <ExternalLink className="h-4 w-4" />
+                      ) : (
+                        <FileText className="h-4 w-4" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {resource && (
+                          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            {resource.label}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 font-medium leading-tight text-text">
+                        {item.title}
+                      </p>
+                      {item.description && (
+                        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-text-muted">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight
+                      className="mt-2 h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                    />
+                  </Link>
+                </li>
               )
             })}
-          </div>
+          </ul>
         )}
       </div>
     </AppShell>
-  )
-}
-
-function CategoryBlock({
-  category,
-  phaseId,
-  items,
-}: {
-  category: ContentCategory
-  phaseId: string
-  items: ContentRow[]
-}) {
-  const meta = getCategory(category)
-  return (
-    <section
-      aria-labelledby={`cat-${category}`}
-      className="space-y-4"
-    >
-      <div>
-        <h2
-          id={`cat-${category}`}
-          className="font-serif text-xl font-semibold text-text md:text-2xl"
-        >
-          {meta.label}
-        </h2>
-        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-text-muted">
-          {meta.description}
-        </p>
-      </div>
-
-      <ul className="flex flex-col gap-2">
-        {items.map((item) => {
-          const resource = item.resource_type
-            ? getResourceType(item.resource_type)
-            : null
-          return (
-            <li key={item.id}>
-              <Link
-                href={`/phases/${phaseId}/items/${item.id}`}
-                className="group flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40"
-              >
-                <span
-                  className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-md bg-bg-muted text-primary"
-                  aria-hidden="true"
-                >
-                  {item.url ? (
-                    <ExternalLink className="h-4 w-4" />
-                  ) : (
-                    <FileText className="h-4 w-4" />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {resource && (
-                      <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        {resource.label}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 font-medium leading-tight text-text">
-                    {item.title}
-                  </p>
-                  {item.description && (
-                    <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-text-muted">
-                      {item.description}
-                    </p>
-                  )}
-                </div>
-                <ChevronRight
-                  className="mt-2 h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
-                  aria-hidden="true"
-                />
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
   )
 }

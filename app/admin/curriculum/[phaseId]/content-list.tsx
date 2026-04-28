@@ -32,38 +32,37 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { CohortBadge } from '@/components/admin/cohort-access-field'
-import {
-  getCategory,
-  getResourceType,
-  type ContentCategory,
-} from '@/lib/curriculum'
+import { getResourceType } from '@/lib/curriculum'
 import type { ContentRow } from './page'
 import { ContentItemForm } from './content-item-form'
 import { deleteContent } from '../actions'
 
 interface Props {
-  category: ContentCategory
   phaseId: string
   phaseCohorts: string[]
   items: ContentRow[]
 }
 
-export function CategorySection({
-  category,
-  phaseId,
-  phaseCohorts,
-  items,
-}: Props) {
-  const meta = getCategory(category)
+/**
+ * Flat list of every content item in a phase.
+ *
+ * Per the simplified UX, categories are not surfaced anywhere outside
+ * the create dialog - so this list shows a single ordered stream of
+ * items with one "Add content" button at the top. The category field
+ * still exists on the row (admins pick it inside the create dialog),
+ * we just don't render section headers, badges, or filters around it.
+ */
+export function ContentList({ phaseId, phaseCohorts, items }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
 
   return (
     <section className="rounded-lg border border-border bg-card">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border p-5">
         <div>
-          <h3 className="font-serif text-lg text-foreground">{meta.label}</h3>
+          <h3 className="font-serif text-lg text-foreground">Content</h3>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            {meta.description}
+            Every piece of fellow-facing content in this phase, in display
+            order. Add as many items as needed.
           </p>
         </div>
 
@@ -76,16 +75,14 @@ export function CategorySection({
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add content to {meta.label}</DialogTitle>
+              <DialogTitle>Add content</DialogTitle>
               <DialogDescription>
-                Create a new content item in this category. You can change
-                category later if needed.
+                Create a new content item in this phase.
               </DialogDescription>
             </DialogHeader>
             <ContentItemForm
               phaseId={phaseId}
               phaseCohorts={phaseCohorts}
-              defaultCategory={category}
               onSaved={() => setCreateOpen(false)}
             />
           </DialogContent>
@@ -94,7 +91,8 @@ export function CategorySection({
 
       {items.length === 0 ? (
         <p className="px-5 py-6 text-sm text-muted-foreground">
-          No content in this category yet.
+          No content yet. Click &ldquo;Add content&rdquo; to create the first
+          item.
         </p>
       ) : (
         <ul className="divide-y divide-border">

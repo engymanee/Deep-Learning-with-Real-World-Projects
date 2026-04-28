@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { ArrowRight, BookOpen } from 'lucide-react'
-import { CONTENT_CATEGORIES } from '@/lib/curriculum'
 import type { DashboardPhase } from '@/lib/dashboard-data'
 
 interface Props {
@@ -81,20 +80,6 @@ export function CurriculumList({ phases }: Props) {
                 </div>
               </div>
 
-              {phase.contentCount > 0 && (
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-text-muted">
-                  {CONTENT_CATEGORIES.map((c) => {
-                    const n = phase.categoryCounts[c.value]
-                    if (!n) return null
-                    return (
-                      <span key={c.value} className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary/40" />
-                        {c.short}: {n}
-                      </span>
-                    )
-                  })}
-                </div>
-              )}
             </Link>
           </li>
         ))}

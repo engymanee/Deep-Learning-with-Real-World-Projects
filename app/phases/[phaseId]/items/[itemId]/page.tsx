@@ -8,7 +8,6 @@ import { requireUser } from '@/lib/auth-server'
 import {
   canFellowSeeContent,
   canFellowSeePhase,
-  getCategory,
   getResourceType,
   type ContentCategory,
   type ResourceType,
@@ -68,7 +67,6 @@ export default async function ContentItemPage({
     if (!canFellowSeeContent(item.cohorts, phase.cohorts, userCohort)) notFound()
   }
 
-  const category = item.category ? getCategory(item.category) : null
   const resource = item.resource_type ? getResourceType(item.resource_type) : null
   const hasBody = !!item.body && item.body.trim().length > 0
   const hasUrl = !!item.url
@@ -97,18 +95,13 @@ export default async function ContentItemPage({
 
         {/* Header */}
         <header className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {category && (
-              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                {category.label}
-              </span>
-            )}
-            {resource && (
+          {resource && (
+            <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                 {resource.label}
               </span>
-            )}
-          </div>
+            </div>
+          )}
           <h1 className="text-pretty font-serif text-3xl leading-tight text-text md:text-4xl">
             {item.title}
           </h1>

@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
-  CONTENT_CATEGORIES,
   canFellowSeeContent,
   canFellowSeePhase,
   type ContentCategory,
@@ -18,8 +17,6 @@ export interface DashboardPhase {
   title: string
   description: string | null
   contentCount: number
-  /** Per-category counts of content visible to this user. */
-  categoryCounts: Record<ContentCategory, number>
 }
 
 export interface DashboardSessionFacilitator {
@@ -63,12 +60,6 @@ function initialsFor(name: string | null | undefined): string {
   return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || '?'
 }
 
-function emptyCategoryCounts(): Record<ContentCategory, number> {
-  const out = {} as Record<ContentCategory, number>
-  for (const c of CONTENT_CATEGORIES) out[c.value] = 0
-  return out
-}
-
 // ============================================================================
 // Loader
 // ============================================================================
@@ -106,20 +97,17 @@ export async function getDashboardData(): Promise<DashboardData> {
     phaseCohortById.set(p.id, (p.cohorts as string[] | null) ?? null)
   }
 
-  // Group items by phase, applying per-fellow cohort visibility.
-  const itemsByPhase = new Map<string, Map<ContentCategory, number>>()
+  // Tally a per-phase content count, applying per-fellow cohort
+  // visibility. Categories aren't surfaced on the dashboard, so we
+  // keep this as a single number per phase.
+  const countsByPhase = new Map<string, number>()
   for (const item of itemRows ?? []) {
     if (!item.category) continue
     if (isFellow) {
       const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
       if (!canFellowSeeContent(item.cohorts, phaseCohorts, userCohort)) continue
     }
-    let inner = itemsByPhase.get(item.year_id)
-    if (!inner) {
-      inner = new Map<ContentCategory, number>()
-      itemsByPhase.set(item.year_id, inner)
-    }
-    inner.set(item.category, (inner.get(item.category) ?? 0) + 1)
+    countsByPhase.set(item.year_id, (countsByPhase.get(item.year_id) ?? 0) + 1)
   }
 
   // Build the phase list, hiding phases the fellow can't see at all.
@@ -128,20 +116,12 @@ export async function getDashboardData(): Promise<DashboardData> {
     if (isFellow && !canFellowSeePhase(p.cohorts as string[] | null, userCohort)) {
       continue
     }
-    const counts = itemsByPhase.get(p.id) ?? new Map<ContentCategory, number>()
-    const categoryCounts = emptyCategoryCounts()
-    let total = 0
-    for (const [cat, n] of counts) {
-      categoryCounts[cat] = n
-      total += n
-    }
     phases.push({
       id: p.id,
       orderIndex: p.order_index,
       title: p.title,
       description: p.description,
-      contentCount: total,
-      categoryCounts,
+      contentCount: countsByPhase.get(p.id) ?? 0,
     })
   }
 
