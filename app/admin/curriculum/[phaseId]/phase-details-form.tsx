@@ -34,19 +34,31 @@ export function PhaseDetailsForm({ phase }: Props) {
   const router = useRouter()
   const titleId = useId()
   const descId = useId()
-  const [message, setMessage] = useState<
-    { kind: 'ok' | 'error'; text: string } | null
-  >(null)
+  const [errorText, setErrorText] = useState<string | null>(null)
+  const [savedOpen, setSavedOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [deleting, startDelete] = useTransition()
 
+  // Bumped on every successful save so the checkbox group remounts with
+  // the fresh `defaultValue` from the server. CohortAccessField is
+  // uncontrolled internally (useState seeded once) so without a key
+  // change the boxes would still show the pre-save state until the user
+  // hard-reloads the page.
+  const fieldKey = phase.cohorts.join(',')
+
   function onSave(formData: FormData) {
-    setMessage(null)
+    setErrorText(null)
     formData.set('id', phase.id)
     startTransition(async () => {
       const res = await updatePhase(formData)
-      setMessage({ kind: res.ok ? 'ok' : 'error', text: res.message })
-      if (res.ok) router.refresh()
+      if (res.ok) {
+        // Refresh first so server data is fresh, then open the
+        // confirmation dialog matching the delete-confirmation styling.
+        router.refresh()
+        setSavedOpen(true)
+      } else {
+        setErrorText(res.message)
+      }
     })
   }
 
@@ -58,7 +70,7 @@ export function PhaseDetailsForm({ phase }: Props) {
       if (res.ok) {
         router.replace('/admin/curriculum')
       } else {
-        setMessage({ kind: 'error', text: res.message })
+        setErrorText(res.message)
       }
     })
   }
@@ -99,19 +111,15 @@ export function PhaseDetailsForm({ phase }: Props) {
         </div>
 
         <CohortAccessField
+          key={fieldKey}
           defaultValue={phase.cohorts}
           idPrefix={`phase-cohort-${phase.id}`}
           description="Assign this phase to one or more cohorts. Only fellows in the assigned cohort(s) can see it. Leaving all unchecked hides the phase from every fellow."
         />
 
-        {message && (
-          <p
-            className={`text-sm ${
-              message.kind === 'error' ? 'text-destructive' : 'text-muted-foreground'
-            }`}
-            role={message.kind === 'error' ? 'alert' : 'status'}
-          >
-            {message.text}
+        {errorText && (
+          <p className="text-sm text-destructive" role="alert">
+            {errorText}
           </p>
         )}
 
@@ -153,6 +161,25 @@ export function PhaseDetailsForm({ phase }: Props) {
           </Button>
         </div>
       </form>
+
+      {/* Save-confirmation dialog. Styled to match the delete-phase
+          AlertDialog so admins get the same visual treatment for both
+          destructive and non-destructive confirmations. */}
+      <AlertDialog open={savedOpen} onOpenChange={setSavedOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Phase updated</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your changes have been saved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setSavedOpen(false)}>
+              Done
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   )
 }
