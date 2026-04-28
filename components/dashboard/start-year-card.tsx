@@ -3,16 +3,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
 /**
- * CTA shown to learners who haven't completed any items yet. Drops
- * them straight into the first unlocked phase, where every content
- * item lives inline and they can pick a starting point.
+ * Shown to learners with no progress yet. Invites them into the first lab.
  */
 export function StartYearCard({
   yearTitle,
-  startPhaseId,
+  startLabId,
 }: {
   yearTitle: string
-  startPhaseId: string | null
+  startLabId: string | null
 }) {
   return (
     <Card className="border-0 shadow-card overflow-hidden">
@@ -27,20 +25,18 @@ export function StartYearCard({
             Start {yearTitle}
           </h2>
           <p className="text-sm text-text leading-relaxed">
-            Each phase brings together everything you need - readings,
-            reflection prompts, lab protocols, and follow-up practice -
-            organized by Before, During, and After alongside your
-            general resources, wisdom coaching, and community of
-            practice. Open the phase to see what&apos;s assigned and
-            begin wherever feels right.
+            You&apos;re beginning a transformative three-year journey. Your
+            first Wisdom Lab walks you through a Before, During, and After flow
+            - readings and reflection prompts ahead of the live session,
+            protocols in the room, and follow-up practice afterwards.
           </p>
-          {startPhaseId ? (
-            <Link href={`/phases/${startPhaseId}`}>
+          {startLabId ? (
+            <Link href={`/labs/${startLabId}`}>
               <Button size="lg">Get Started</Button>
             </Link>
           ) : (
             <Button size="lg" disabled>
-              No phases available yet
+              No labs available yet
             </Button>
           )}
         </CardContent>

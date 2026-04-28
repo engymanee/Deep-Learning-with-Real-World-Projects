@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Lock, ShieldCheck } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Lock,
+  Check,
+  ShieldCheck,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { fellowCanAccess, isCohort, type Cohort } from '@/lib/cohorts'
@@ -16,15 +22,15 @@ interface YearRow {
 
 interface LabRow {
   id: string
+  title: string
   year_id: string
+  order_index: number
   cohorts: string[] | null
-  category: string | null
-  resource_type: string | null
 }
 
 interface LabProgressRow {
   lab_id: string
-  status: string | null
+  completed_at: string | null
 }
 
 interface YearProgressRow {
@@ -32,33 +38,70 @@ interface YearProgressRow {
   status: 'locked' | 'in_progress' | 'complete'
 }
 
+type LabStatus = 'complete' | 'in_progress' | 'not_started'
 type Role = 'fellow' | 'facilitator' | 'admin' | null
+
+function CompletionDot({ status }: { status: LabStatus }) {
+  switch (status) {
+    case 'complete':
+      return (
+        <span
+          className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground"
+          aria-label="Completed"
+        >
+          <Check className="h-2.5 w-2.5" aria-hidden="true" />
+        </span>
+      )
+    case 'in_progress':
+      return (
+        <span
+          className="h-2 w-2 rounded-full bg-gradient-to-r from-primary to-transparent"
+          aria-label="In progress"
+        />
+      )
+    case 'not_started':
+    default:
+      return (
+        <span
+          className="h-2 w-2 rounded-full border border-primary"
+          aria-label="Not started"
+        />
+      )
+  }
+}
 
 interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
-  /** ID of the currently-viewed phase, used to highlight its row. */
   currentYearId?: string
+  currentLabId?: string
 }
 
 /**
- * Curriculum sidebar.
+ * Dashboard / lab curriculum sidebar.
  *
- * Phases are the only navigable level - clicking a phase opens
- * `/phases/[id]`, where content items are grouped by category and
- * rendered inline. Fellows see a lock for any phase that hasn't been
- * unlocked, and a completion fraction (items complete / total)
- * computed against the cohort-filtered item list. Admins and
- * facilitators see every phase unlocked, and (admins only) get a
- * shortcut into the curriculum manager.
+ * Display only - no admin editing lives here. Fellows see a lock icon on
+ * years that haven't been unlocked yet; admins and facilitators see every
+ * year as open. All curriculum editing (rename, create new labels, reorder,
+ * etc.) happens on /admin/curriculum.
  */
-export function Sidebar({ isOpen = true, onClose, currentYearId }: SidebarProps) {
+export function Sidebar({
+  isOpen = true,
+  onClose,
+  currentYearId,
+  currentLabId,
+}: SidebarProps) {
   const [years, setYears] = useState<YearRow[]>([])
   const [labs, setLabs] = useState<LabRow[]>([])
   const [completed, setCompleted] = useState<Set<string>>(new Set())
   const [unlockedYears, setUnlockedYears] = useState<Set<string>>(new Set())
   const [role, setRole] = useState<Role>(null)
+  const [expandedYear, setExpandedYear] = useState<string | null>(currentYearId ?? null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (currentYearId) setExpandedYear(currentYearId)
+  }, [currentYearId])
 
   useEffect(() => {
     let cancelled = false
@@ -76,7 +119,7 @@ export function Sidebar({ isOpen = true, onClose, currentYearId }: SidebarProps)
           .order('order_index', { ascending: true }),
         supabase
           .from('labs')
-          .select('id, year_id, cohorts, category, resource_type')
+          .select('id, title, year_id, order_index, cohorts')
           .order('order_index', { ascending: true }),
       ])
 
@@ -98,7 +141,7 @@ export function Sidebar({ isOpen = true, onClose, currentYearId }: SidebarProps)
             .eq('profile_id', user.id),
           supabase
             .from('user_lab_progress')
-            .select('lab_id, status')
+            .select('lab_id, completed_at')
             .eq('profile_id', user.id),
         ])
         currentRole = profileRow?.role ?? null
@@ -109,8 +152,8 @@ export function Sidebar({ isOpen = true, onClose, currentYearId }: SidebarProps)
 
       if (cancelled) return
 
-      // Fellows only see phases / items whose cohort gating allows them.
-      // Admins and facilitators see the full curriculum so they can
+      // Fellows only see phases / labs whose cohort gating allows them.
+      // Admins and facilitators get the full curriculum so they can
       // navigate any cohort's content from the sidebar.
       const isFellowRole = currentRole === 'fellow'
       const visibleYears = (yearsData ?? []).filter((y) =>
@@ -119,32 +162,31 @@ export function Sidebar({ isOpen = true, onClose, currentYearId }: SidebarProps)
       const visibleYearIds = new Set(visibleYears.map((y) => y.id))
       const visibleLabs = (labsData ?? []).filter((l) => {
         if (!visibleYearIds.has(l.year_id)) return false
-        // Drop legacy items that pre-date the typed schema.
-        if (!l.category || !l.resource_type) return false
         if (!isFellowRole) return true
         return fellowCanAccess(l.cohorts as string[] | null, userCohort)
       })
 
+      const allYears = visibleYears
       setYears(visibleYears)
       setLabs(visibleLabs)
       setRole(currentRole)
       setCompleted(
         new Set(
-          labProgress.filter((p) => p.status === 'complete').map((p) => p.lab_id),
+          labProgress.filter((p) => p.completed_at != null).map((p) => p.lab_id),
         ),
       )
 
-      // Admins / facilitators get every phase unlocked. Fellows unlock
-      // the first phase automatically; each subsequent phase only opens
-      // once the preceding one has a complete record (or the fellow
-      // already has a non-locked row for it).
+      // Admins / facilitators get everything unlocked. Fellows unlock the
+      // first year automatically, and each subsequent year only once the
+      // preceding one is marked complete (or they already have a
+      // non-locked row for it).
       const unlocked = new Set<string>()
       if (currentRole === 'admin' || currentRole === 'facilitator') {
-        visibleYears.forEach((y) => unlocked.add(y.id))
+        allYears.forEach((y) => unlocked.add(y.id))
       } else {
         const progressByYear = new Map(yearProgress.map((p) => [p.year_id, p.status]))
         let previousComplete = true
-        for (const y of visibleYears) {
+        for (const y of allYears) {
           const status = progressByYear.get(y.id)
           const isUnlocked =
             previousComplete || status === 'in_progress' || status === 'complete'
@@ -163,8 +205,11 @@ export function Sidebar({ isOpen = true, onClose, currentYearId }: SidebarProps)
     }
   }, [])
 
+  const toggleYear = (yearId: string) => {
+    setExpandedYear(expandedYear === yearId ? null : yearId)
+  }
+
   const isAdmin = role === 'admin'
-  const isFellow = role === 'fellow'
 
   return (
     <aside
@@ -192,77 +237,83 @@ export function Sidebar({ isOpen = true, onClose, currentYearId }: SidebarProps)
 
         {loading && (
           <div className="space-y-2" aria-hidden="true">
-            <div className="h-9 animate-pulse rounded bg-bg-muted" />
-            <div className="h-9 animate-pulse rounded bg-bg-muted" />
-            <div className="h-9 animate-pulse rounded bg-bg-muted" />
+            <div className="h-8 animate-pulse rounded bg-bg-muted" />
+            <div className="h-8 animate-pulse rounded bg-bg-muted" />
+            <div className="h-8 animate-pulse rounded bg-bg-muted" />
           </div>
         )}
 
         {!loading &&
           years.map((year) => {
             const yearLabs = labs.filter((l) => l.year_id === year.id)
-            const totalItems = yearLabs.length
-            const completedItems = yearLabs.filter((l) => completed.has(l.id)).length
+            const isExpanded = expandedYear === year.id
             const isUnlocked = unlockedYears.has(year.id)
             const isLocked = !isUnlocked
-            const isCurrent = currentYearId === year.id
-
-            const row = (
-              <div
-                className={cn(
-                  'flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                  isCurrent && !isLocked && 'bg-bg-muted text-primary',
-                  !isCurrent && !isLocked && 'text-text hover:bg-border',
-                  isLocked && 'cursor-not-allowed text-text-muted opacity-60',
-                )}
-              >
-                <span className="truncate pr-2 text-left font-semibold">
-                  {year.title}
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  {isFellow && totalItems > 0 && !isLocked && (
-                    <span className="text-[11px] font-medium text-text-muted">
-                      {completedItems}/{totalItems}
-                    </span>
-                  )}
-                  {isLocked && (
-                    <Lock className="h-4 w-4 text-text-muted" aria-hidden="true" />
-                  )}
-                </span>
-              </div>
-            )
-
-            if (isLocked) {
-              return (
-                <div
-                  key={year.id}
-                  className="mb-1"
-                  aria-disabled="true"
-                  title="Complete the previous phase to unlock"
-                >
-                  {row}
-                </div>
-              )
-            }
+            const displayTitle = year.title
 
             return (
-              <Link
-                key={year.id}
-                href={`/phases/${year.id}`}
-                onClick={onClose}
-                aria-current={isCurrent ? 'page' : undefined}
-                className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md mb-1"
-              >
-                {row}
-              </Link>
+              <div key={year.id} className="mb-3">
+                <button
+                  type="button"
+                  onClick={() => !isLocked && toggleYear(year.id)}
+                  disabled={isLocked}
+                  aria-expanded={isExpanded}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-semibold transition-colors',
+                    isExpanded && !isLocked
+                      ? 'bg-bg-muted text-primary'
+                      : 'text-text hover:bg-border',
+                    isLocked && 'cursor-not-allowed opacity-60',
+                  )}
+                >
+                  <span className="truncate pr-2 text-left">{displayTitle}</span>
+                  {isLocked ? (
+                    <Lock className="h-4 w-4 text-text-muted" aria-hidden="true" />
+                  ) : isExpanded ? (
+                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
+
+                {isExpanded && !isLocked && (
+                  <div className="ml-2 mt-1 space-y-0.5 border-l border-border pl-2">
+                    {yearLabs.map((lab) => {
+                      const isCurrent = currentLabId === lab.id
+                      const status: LabStatus = completed.has(lab.id)
+                        ? 'complete'
+                        : isCurrent
+                        ? 'in_progress'
+                        : 'not_started'
+
+                      return (
+                        <Link
+                          key={lab.id}
+                          href={`/labs/${lab.id}`}
+                          onClick={onClose}
+                          aria-current={isCurrent ? 'page' : undefined}
+                          className={cn(
+                            'flex items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors',
+                            isCurrent
+                              ? 'border-l-2 border-primary bg-white font-medium text-text'
+                              : 'text-text hover:bg-border/30',
+                          )}
+                        >
+                          <CompletionDot status={status} />
+                          <span className="truncate leading-relaxed">{lab.title}</span>
+                        </Link>
+                      )
+                    })}
+                    {yearLabs.length === 0 && (
+                      <p className="px-2 py-1 text-xs text-text-muted">
+                        No labs published yet.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             )
           })}
-
-        {!loading && years.length === 0 && (
-          <p className="px-2 py-1 text-xs text-text-muted">
-            No phases published yet.
-          </p>
-        )}
 
         {!loading && isAdmin && (
           <div className="pt-2">
