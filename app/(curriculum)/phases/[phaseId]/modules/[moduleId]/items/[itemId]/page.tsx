@@ -150,8 +150,11 @@ export default async function ContentItemPage({
   const duration = formatDuration(item.duration_minutes)
   const hasBody = !!item.body && item.body.trim().length > 0
   const hasUrl = !!item.url
-  const reflectionRequired =
-    item.reflection_enabled && !!item.reflection_prompt?.trim()
+  // Reflection is required as soon as the admin toggles it on. The
+  // prompt is enforced separately at admin save time, so it'll
+  // always be present here in practice - but we don't bypass the
+  // gate just because the prompt happens to be missing.
+  const reflectionRequired = item.reflection_enabled === true
 
   const { next } = findAdjacentItems(curriculum, item.id)
 

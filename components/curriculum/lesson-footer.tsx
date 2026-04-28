@@ -151,12 +151,17 @@ export function LessonFooter({
             )}
             {completedBadge}
           </>
+        ) : blocked ? (
+          // Reflection (or link) gate is active. Don't even render
+          // the Mark as completed button - completion isn't a
+          // visual option yet. The hint above explains why.
+          null
         ) : (
-          // Not yet complete: single primary CTA.
+          // All gates cleared: single primary CTA.
           <Button
             type="button"
             onClick={handleMarkComplete}
-            disabled={pending || blocked}
+            disabled={pending}
           >
             {pending ? 'Marking...' : 'Mark as completed'}
           </Button>
