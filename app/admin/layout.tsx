@@ -1,15 +1,23 @@
 import type { ReactNode } from 'react'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { requireUser } from '@/lib/auth-server'
-import { Users, LayoutDashboard, ArrowLeft, Building2, MessagesSquare } from 'lucide-react'
+import { requireAdmin } from '@/lib/auth-server'
+import {
+  Users,
+  LayoutDashboard,
+  ArrowLeft,
+  Building2,
+  BookOpen,
+  Megaphone,
+  MessagesSquare,
+} from 'lucide-react'
 import { TopBar } from '@/components/top-bar'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const user = await requireUser()
-  if (user.role !== 'admin') {
-    redirect('/dashboard')
-  }
+  // requireAdmin always evaluates the real underlying account, ignoring
+  // any active "preview as fellow" cookie. This keeps the admin console
+  // reachable even while the admin is currently previewing the platform
+  // as a fellow on other surfaces.
+  await requireAdmin()
 
   return (
     <div className="min-h-screen bg-background">
@@ -38,9 +46,19 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <AdminTab href="/admin/users" icon={<Users className="h-4 w-4" />} label="Users" />
           <AdminTab href="/admin/schools" icon={<Building2 className="h-4 w-4" />} label="Schools" />
           <AdminTab
+            href="/admin/curriculum"
+            icon={<BookOpen className="h-4 w-4" />}
+            label="Curriculum"
+          />
+          <AdminTab
             href="/admin/community"
             icon={<MessagesSquare className="h-4 w-4" />}
             label="Community"
+          />
+          <AdminTab
+            href="/admin/announcements"
+            icon={<Megaphone className="h-4 w-4" />}
+            label="Announcements"
           />
         </nav>
 

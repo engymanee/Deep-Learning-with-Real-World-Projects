@@ -3,6 +3,7 @@ import { Lora, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { UserProvider } from '@/lib/user-context'
 import { getCurrentUser } from '@/lib/auth-server'
+import { AdminPreviewBanner } from '@/components/admin/preview-banner'
 import './globals.css'
 
 const _serif = Lora({
@@ -51,7 +52,10 @@ export default async function RootLayout({
       <body
         className={`${_sans.variable} ${_serif.variable} font-sans antialiased`}
       >
-        <UserProvider initialUser={user}>{children}</UserProvider>
+        <UserProvider initialUser={user}>
+          <AdminPreviewBanner />
+          {children}
+        </UserProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
