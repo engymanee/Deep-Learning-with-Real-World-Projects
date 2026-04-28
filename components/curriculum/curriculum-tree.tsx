@@ -70,9 +70,32 @@ export function CurriculumTree({ phases }: Props) {
 
   const [openIds, setOpenIds] = useState<Set<string>>(initialOpen)
 
+  // Auto-expand the phase + module that contain the active item.
+  // Runs whenever the URL changes (back/forward, deep-link, or
+  // sibling navigation in the layout) so the user always sees
+  // their place in the tree. Wrapped in setOpenIds(prev=>...) so
+  // we never clobber phases the user has manually expanded.
+  useEffect(() => {
+    if (!activeItemId) return
+    for (const phase of phases) {
+      for (const mod of phase.modules) {
+        if (mod.items.some((it) => it.id === activeItemId)) {
+          setOpenIds((prev) => {
+            if (prev.has(phase.id) && prev.has(mod.id)) return prev
+            const next = new Set(prev)
+            next.add(phase.id)
+            next.add(mod.id)
+            return next
+          })
+          return
+        }
+      }
+    }
+  }, [activeItemId, phases])
+
   // If the URL hash points at a phase (e.g. #phase-abc), open and
   // scroll to it. Runs once after mount and any time the hash
-  // changes.
+  // changes - used by deep-links from the global sidebar.
   useEffect(() => {
     function applyHash() {
       const hash = window.location.hash.replace(/^#/, '')
