@@ -29,11 +29,11 @@ const nullable = (v: FormDataEntryValue | null) => {
 }
 
 /**
- * Read the cohort selections for a phase from a form. The CohortAccessField
- * component submits one entry per ticked cohort, so an empty array means
- * "no cohorts assigned" (= hidden from every fellow).
+ * Read explicit cohort selections from a form. The CohortAccessField
+ * component submits one entry per ticked cohort, so an empty array
+ * means "no cohorts ticked" (= explicitly locked).
  */
-function readPhaseCohorts(formData: FormData, name = 'cohorts'): string[] {
+function readCohortSelections(formData: FormData, name = 'cohorts'): string[] {
   const raw = formData.getAll(name)
   const allowed = new Set(COHORTS as readonly string[])
   const out = new Set<string>()
@@ -42,14 +42,16 @@ function readPhaseCohorts(formData: FormData, name = 'cohorts'): string[] {
 }
 
 /**
- * Read cohort access for a content item, honoring the `inherit` flag.
+ * Read cohort access for a child entity (module or content) that
+ * supports inheriting from its parent. The form must include a
+ * `cohorts_inherit` checkbox:
  *
- *   inherit=on        -> NULL (item inherits its phase's cohorts)
- *   inherit absent    -> array of ticked cohorts (may be empty = locked)
+ *   inherit=on        -> NULL (entity inherits from parent)
+ *   inherit absent    -> array of ticked cohorts (may be [] = locked)
  */
-function readContentCohorts(formData: FormData): string[] | null {
+function readInheritableCohorts(formData: FormData): string[] | null {
   if (trim(formData.get('cohorts_inherit')) === 'on') return null
-  return readPhaseCohorts(formData)
+  return readCohortSelections(formData)
 }
 
 // ============================================================================
@@ -61,12 +63,11 @@ export async function createPhase(formData: FormData): Promise<ActionResult> {
     await requireAdmin()
     const title = trim(formData.get('title'))
     const description = nullable(formData.get('description'))
-    const cohorts = readPhaseCohorts(formData)
+    const cohorts = readCohortSelections(formData)
     if (!title) return fail('Phase title is required')
 
     const supabase = await createClient()
 
-    // Append at the end of the curriculum.
     const { data: maxRow } = await supabase
       .from('years')
       .select('order_index')
@@ -94,7 +95,7 @@ export async function updatePhase(formData: FormData): Promise<ActionResult> {
     const id = trim(formData.get('id'))
     const title = trim(formData.get('title'))
     const description = nullable(formData.get('description'))
-    const cohorts = readPhaseCohorts(formData)
+    const cohorts = readCohortSelections(formData)
     if (!id) return fail('Missing phase id')
     if (!title) return fail('Phase title is required')
 
@@ -122,7 +123,8 @@ export async function deletePhase(formData: FormData): Promise<ActionResult> {
     if (!id) return fail('Missing phase id')
 
     const supabase = await createClient()
-    // Cascade is set on labs.year_id, so all content items go with the phase.
+    // Cascade is set on modules.phase_id and labs.module_id, so deleting
+    // the phase deletes every descendant module and content item.
     const { error } = await supabase.from('years').delete().eq('id', id)
     if (error) return fail(error.message)
 
@@ -139,8 +141,6 @@ export async function reorderPhases(orderedIds: string[]): Promise<ActionResult>
     await requireAdmin()
     const supabase = await createClient()
 
-    // Pass 1: bump every affected row out of conflict range so the
-    // unique (order_index) constraint can't bite when shuffling.
     await Promise.all(
       orderedIds.map((id, i) =>
         supabase
@@ -149,7 +149,6 @@ export async function reorderPhases(orderedIds: string[]): Promise<ActionResult>
           .eq('id', id),
       ),
     )
-    // Pass 2: write the final indices.
     const errors = await Promise.all(
       orderedIds.map((id, i) =>
         supabase
@@ -171,6 +170,141 @@ export async function reorderPhases(orderedIds: string[]): Promise<ActionResult>
 }
 
 // ============================================================================
+// Modules (table: modules)
+// ============================================================================
+
+export async function createModule(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const phaseId = trim(formData.get('phase_id'))
+    const title = trim(formData.get('title'))
+    const description = nullable(formData.get('description'))
+    const cohorts = readInheritableCohorts(formData)
+    if (!phaseId) return fail('Missing phase id')
+    if (!title) return fail('Module title is required')
+
+    const supabase = await createClient()
+
+    const { data: maxRow } = await supabase
+      .from('modules')
+      .select('order_index')
+      .eq('phase_id', phaseId)
+      .order('order_index', { ascending: false })
+      .limit(1)
+      .maybeSingle<{ order_index: number }>()
+    const nextIndex = (maxRow?.order_index ?? 0) + 1
+
+    const { error } = await supabase.from('modules').insert({
+      phase_id: phaseId,
+      title,
+      description,
+      cohorts,
+      order_index: nextIndex,
+    })
+    if (error) return fail(error.message)
+
+    revalidatePath(`/admin/curriculum/${phaseId}`)
+    revalidatePath(`/phases/${phaseId}`)
+    revalidatePath('/dashboard')
+    return ok('Module created')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export async function updateModule(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const id = trim(formData.get('id'))
+    const phaseId = trim(formData.get('phase_id'))
+    const title = trim(formData.get('title'))
+    const description = nullable(formData.get('description'))
+    const cohorts = readInheritableCohorts(formData)
+    if (!id) return fail('Missing module id')
+    if (!phaseId) return fail('Missing phase id')
+    if (!title) return fail('Module title is required')
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('modules')
+      .update({ title, description, cohorts })
+      .eq('id', id)
+    if (error) return fail(error.message)
+
+    revalidatePath(`/admin/curriculum/${phaseId}`)
+    revalidatePath(`/admin/curriculum/${phaseId}/modules/${id}`)
+    revalidatePath(`/phases/${phaseId}`)
+    revalidatePath(`/phases/${phaseId}/modules/${id}`)
+    revalidatePath('/dashboard')
+    return ok('Module updated')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export async function deleteModule(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const id = trim(formData.get('id'))
+    const phaseId = trim(formData.get('phase_id'))
+    if (!id) return fail('Missing module id')
+
+    const supabase = await createClient()
+    // Cascade on labs.module_id removes every content item under this module.
+    const { error } = await supabase.from('modules').delete().eq('id', id)
+    if (error) return fail(error.message)
+
+    if (phaseId) {
+      revalidatePath(`/admin/curriculum/${phaseId}`)
+      revalidatePath(`/phases/${phaseId}`)
+    }
+    revalidatePath('/dashboard')
+    return ok('Module deleted')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export async function reorderModules(
+  phaseId: string,
+  orderedIds: string[],
+): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    if (!phaseId) return fail('Missing phase id')
+    const supabase = await createClient()
+
+    await Promise.all(
+      orderedIds.map((id, i) =>
+        supabase
+          .from('modules')
+          .update({ order_index: 10000 + i })
+          .eq('id', id)
+          .eq('phase_id', phaseId),
+      ),
+    )
+    const errors = await Promise.all(
+      orderedIds.map((id, i) =>
+        supabase
+          .from('modules')
+          .update({ order_index: i + 1 })
+          .eq('id', id)
+          .eq('phase_id', phaseId)
+          .then((r) => r.error),
+      ),
+    )
+    const firstError = errors.find(Boolean)
+    if (firstError) return fail(firstError.message)
+
+    revalidatePath(`/admin/curriculum/${phaseId}`)
+    revalidatePath(`/phases/${phaseId}`)
+    return ok('Modules reordered')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+// ============================================================================
 // Content items (table: labs)
 // ============================================================================
 
@@ -182,7 +316,8 @@ function assertResourceType(v: string): asserts v is ResourceType {
 }
 
 interface ContentInputs {
-  yearId: string
+  phaseId: string
+  moduleId: string
   category: ContentCategory
   resourceType: ResourceType
   title: string
@@ -193,16 +328,18 @@ interface ContentInputs {
 }
 
 function readContentInputs(formData: FormData): ContentInputs | string {
-  const yearId = trim(formData.get('year_id'))
+  const phaseId = trim(formData.get('phase_id'))
+  const moduleId = trim(formData.get('module_id'))
   const category = trim(formData.get('category'))
   const resourceType = trim(formData.get('resource_type'))
   const title = trim(formData.get('title'))
   const description = nullable(formData.get('description'))
   const body = nullable(formData.get('body'))
   const url = nullable(formData.get('url'))
-  const cohorts = readContentCohorts(formData)
+  const cohorts = readInheritableCohorts(formData)
 
-  if (!yearId) return 'Missing phase id'
+  if (!phaseId) return 'Missing phase id'
+  if (!moduleId) return 'Missing module id'
   if (!title) return 'Title is required'
   if (!category) return 'Pick a category'
   if (!resourceType) return 'Pick a resource type'
@@ -216,7 +353,8 @@ function readContentInputs(formData: FormData): ContentInputs | string {
     return 'URL must start with http:// or https://'
   }
   return {
-    yearId,
+    phaseId,
+    moduleId,
     category: category as ContentCategory,
     resourceType: resourceType as ResourceType,
     title,
@@ -234,11 +372,13 @@ export async function createContent(formData: FormData): Promise<ActionResult> {
     if (typeof parsed === 'string') return fail(parsed)
     const supabase = await createClient()
 
-    // Append within the (phase, category) bucket.
+    // Append within the (module, category) bucket. We keep `category`
+    // in the ordering key so admins can reason about ordering even
+    // though the fellow UI no longer surfaces categories.
     const { data: maxRow } = await supabase
       .from('labs')
       .select('order_index')
-      .eq('year_id', parsed.yearId)
+      .eq('module_id', parsed.moduleId)
       .eq('category', parsed.category)
       .order('order_index', { ascending: false })
       .limit(1)
@@ -246,7 +386,10 @@ export async function createContent(formData: FormData): Promise<ActionResult> {
     const nextIndex = (maxRow?.order_index ?? 0) + 1
 
     const { error } = await supabase.from('labs').insert({
-      year_id: parsed.yearId,
+      // year_id is kept as a denormalized convenience FK so phase-level
+      // queries don't have to join through modules every time.
+      year_id: parsed.phaseId,
+      module_id: parsed.moduleId,
       category: parsed.category,
       resource_type: parsed.resourceType,
       title: parsed.title,
@@ -258,9 +401,10 @@ export async function createContent(formData: FormData): Promise<ActionResult> {
     })
     if (error) return fail(error.message)
 
-    revalidatePath(`/admin/curriculum/${parsed.yearId}`)
-    revalidatePath('/admin/curriculum')
-    revalidatePath(`/phases/${parsed.yearId}`)
+    revalidatePath(`/admin/curriculum/${parsed.phaseId}/modules/${parsed.moduleId}`)
+    revalidatePath(`/admin/curriculum/${parsed.phaseId}`)
+    revalidatePath(`/phases/${parsed.phaseId}/modules/${parsed.moduleId}`)
+    revalidatePath(`/phases/${parsed.phaseId}`)
     return ok('Content added')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
@@ -290,9 +434,9 @@ export async function updateContent(formData: FormData): Promise<ActionResult> {
       .eq('id', id)
     if (error) return fail(error.message)
 
-    revalidatePath(`/admin/curriculum/${parsed.yearId}`)
-    revalidatePath(`/phases/${parsed.yearId}`)
-    revalidatePath(`/phases/${parsed.yearId}/items/${id}`)
+    revalidatePath(`/admin/curriculum/${parsed.phaseId}/modules/${parsed.moduleId}`)
+    revalidatePath(`/phases/${parsed.phaseId}/modules/${parsed.moduleId}`)
+    revalidatePath(`/phases/${parsed.phaseId}/modules/${parsed.moduleId}/items/${id}`)
     return ok('Content updated')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
@@ -303,18 +447,20 @@ export async function deleteContent(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin()
     const id = trim(formData.get('id'))
-    const yearId = trim(formData.get('year_id'))
+    const phaseId = trim(formData.get('phase_id'))
+    const moduleId = trim(formData.get('module_id'))
     if (!id) return fail('Missing content id')
 
     const supabase = await createClient()
     const { error } = await supabase.from('labs').delete().eq('id', id)
     if (error) return fail(error.message)
 
-    if (yearId) {
-      revalidatePath(`/admin/curriculum/${yearId}`)
-      revalidatePath(`/phases/${yearId}`)
+    if (phaseId && moduleId) {
+      revalidatePath(`/admin/curriculum/${phaseId}/modules/${moduleId}`)
+      revalidatePath(`/admin/curriculum/${phaseId}`)
+      revalidatePath(`/phases/${phaseId}/modules/${moduleId}`)
+      revalidatePath(`/phases/${phaseId}`)
     }
-    revalidatePath('/admin/curriculum')
     return ok('Content deleted')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
@@ -322,7 +468,8 @@ export async function deleteContent(formData: FormData): Promise<ActionResult> {
 }
 
 export async function reorderContent(
-  yearId: string,
+  phaseId: string,
+  moduleId: string,
   category: ContentCategory,
   orderedIds: string[],
 ): Promise<ActionResult> {
@@ -335,9 +482,9 @@ export async function reorderContent(
       orderedIds.map((id, i) =>
         supabase
           .from('labs')
-          .update({ order_index: 10000 + i })
+          .update({ order_index: 100000 + i })
           .eq('id', id)
-          .eq('year_id', yearId)
+          .eq('module_id', moduleId)
           .eq('category', category),
       ),
     )
@@ -347,7 +494,7 @@ export async function reorderContent(
           .from('labs')
           .update({ order_index: i + 1 })
           .eq('id', id)
-          .eq('year_id', yearId)
+          .eq('module_id', moduleId)
           .eq('category', category)
           .then((r) => r.error),
       ),
@@ -355,8 +502,8 @@ export async function reorderContent(
     const firstError = errors.find(Boolean)
     if (firstError) return fail(firstError.message)
 
-    revalidatePath(`/admin/curriculum/${yearId}`)
-    revalidatePath(`/phases/${yearId}`)
+    revalidatePath(`/admin/curriculum/${phaseId}/modules/${moduleId}`)
+    revalidatePath(`/phases/${phaseId}/modules/${moduleId}`)
     return ok('Content reordered')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')

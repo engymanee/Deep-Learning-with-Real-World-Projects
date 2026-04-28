@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
   canFellowSeeContent,
+  canFellowSeeModule,
   canFellowSeePhase,
   getResourceType,
   type ContentCategory,
@@ -21,9 +22,15 @@ interface PhaseRow {
   cohorts: string[] | null
 }
 
+interface ModuleRow {
+  id: string
+  title: string
+  cohorts: string[] | null
+}
+
 interface ContentRow {
   id: string
-  year_id: string
+  module_id: string
   title: string
   description: string | null
   body: string | null
@@ -36,35 +43,53 @@ interface ContentRow {
 export default async function ContentItemPage({
   params,
 }: {
-  params: Promise<{ phaseId: string; itemId: string }>
+  params: Promise<{ phaseId: string; moduleId: string; itemId: string }>
 }) {
-  const { phaseId, itemId } = await params
+  const { phaseId, moduleId, itemId } = await params
   const user = await requireUser()
   const supabase = await createClient()
 
-  const [{ data: phase }, { data: item }] = await Promise.all([
+  const [{ data: phase }, { data: module }, { data: item }] = await Promise.all([
     supabase
       .from('years')
       .select('id, title, cohorts')
       .eq('id', phaseId)
       .maybeSingle<PhaseRow>(),
     supabase
+      .from('modules')
+      .select('id, title, cohorts')
+      .eq('id', moduleId)
+      .eq('phase_id', phaseId)
+      .maybeSingle<ModuleRow>(),
+    supabase
       .from('labs')
       .select(
-        'id, year_id, title, description, body, url, category, resource_type, cohorts',
+        'id, module_id, title, description, body, url, category, resource_type, cohorts',
       )
       .eq('id', itemId)
-      .eq('year_id', phaseId)
+      .eq('module_id', moduleId)
       .maybeSingle<ContentRow>(),
   ])
 
-  if (!phase || !item) notFound()
+  if (!phase || !module || !item) notFound()
 
   const isFellow = user.role === 'fellow'
   const userCohort = user.cohort ?? null
   if (isFellow) {
     if (!canFellowSeePhase(phase.cohorts, userCohort)) notFound()
-    if (!canFellowSeeContent(item.cohorts, phase.cohorts, userCohort)) notFound()
+    if (!canFellowSeeModule(module.cohorts, phase.cohorts, userCohort)) {
+      notFound()
+    }
+    if (
+      !canFellowSeeContent(
+        item.cohorts,
+        phase.cohorts,
+        userCohort,
+        module.cohorts,
+      )
+    ) {
+      notFound()
+    }
   }
 
   const resource = item.resource_type ? getResourceType(item.resource_type) : null
@@ -77,7 +102,7 @@ export default async function ContentItemPage({
         {/* Breadcrumb */}
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center gap-1.5 text-xs text-text-muted"
+          className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted"
         >
           <Link href="/dashboard" className="hover:text-text">
             Dashboard
@@ -85,9 +110,16 @@ export default async function ContentItemPage({
           <ChevronRight className="h-3 w-3" aria-hidden="true" />
           <Link
             href={`/phases/${phase.id}`}
-            className="max-w-[180px] truncate hover:text-text sm:max-w-none"
+            className="max-w-[140px] truncate hover:text-text sm:max-w-none"
           >
             {phase.title}
+          </Link>
+          <ChevronRight className="h-3 w-3" aria-hidden="true" />
+          <Link
+            href={`/phases/${phase.id}/modules/${module.id}`}
+            className="max-w-[140px] truncate hover:text-text sm:max-w-none"
+          >
+            {module.title}
           </Link>
           <ChevronRight className="h-3 w-3" aria-hidden="true" />
           <span className="truncate font-medium text-text">{item.title}</span>
@@ -164,10 +196,10 @@ export default async function ContentItemPage({
         {/* Back link */}
         <div className="pt-4">
           <Link
-            href={`/phases/${phase.id}`}
+            href={`/phases/${phase.id}/modules/${module.id}`}
             className="text-sm text-text-muted hover:text-text"
           >
-            &larr; Back to {phase.title}
+            &larr; Back to {module.title}
           </Link>
         </div>
       </div>

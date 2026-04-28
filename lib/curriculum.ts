@@ -123,19 +123,45 @@ export function isResourceType(v: unknown): v is ResourceType {
 // ============================================================================
 
 /**
- * Resolve the *effective* cohort list for a content item by combining
- * its own override with the parent phase. Used purely as a derived
- * value - the database stores `null` to mean "inherit", and that's
- * what callers should write back when an admin clears the override.
+ * Cohort access cascades down the hierarchy:
+ *
+ *   Phase  ->  Module  ->  Content
+ *
+ * At every level except the phase, NULL means "inherit from parent",
+ * an empty array means "explicitly locked", and any non-empty array
+ * is an override that *replaces* the inherited list. The phase itself
+ * is the source of truth, so its NULL is treated the same as [].
+ */
+
+/**
+ * Effective cohorts for a module, after cascading from its phase.
+ * Returns the module's own list when set; otherwise inherits the
+ * phase's list.
+ */
+export function effectiveModuleCohorts(
+  moduleCohorts: readonly string[] | null | undefined,
+  phaseCohorts: readonly string[] | null | undefined,
+): readonly string[] {
+  if (moduleCohorts == null) return phaseCohorts ?? []
+  return moduleCohorts
+}
+
+/**
+ * Effective cohorts for a content item, after cascading from its
+ * module (which itself cascades from the phase).
+ *
+ * The optional `moduleCohorts` parameter lets older call sites that
+ * don't yet have a module in scope keep working - they get the
+ * pre-modules behaviour (inherit straight from the phase).
  */
 export function effectiveCohorts(
   itemCohorts: readonly string[] | null | undefined,
   phaseCohorts: readonly string[] | null | undefined,
+  moduleCohorts?: readonly string[] | null | undefined,
 ): readonly string[] {
-  // null  -> inherit from phase
-  if (itemCohorts == null) return phaseCohorts ?? []
-  // []    -> explicitly locked (no one)
-  // [...] -> override; intersected with phase below in canFellowSeeContent
+  if (itemCohorts == null) {
+    return effectiveModuleCohorts(moduleCohorts, phaseCohorts)
+  }
   return itemCohorts
 }
 
@@ -148,17 +174,49 @@ export function canFellowSeePhase(
 }
 
 /**
- * Whether a fellow with `userCohort` can see a given content item.
- * The content item is visible only when:
- *   - the parent phase is visible to the fellow, AND
- *   - the effective cohort list (item override OR inherited phase list)
- *     contains the fellow's cohort.
+ * Whether a fellow with `userCohort` can see a given module.
+ * Visible when the parent phase is visible AND the effective module
+ * cohorts (override OR inherited phase list) include the fellow.
+ */
+export function canFellowSeeModule(
+  moduleCohorts: readonly string[] | null | undefined,
+  phaseCohorts: readonly string[] | null | undefined,
+  userCohort: Cohort | null | undefined,
+): boolean {
+  if (!canFellowSeePhase(phaseCohorts, userCohort)) return false
+  return fellowCanAccess(
+    effectiveModuleCohorts(moduleCohorts, phaseCohorts),
+    userCohort,
+  )
+}
+
+/**
+ * Whether a fellow with `userCohort` can see a given content item,
+ * applying the full Phase -> Module -> Content cascade.
+ *
+ * The `moduleCohorts` parameter is optional for backwards-compat with
+ * any caller that hasn't been updated yet; passing `undefined` makes
+ * inheritance fall straight through to the phase.
  */
 export function canFellowSeeContent(
   itemCohorts: readonly string[] | null | undefined,
   phaseCohorts: readonly string[] | null | undefined,
   userCohort: Cohort | null | undefined,
+  moduleCohorts?: readonly string[] | null | undefined,
 ): boolean {
   if (!canFellowSeePhase(phaseCohorts, userCohort)) return false
-  return fellowCanAccess(effectiveCohorts(itemCohorts, phaseCohorts), userCohort)
+  if (moduleCohorts !== undefined) {
+    if (
+      !fellowCanAccess(
+        effectiveModuleCohorts(moduleCohorts, phaseCohorts),
+        userCohort,
+      )
+    ) {
+      return false
+    }
+  }
+  return fellowCanAccess(
+    effectiveCohorts(itemCohorts, phaseCohorts, moduleCohorts),
+    userCohort,
+  )
 }

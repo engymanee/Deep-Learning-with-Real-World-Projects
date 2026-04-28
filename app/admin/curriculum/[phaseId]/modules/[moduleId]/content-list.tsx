@@ -35,24 +35,32 @@ import { CohortBadge } from '@/components/admin/cohort-access-field'
 import { getResourceType } from '@/lib/curriculum'
 import type { ContentRow } from './page'
 import { ContentItemForm } from './content-item-form'
-import { deleteContent } from '../actions'
+import { deleteContent } from '../../../actions'
 
 interface Props {
   phaseId: string
-  phaseCohorts: string[]
+  moduleId: string
+  /** Raw module override; null means "inherit from phase". */
+  moduleCohorts: string[] | null
+  /** Pre-resolved cohort list a content item inherits when its own override is null. */
+  moduleEffectiveCohorts: string[]
   items: ContentRow[]
 }
 
 /**
- * Flat list of every content item in a phase.
+ * Flat list of every content item in a module.
  *
- * Per the simplified UX, categories are not surfaced anywhere outside
- * the create dialog - so this list shows a single ordered stream of
- * items with one "Add content" button at the top. The category field
- * still exists on the row (admins pick it inside the create dialog),
- * we just don't render section headers, badges, or filters around it.
+ * Mirrors the previous phase-scoped list: a single ordered stream
+ * with one "Add content" button at the top. Cohort inheritance is
+ * now resolved through the module rather than the phase.
  */
-export function ContentList({ phaseId, phaseCohorts, items }: Props) {
+export function ContentList({
+  phaseId,
+  moduleId,
+  moduleCohorts,
+  moduleEffectiveCohorts,
+  items,
+}: Props) {
   const [createOpen, setCreateOpen] = useState(false)
 
   return (
@@ -61,8 +69,8 @@ export function ContentList({ phaseId, phaseCohorts, items }: Props) {
         <div>
           <h3 className="font-serif text-lg text-foreground">Content</h3>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Every piece of fellow-facing content in this phase, in display
-            order. Add as many items as needed.
+            Every piece of fellow-facing content in this module, in display
+            order.
           </p>
         </div>
 
@@ -77,12 +85,14 @@ export function ContentList({ phaseId, phaseCohorts, items }: Props) {
             <DialogHeader>
               <DialogTitle>Add content</DialogTitle>
               <DialogDescription>
-                Create a new content item in this phase.
+                Create a new content item in this module.
               </DialogDescription>
             </DialogHeader>
             <ContentItemForm
               phaseId={phaseId}
-              phaseCohorts={phaseCohorts}
+              moduleId={moduleId}
+              moduleCohorts={moduleCohorts}
+              moduleEffectiveCohorts={moduleEffectiveCohorts}
               onSaved={() => setCreateOpen(false)}
             />
           </DialogContent>
@@ -101,7 +111,9 @@ export function ContentList({ phaseId, phaseCohorts, items }: Props) {
               key={item.id}
               item={item}
               phaseId={phaseId}
-              phaseCohorts={phaseCohorts}
+              moduleId={moduleId}
+              moduleCohorts={moduleCohorts}
+              moduleEffectiveCohorts={moduleEffectiveCohorts}
             />
           ))}
         </ul>
@@ -113,11 +125,15 @@ export function ContentList({ phaseId, phaseCohorts, items }: Props) {
 function ContentRowItem({
   item,
   phaseId,
-  phaseCohorts,
+  moduleId,
+  moduleCohorts,
+  moduleEffectiveCohorts,
 }: {
   item: ContentRow
   phaseId: string
-  phaseCohorts: string[]
+  moduleId: string
+  moduleCohorts: string[] | null
+  moduleEffectiveCohorts: string[]
 }) {
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
@@ -128,7 +144,8 @@ function ContentRowItem({
   function onDelete() {
     const fd = new FormData()
     fd.set('id', item.id)
-    fd.set('year_id', phaseId)
+    fd.set('phase_id', phaseId)
+    fd.set('module_id', moduleId)
     startDelete(async () => {
       const res = await deleteContent(fd)
       if (res.ok) router.refresh()
@@ -145,9 +162,9 @@ function ContentRowItem({
           {inherits ? (
             <span
               className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
-              title="Inherits cohort access from the phase"
+              title="Inherits cohort access from the module"
             >
-              Inherits phase
+              Inherits module
             </span>
           ) : (
             <CohortBadge cohorts={item.cohorts} />
@@ -194,7 +211,9 @@ function ContentRowItem({
             </DialogHeader>
             <ContentItemForm
               phaseId={phaseId}
-              phaseCohorts={phaseCohorts}
+              moduleId={moduleId}
+              moduleCohorts={moduleCohorts}
+              moduleEffectiveCohorts={moduleEffectiveCohorts}
               initial={{
                 id: item.id,
                 category: item.category,
@@ -233,7 +252,7 @@ function ContentRowItem({
               <AlertDialogTitle>Delete this content item?</AlertDialogTitle>
               <AlertDialogDescription>
                 This will permanently remove &ldquo;{item.title}&rdquo; from
-                this phase.
+                this module.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

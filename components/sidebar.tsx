@@ -5,7 +5,11 @@ import Link from 'next/link'
 import { Layers, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { canFellowSeePhase, type ContentCategory } from '@/lib/curriculum'
+import {
+  canFellowSeeContent,
+  canFellowSeePhase,
+  type ContentCategory,
+} from '@/lib/curriculum'
 import { isCohort, type Cohort } from '@/lib/cohorts'
 
 interface PhaseRow {
@@ -15,9 +19,16 @@ interface PhaseRow {
   cohorts: string[] | null
 }
 
+interface ModuleRow {
+  id: string
+  phase_id: string
+  cohorts: string[] | null
+}
+
 interface ContentRow {
   id: string
   year_id: string
+  module_id: string | null
   category: ContentCategory | null
   cohorts: string[] | null
 }
@@ -62,14 +73,21 @@ export function Sidebar({
         data: { user },
       } = await supabase.auth.getUser()
 
-      const [{ data: phaseRows }, { data: contentRows }] = await Promise.all([
+      const [
+        { data: phaseRows },
+        { data: moduleRows },
+        { data: contentRows },
+      ] = await Promise.all([
         supabase
           .from('years')
           .select('id, title, order_index, cohorts')
           .order('order_index', { ascending: true }),
         supabase
+          .from('modules')
+          .select('id, phase_id, cohorts'),
+        supabase
           .from('labs')
-          .select('id, year_id, category, cohorts'),
+          .select('id, year_id, module_id, category, cohorts'),
       ])
 
       let currentRole: Role = null
@@ -97,24 +115,33 @@ export function Sidebar({
       )
       const visiblePhaseIds = new Set(visiblePhases.map((p) => p.id))
 
-      // Tally per-phase content count using the same visibility rule.
+      // Tally per-phase content count using the full Phase -> Module
+      // -> Content cascade. We delegate the visibility rule to the
+      // shared helper so it stays in sync with server-side filtering.
       const phaseCohortById = new Map<string, string[] | null>()
       for (const p of phaseRows ?? []) {
         phaseCohortById.set(p.id, (p.cohorts as string[] | null) ?? null)
       }
+      const moduleCohortById = new Map<string, string[] | null>()
+      for (const m of (moduleRows ?? []) as ModuleRow[]) {
+        moduleCohortById.set(m.id, m.cohorts)
+      }
+
       const tally = new Map<string, number>()
       for (const item of (contentRows ?? []) as ContentRow[]) {
         if (!visiblePhaseIds.has(item.year_id)) continue
         if (!item.category) continue
+        if (!item.module_id) continue
         if (isFellowRole) {
           const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
-          const inheritedOrOverride =
-            item.cohorts == null ? phaseCohorts : item.cohorts
+          const moduleCohorts = moduleCohortById.get(item.module_id) ?? null
           if (
-            inheritedOrOverride == null ||
-            inheritedOrOverride.length === 0 ||
-            !userCohort ||
-            !inheritedOrOverride.includes(userCohort)
+            !canFellowSeeContent(
+              item.cohorts,
+              phaseCohorts,
+              userCohort,
+              moduleCohorts,
+            )
           ) {
             continue
           }

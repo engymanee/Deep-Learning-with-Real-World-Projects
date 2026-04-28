@@ -20,8 +20,7 @@ import {
   type ContentCategory,
   type ResourceType,
 } from '@/lib/curriculum'
-import { COHORTS } from '@/lib/cohorts'
-import { createContent, updateContent } from '../actions'
+import { createContent, updateContent } from '../../../actions'
 
 export interface ContentItemDraft {
   id?: string
@@ -32,7 +31,7 @@ export interface ContentItemDraft {
   body: string
   url: string
   /**
-   * `null`  -> inherit from the phase
+   * `null`  -> inherit from the module
    * `[]`    -> locked (no fellows)
    * `[...]` -> override with this exact list
    */
@@ -41,7 +40,11 @@ export interface ContentItemDraft {
 
 interface Props {
   phaseId: string
-  phaseCohorts: string[]
+  moduleId: string
+  /** Raw module override; used for the inheritance hint in the form. */
+  moduleCohorts: string[] | null
+  /** Resolved list a content item inherits when its own override is null. */
+  moduleEffectiveCohorts: string[]
   /** When supplied this is an edit; when omitted it's a fresh create. */
   initial?: ContentItemDraft
   /** Pre-fill category for the create flow. */
@@ -51,7 +54,9 @@ interface Props {
 
 export function ContentItemForm({
   phaseId,
-  phaseCohorts,
+  moduleId,
+  moduleCohorts,
+  moduleEffectiveCohorts,
   initial,
   defaultCategory,
   onSaved,
@@ -78,7 +83,8 @@ export function ContentItemForm({
 
   function onSubmit(formData: FormData) {
     setError(null)
-    formData.set('year_id', phaseId)
+    formData.set('phase_id', phaseId)
+    formData.set('module_id', moduleId)
     formData.set('category', category)
     formData.set('resource_type', resourceType)
     if (inherit) formData.set('cohorts_inherit', 'on')
@@ -97,13 +103,15 @@ export function ContentItemForm({
     })
   }
 
+  // Used purely for the inheritance hint - whether the parent module
+  // has any cohort access at all.
+  const inheritIsEmpty = moduleEffectiveCohorts.length === 0
+  const moduleOverridden = moduleCohorts !== null
+
   return (
     <form action={onSubmit} className="flex flex-col gap-5">
       {/* Category is only chooseable on create. On edit, the previously
-          assigned category is preserved silently and never surfaced -
-          per the policy that category UI lives only inside the create
-          dialog. The value still flows back to the server via the
-          formData.set('category', ...) call below. */}
+          assigned category is preserved silently. */}
       {!isEdit ? (
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
@@ -225,14 +233,18 @@ export function ContentItemForm({
           />
           <span>
             <span className="font-medium text-foreground">
-              Inherit cohort access from this phase
+              Inherit cohort access from this module
             </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
-              {phaseCohorts.length === 0
-                ? 'Phase is currently unassigned, so no fellows can see this content.'
-                : `Visible to fellows in ${phaseCohorts
+              {inheritIsEmpty
+                ? `Module is currently unassigned${
+                    moduleOverridden ? ' (overridden)' : ''
+                  }, so no fellows can see this content.`
+                : `Visible to fellows in ${moduleEffectiveCohorts
                     .map((c) => `Cohort ${c}`)
-                    .join(', ')}.`}
+                    .join(', ')}${
+                    moduleOverridden ? '' : ' (inherited from the phase)'
+                  }.`}
             </span>
           </span>
         </label>
@@ -244,13 +256,10 @@ export function ContentItemForm({
               }
               idPrefix={`content-cohort-${initial?.id ?? 'new'}`}
               label="Override cohort access"
-              description="Tick the cohorts that should see this content. Leaving all unchecked hides this item from every fellow even if they can see the phase."
+              description="Tick the cohorts that should see this content. Leaving all unchecked hides this item from every fellow even if they can see the module."
             />
           </div>
         )}
-        {/* Always render hidden inputs for non-overridden cohort values
-            so getAll('cohorts') yields [] when the user clears them */}
-        {COHORTS.length === 0 && null}
       </div>
 
       {error && (

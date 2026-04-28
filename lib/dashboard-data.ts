@@ -74,38 +74,66 @@ export async function getDashboardData(): Promise<DashboardData> {
   const isFellow = user.role === 'fellow'
   const userCohort = user.cohort ?? null
 
-  const [{ data: phaseRows }, { data: itemRows }] = await Promise.all([
-    supabase
-      .from('years')
-      .select('id, order_index, title, description, cohorts')
-      .order('order_index', { ascending: true }),
-    supabase
-      .from('labs')
-      .select('id, year_id, category, cohorts')
-      .returns<
-        Array<{
-          id: string
-          year_id: string
-          category: ContentCategory | null
-          cohorts: string[] | null
-        }>
-      >(),
-  ])
+  const [{ data: phaseRows }, { data: moduleRows }, { data: itemRows }] =
+    await Promise.all([
+      supabase
+        .from('years')
+        .select('id, order_index, title, description, cohorts')
+        .order('order_index', { ascending: true }),
+      supabase
+        .from('modules')
+        .select('id, phase_id, cohorts'),
+      supabase
+        .from('labs')
+        .select('id, year_id, module_id, category, cohorts')
+        .returns<
+          Array<{
+            id: string
+            year_id: string
+            module_id: string | null
+            category: ContentCategory | null
+            cohorts: string[] | null
+          }>
+        >(),
+    ])
 
   const phaseCohortById = new Map<string, string[] | null>()
   for (const p of phaseRows ?? []) {
     phaseCohortById.set(p.id, (p.cohorts as string[] | null) ?? null)
   }
 
+  // For module-level cascading we need quick lookups from module id ->
+  // its parent phase id and its own cohort override.
+  const moduleCohortById = new Map<string, string[] | null>()
+  const modulePhaseById = new Map<string, string>()
+  for (const m of (moduleRows ?? []) as Array<{
+    id: string
+    phase_id: string
+    cohorts: string[] | null
+  }>) {
+    moduleCohortById.set(m.id, m.cohorts)
+    modulePhaseById.set(m.id, m.phase_id)
+  }
+
   // Tally a per-phase content count, applying per-fellow cohort
-  // visibility. Categories aren't surfaced on the dashboard, so we
-  // keep this as a single number per phase.
+  // visibility through the full Phase -> Module -> Content cascade.
   const countsByPhase = new Map<string, number>()
   for (const item of itemRows ?? []) {
     if (!item.category) continue
+    if (!item.module_id) continue
+    const moduleCohorts = moduleCohortById.get(item.module_id) ?? null
+    const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
     if (isFellow) {
-      const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
-      if (!canFellowSeeContent(item.cohorts, phaseCohorts, userCohort)) continue
+      if (
+        !canFellowSeeContent(
+          item.cohorts,
+          phaseCohorts,
+          userCohort,
+          moduleCohorts,
+        )
+      ) {
+        continue
+      }
     }
     countsByPhase.set(item.year_id, (countsByPhase.get(item.year_id) ?? 0) + 1)
   }

@@ -1,15 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ChevronRight, ExternalLink, FileText } from 'lucide-react'
+import { BookOpen, ChevronRight } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
   canFellowSeeContent,
+  canFellowSeeModule,
   canFellowSeePhase,
-  getResourceType,
-  type ContentCategory,
-  type ResourceType,
 } from '@/lib/curriculum'
 
 export const dynamic = 'force-dynamic'
@@ -21,16 +19,19 @@ interface PhaseRow {
   cohorts: string[] | null
 }
 
-interface ContentRow {
+interface ModuleRow {
   id: string
+  phase_id: string
   title: string
   description: string | null
-  body: string | null
-  url: string | null
-  category: ContentCategory | null
-  resource_type: ResourceType | null
   cohorts: string[] | null
   order_index: number
+}
+
+interface ContentVisibilityRow {
+  id: string
+  module_id: string | null
+  cohorts: string[] | null
 }
 
 export default async function PhasePage({
@@ -42,21 +43,27 @@ export default async function PhasePage({
   const user = await requireUser()
   const supabase = await createClient()
 
-  const [{ data: phase }, { data: items }] = await Promise.all([
-    supabase
-      .from('years')
-      .select('id, title, description, cohorts')
-      .eq('id', phaseId)
-      .maybeSingle<PhaseRow>(),
-    supabase
-      .from('labs')
-      .select(
-        'id, title, description, body, url, category, resource_type, cohorts, order_index',
-      )
-      .eq('year_id', phaseId)
-      .order('order_index', { ascending: true })
-      .returns<ContentRow[]>(),
-  ])
+  const [{ data: phase }, { data: modules }, { data: contentRows }] =
+    await Promise.all([
+      supabase
+        .from('years')
+        .select('id, title, description, cohorts')
+        .eq('id', phaseId)
+        .maybeSingle<PhaseRow>(),
+      supabase
+        .from('modules')
+        .select('id, phase_id, title, description, cohorts, order_index')
+        .eq('phase_id', phaseId)
+        .order('order_index', { ascending: true })
+        .returns<ModuleRow[]>(),
+      // Pull just enough data to compute visible content count per
+      // module without surfacing the contents themselves.
+      supabase
+        .from('labs')
+        .select('id, module_id, cohorts')
+        .eq('year_id', phaseId)
+        .returns<ContentVisibilityRow[]>(),
+    ])
 
   if (!phase) notFound()
 
@@ -65,17 +72,42 @@ export default async function PhasePage({
   const userCohort = user.cohort ?? null
   if (isFellow && !canFellowSeePhase(phase.cohorts, userCohort)) notFound()
 
-  // Filter items by visibility - they still need a category in the
-  // database (it's a non-nullable column for new rows) but we never
-  // surface that grouping to fellows; everything renders as one list
-  // in display order.
-  const visibleItems = (items ?? []).filter((item) => {
-    if (!item.category) return false
-    if (!isFellow) return true
-    return canFellowSeeContent(item.cohorts, phase.cohorts, userCohort)
-  })
+  // Filter modules by visibility (cascading from the phase).
+  const visibleModules = (modules ?? []).filter((m) =>
+    isFellow
+      ? canFellowSeeModule(m.cohorts, phase.cohorts, userCohort)
+      : true,
+  )
 
-  const totalVisible = visibleItems.length
+  // For each visible module, count the items the fellow can actually
+  // see. Admins/facilitators see everything.
+  const moduleCohortById = new Map<string, string[] | null>()
+  for (const m of visibleModules) moduleCohortById.set(m.id, m.cohorts)
+
+  const countsByModule = new Map<string, number>()
+  for (const item of contentRows ?? []) {
+    if (!item.module_id) continue
+    if (!moduleCohortById.has(item.module_id)) continue
+    if (isFellow) {
+      const moduleCohorts = moduleCohortById.get(item.module_id) ?? null
+      if (
+        !canFellowSeeContent(
+          item.cohorts,
+          phase.cohorts,
+          userCohort,
+          moduleCohorts,
+        )
+      ) {
+        continue
+      }
+    }
+    countsByModule.set(
+      item.module_id,
+      (countsByModule.get(item.module_id) ?? 0) + 1,
+    )
+  }
+
+  const totalModules = visibleModules.length
 
   return (
     <AppShell showSidebar currentYearId={phase.id}>
@@ -106,58 +138,48 @@ export default async function PhasePage({
             </p>
           )}
           <p className="text-sm text-text-muted">
-            {totalVisible === 0
-              ? 'No content available yet.'
-              : `${totalVisible} item${totalVisible === 1 ? '' : 's'} available`}
+            {totalModules === 0
+              ? 'No modules available yet.'
+              : `${totalModules} module${totalModules === 1 ? '' : 's'} available`}
           </p>
         </header>
 
-        {/* Content */}
-        {totalVisible === 0 ? (
+        {/* Modules */}
+        {totalModules === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-10 text-center">
             <p className="text-sm text-text-muted">
-              Content for this phase hasn&apos;t been published yet. Check
+              Modules for this phase haven&apos;t been published yet. Check
               back soon.
             </p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {visibleItems.map((item) => {
-              const resource = item.resource_type
-                ? getResourceType(item.resource_type)
-                : null
+          <ul className="grid gap-3 md:grid-cols-2">
+            {visibleModules.map((module) => {
+              const count = countsByModule.get(module.id) ?? 0
               return (
-                <li key={item.id}>
+                <li key={module.id}>
                   <Link
-                    href={`/phases/${phase.id}/items/${item.id}`}
-                    className="group flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40"
+                    href={`/phases/${phase.id}/modules/${module.id}`}
+                    className="group flex h-full items-start gap-3 rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/40"
                   >
                     <span
                       className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-md bg-bg-muted text-primary"
                       aria-hidden="true"
                     >
-                      {item.url ? (
-                        <ExternalLink className="h-4 w-4" />
-                      ) : (
-                        <FileText className="h-4 w-4" />
-                      )}
+                      <BookOpen className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {resource && (
-                          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                            {resource.label}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 font-medium leading-tight text-text">
-                        {item.title}
+                      <p className="font-medium leading-tight text-text">
+                        {module.title}
                       </p>
-                      {item.description && (
+                      {module.description && (
                         <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-text-muted">
-                          {item.description}
+                          {module.description}
                         </p>
                       )}
+                      <p className="mt-2 text-xs text-text-muted">
+                        {count} {count === 1 ? 'item' : 'items'}
+                      </p>
                     </div>
                     <ChevronRight
                       className="mt-2 h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
