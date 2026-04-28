@@ -18,10 +18,12 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const code = searchParams.get('code')
   const errorDescription = searchParams.get('error_description')
-  const rawNext = searchParams.get('next') ?? '/dashboard'
+  // Default to "/" so the root page's role-aware redirect picks the
+  // right home (admins -> /admin, everyone else -> /dashboard).
+  const rawNext = searchParams.get('next') ?? '/'
 
   // Only allow relative redirects to prevent open-redirect abuse.
-  const next = rawNext.startsWith('/') ? rawNext : '/dashboard'
+  const next = rawNext.startsWith('/') ? rawNext : '/'
 
   if (errorDescription) {
     return NextResponse.redirect(

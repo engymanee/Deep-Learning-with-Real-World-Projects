@@ -20,7 +20,10 @@ type Method = 'password' | 'code'
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') ?? '/dashboard'
+  // Default to "/" so the root page can redirect by role (admins land
+  // on /admin, fellows on /dashboard) instead of hard-coding /dashboard
+  // for every account type.
+  const next = searchParams.get('next') ?? '/'
 
   const [method, setMethod] = useState<Method>('password')
   const [email, setEmail] = useState('')
@@ -49,7 +52,7 @@ function LoginForm() {
       // `router.refresh()` because the navigation itself triggers a
       // fresh server render of the destination - calling refresh on top
       // double-renders and adds noticeable click-to-content latency.
-      router.replace(next.startsWith('/') ? next : '/dashboard')
+      router.replace(next.startsWith('/') ? next : '/')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to sign in')
     } finally {
@@ -74,7 +77,7 @@ function LoginForm() {
         typeof window !== 'undefined' ? window.location.origin : ''
       const redirectTo = origin
         ? `${origin}/auth/callback?next=${encodeURIComponent(
-            next.startsWith('/') ? next : '/dashboard',
+            next.startsWith('/') ? next : '/',
           )}`
         : undefined
 

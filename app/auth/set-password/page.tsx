@@ -86,7 +86,9 @@ export default function AcceptInvitePage() {
       const supabase = createClient()
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
-      router.push('/dashboard')
+      // Send through "/" so admins go to /admin and fellows to
+      // /dashboard, picked server-side by the root page.
+      router.push('/')
       router.refresh()
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : 'Unable to set password')
@@ -97,11 +99,11 @@ export default function AcceptInvitePage() {
 
   function handleCodeContinue() {
     // No password set. The invite exchange already gave us a live
-    // session, so we just forward to the dashboard. Future logins go
-    // through the "email me a code" path on /auth/login.
+    // session, so we just forward through "/" so the root page picks
+    // /admin or /dashboard based on role.
     setSubmitError(null)
     setIsSubmitting(true)
-    router.push('/dashboard')
+    router.push('/')
     router.refresh()
   }
 
