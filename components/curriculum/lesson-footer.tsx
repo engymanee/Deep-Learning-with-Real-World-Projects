@@ -57,12 +57,14 @@ export function LessonFooter({
     setOptimistic(isCompleted)
   }
 
-  // Both gates are enforced silently. The Mark as completed button
-  // simply stays disabled until the fellow opens the link (when
-  // present) and submits the required reflection (when required) -
-  // no inline copy spelling out the rule, the form fields above
-  // already tell the story.
   const blocked = !optimistic && (needsLinkClick || needsReflection)
+  // The link gate is enforced silently - the button is just disabled
+  // until the fellow opens the resource, with no inline hint. The
+  // reflection gate still surfaces a hint because the textarea sits
+  // right above the footer and a nudge there is helpful.
+  const blockMessage = needsReflection
+    ? 'Submit your reflection above before you can mark this complete.'
+    : null
 
   function handleMarkComplete() {
     setError(null)
@@ -119,6 +121,12 @@ export function LessonFooter({
 
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-6">
+      {!optimistic && blocked && blockMessage && (
+        <p className="text-sm text-muted-foreground" role="status">
+          {blockMessage}
+        </p>
+      )}
+
       {error && (
         <p className="text-sm text-destructive" role="alert">
           {error}
@@ -143,14 +151,17 @@ export function LessonFooter({
             )}
             {completedBadge}
           </>
+        ) : blocked ? (
+          // Reflection (or link) gate is active. Don't even render
+          // the Mark as completed button - completion isn't a
+          // visual option yet. The hint above explains why.
+          null
         ) : (
-          // Single primary CTA. Disabled (no inline hint) while any
-          // gate is unmet - the form fields above tell the fellow
-          // what's missing.
+          // All gates cleared: single primary CTA.
           <Button
             type="button"
             onClick={handleMarkComplete}
-            disabled={pending || blocked}
+            disabled={pending}
           >
             {pending ? 'Marking...' : 'Mark as completed'}
           </Button>
