@@ -1,5 +1,4 @@
 import { Eye, X } from 'lucide-react'
-import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth-server'
 import { endPreview } from '@/app/admin/preview/actions'
 
@@ -46,12 +45,6 @@ export async function AdminPreviewBanner() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Link
-            href="/admin"
-            className="hidden rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted sm:inline-block"
-          >
-            Admin console
-          </Link>
           <form action={endPreview}>
             <button
               type="submit"
