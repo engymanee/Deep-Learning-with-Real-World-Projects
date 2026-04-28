@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
-import { ExternalLink } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronLeft, ExternalLink } from 'lucide-react'
+import { AppShell } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { CompletionRadio } from '@/components/curriculum/completion-radio'
 import { createClient } from '@/lib/supabase/server'
@@ -113,85 +115,95 @@ export default async function ContentItemPage({
   const hasUrl = !!item.url
 
   return (
-    <article className="mx-auto max-w-2xl space-y-8">
-      <header className="space-y-3">
-        {(resource || duration) && (
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {resource && (
-              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 font-medium uppercase tracking-wider">
-                {resource.label}
-              </span>
-            )}
-            {duration && <span>{duration}</span>}
-          </div>
-        )}
-        <h1 className="text-pretty font-serif text-3xl leading-tight text-foreground md:text-4xl">
-          {item.title}
-        </h1>
-        {item.description && (
-          <p className="text-pretty text-base leading-relaxed text-muted-foreground">
-            {item.description}
-          </p>
-        )}
-      </header>
+    <AppShell showSidebar currentYearId={phaseId} currentLabId={item.id}>
+      <article className="mx-auto max-w-2xl space-y-8">
+        <Link
+          href={`/dashboard#phase-${phaseId}`}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          Back to curriculum
+        </Link>
 
-      {/* Body */}
-      {hasBody && (
-        <div className="space-y-4 text-base leading-relaxed text-foreground">
-          {item.body!.split(/\n{2,}/).map((para, i) => (
-            <p key={i} className="whitespace-pre-wrap">
-              {para}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {/* External resource CTA */}
-      {hasUrl && (
-        <div className="rounded-lg border border-border bg-card p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">
-                {hasBody ? 'Linked resource' : 'Open this resource'}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {item.url}
-              </p>
+        <header className="space-y-3">
+          {(resource || duration) && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {resource && (
+                <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 font-medium uppercase tracking-wider">
+                  {resource.label}
+                </span>
+              )}
+              {duration && <span>{duration}</span>}
             </div>
-            <Button asChild>
-              <a
-                href={item.url!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5"
-              >
-                Open
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
-            </Button>
-          </div>
-        </div>
-      )}
+          )}
+          <h1 className="text-pretty font-serif text-3xl leading-tight text-foreground md:text-4xl">
+            {item.title}
+          </h1>
+          {item.description && (
+            <p className="text-pretty text-base leading-relaxed text-muted-foreground">
+              {item.description}
+            </p>
+          )}
+        </header>
 
-      {!hasBody && !hasUrl && (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            This item has no content attached yet.
+        {/* Body */}
+        {hasBody && (
+          <div className="space-y-4 text-base leading-relaxed text-foreground">
+            {item.body!.split(/\n{2,}/).map((para, i) => (
+              <p key={i} className="whitespace-pre-wrap">
+                {para}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* External resource CTA */}
+        {hasUrl && (
+          <div className="rounded-lg border border-border bg-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  {hasBody ? 'Linked resource' : 'Open this resource'}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {item.url}
+                </p>
+              </div>
+              <Button asChild>
+                <a
+                  href={item.url!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5"
+                >
+                  Open
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!hasBody && !hasUrl && (
+          <div className="rounded-lg border border-dashed border-border p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              This item has no content attached yet.
+            </p>
+          </div>
+        )}
+
+        {/* Completion control */}
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
+          <CompletionRadio
+            contentId={item.id}
+            isCompleted={isCompleted}
+            itemTitle={item.title}
+          />
+          <p className="text-sm text-foreground">
+            {isCompleted ? 'Completed' : 'Mark as complete'}
           </p>
         </div>
-      )}
-
-      {/* Completion control */}
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
-        <CompletionRadio
-          contentId={item.id}
-          isCompleted={isCompleted}
-          itemTitle={item.title}
-        />
-        <p className="text-sm text-foreground">
-          {isCompleted ? 'Completed' : 'Mark as complete'}
-        </p>
-      </div>
-    </article>
+      </article>
+    </AppShell>
   )
 }

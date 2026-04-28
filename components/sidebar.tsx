@@ -216,7 +216,10 @@ export function Sidebar({
             return (
               <Link
                 key={phase.id}
-                href={`/phases/${phase.id}`}
+                // Phases no longer have a dedicated page - the dashboard's
+                // collapsible curriculum tree owns browsing. Hash-link to
+                // the right phase block; the tree opens it on hashchange.
+                href={`/dashboard#phase-${phase.id}`}
                 onClick={onClose}
                 aria-current={isCurrent ? 'page' : undefined}
                 className={cn(

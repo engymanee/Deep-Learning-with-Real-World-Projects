@@ -1,7 +1,8 @@
 import { AppShell } from '@/components/app-shell'
 import { getDashboardData } from '@/lib/dashboard-data'
+import { loadFullCurriculum } from '@/lib/curriculum-tree'
 import { LiveSessionCard } from '@/components/dashboard/live-session-card'
-import { CurriculumList } from '@/components/dashboard/curriculum-list'
+import { CurriculumTree } from '@/components/curriculum/curriculum-tree'
 import { AnnouncementsFeed } from '@/components/dashboard/announcements-feed'
 
 export const dynamic = 'force-dynamic'
@@ -18,19 +19,28 @@ function getWelcomeSubtitle(
   }
   if (role === 'facilitator') {
     return phasesCount === 0
-      ? "No curriculum is published yet"
+      ? 'No curriculum is published yet'
       : `Reviewing ${phasesCount} phase${phasesCount === 1 ? '' : 's'} of curriculum`
   }
   // fellow
   if (phasesCount === 0) {
-    return "No curriculum has been assigned to your cohort yet"
+    return 'No curriculum has been assigned to your cohort yet'
   }
   return `${phasesCount} phase${phasesCount === 1 ? '' : 's'} available - ${contentCount} item${contentCount === 1 ? '' : 's'} in total`
 }
 
 export default async function DashboardPage() {
-  const data = await getDashboardData()
-  const totalContent = data.phases.reduce((sum, p) => sum + p.contentCount, 0)
+  // Two parallel loads: dashboard chrome (sessions, announcements,
+  // welcome copy) and the full Phase -> Module -> Content tree the
+  // collapsible curriculum view renders inline.
+  const [data, curriculum] = await Promise.all([
+    getDashboardData(),
+    loadFullCurriculum(),
+  ])
+  const totalContent = curriculum.phases.reduce(
+    (sum, p) => sum + p.itemCount,
+    0,
+  )
 
   return (
     <AppShell showSidebar>
@@ -42,7 +52,7 @@ export default async function DashboardPage() {
           </h1>
           <p className="text-text-muted">
             {getWelcomeSubtitle(
-              data.phases.length,
+              curriculum.phases.length,
               totalContent,
               data.user.role,
             )}
@@ -54,8 +64,27 @@ export default async function DashboardPage() {
           <LiveSessionCard session={data.upcomingSession} />
         )}
 
-        {/* Curriculum overview */}
-        <CurriculumList phases={data.phases} />
+        {/* Curriculum overview - collapsible tree */}
+        <section
+          aria-labelledby="curriculum-heading"
+          className="space-y-4"
+        >
+          <div className="flex items-end justify-between">
+            <h3
+              id="curriculum-heading"
+              className="font-serif text-lg text-primary"
+            >
+              Curriculum
+            </h3>
+            {curriculum.phases.length > 0 && (
+              <span className="text-xs text-text-muted">
+                {curriculum.phases.length} phase
+                {curriculum.phases.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
+          <CurriculumTree phases={curriculum.phases} />
+        </section>
 
         {/* Announcements */}
         <AnnouncementsFeed announcements={data.announcements} />

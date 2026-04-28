@@ -21,8 +21,9 @@ export type ToggleResult =
  * shouldn't see. Idempotent: calling twice with the same intent
  * just no-ops.
  *
- * Revalidates the affected phase, module, and item paths so the
- * sidebar tree and the right pane both reflect the new state.
+ * Lives at the /phases route root (not under [phaseId]) because the
+ * dashboard's curriculum tree also calls it - we don't want this
+ * action coupled to a specific phase URL segment.
  */
 export async function toggleContentCompletion(
   contentId: string,
@@ -92,12 +93,10 @@ export async function toggleContentCompletion(
       if (deleteError) return { ok: false, message: deleteError.message }
     }
 
-    revalidatePath(`/phases/${item.year_id}`)
-    revalidatePath(`/phases/${item.year_id}/modules/${item.module_id}`)
+    revalidatePath('/dashboard')
     revalidatePath(
       `/phases/${item.year_id}/modules/${item.module_id}/items/${contentId}`,
     )
-    revalidatePath('/dashboard')
 
     return { ok: true, completed: nextCompleted }
   } catch (e) {

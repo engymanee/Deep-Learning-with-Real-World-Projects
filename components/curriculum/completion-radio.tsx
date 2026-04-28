@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { toggleContentCompletion } from '@/app/phases/[phaseId]/actions'
+import { toggleContentCompletion } from '@/app/phases/actions'
 
 interface Props {
   contentId: string

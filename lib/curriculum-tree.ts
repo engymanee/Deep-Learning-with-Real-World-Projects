@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
@@ -10,12 +9,13 @@ import {
 /**
  * Server-side data layer for the fellow curriculum view.
  *
- * Returns the entire phase -> modules -> contents tree the current
- * user is allowed to see, plus their completion set. Visibility uses
- * the same Phase -> Module -> Content cascade as everywhere else, and
- * is bypassed for admins/facilitators (they see everything).
+ * Returns every Phase -> Module -> Content the current user is
+ * allowed to see, plus their completion set, as a flat tree the
+ * dashboard renders inline (no per-phase landing page).
  *
- * Use from layouts/pages under `/phases/[phaseId]/...`.
+ * Visibility uses the same Phase -> Module -> Content cascade as
+ * everywhere else, and is bypassed for admins/facilitators (they see
+ * everything).
  */
 
 export interface CurriculumItem {
@@ -23,7 +23,7 @@ export interface CurriculumItem {
   title: string
   /** Optional duration in minutes; rendered as "55min" in the tree. */
   durationMinutes: number | null
-  /** href for the right-pane router push when this item is opened. */
+  /** href for the content viewer page. */
   href: string
   /** Whether the current user has marked this item complete. */
   isCompleted: boolean
@@ -33,57 +33,59 @@ export interface CurriculumModule {
   id: string
   title: string
   description: string | null
-  /** href for the module landing page (no specific item selected). */
-  href: string
   items: CurriculumItem[]
 }
 
-export interface CurriculumTree {
-  phase: {
-    id: string
-    title: string
-    description: string | null
-    /** href for the phase landing page. */
-    href: string
-  }
+export interface CurriculumPhase {
+  id: string
+  title: string
+  description: string | null
   modules: CurriculumModule[]
-  /** True when the user is an admin/facilitator (visibility filtering bypassed). */
+  /** Total visible content items across all modules. */
+  itemCount: number
+  /** Total items the user has marked complete. */
+  completedCount: number
+}
+
+export interface FullCurriculum {
+  phases: CurriculumPhase[]
+  /** True when the user is an admin/facilitator (visibility bypassed). */
   isPrivileged: boolean
 }
 
 /**
- * Load the full visible tree for a phase. Triggers `notFound()` if
- * the phase doesn't exist or the user can't see it. Never returns a
- * stub - if you get back a tree it's valid for the user.
+ * Load every visible phase + nested modules + items for the current
+ * user, in display order. Single helper used by the dashboard's
+ * collapsible curriculum tree.
  */
-export async function loadCurriculumTree(
-  phaseId: string,
-): Promise<CurriculumTree> {
+export async function loadFullCurriculum(): Promise<FullCurriculum> {
   const user = await requireUser()
   const supabase = await createClient()
   const isFellow = user.role === 'fellow'
   const userCohort = user.cohort ?? null
 
   const [
-    { data: phase },
-    { data: modules },
-    { data: items },
-    { data: completions },
+    { data: phaseRows },
+    { data: moduleRows },
+    { data: itemRows },
+    { data: completionRows },
   ] = await Promise.all([
     supabase
       .from('years')
-      .select('id, title, description, cohorts')
-      .eq('id', phaseId)
-      .maybeSingle<{
-        id: string
-        title: string
-        description: string | null
-        cohorts: string[] | null
-      }>(),
+      .select('id, title, description, cohorts, order_index')
+      .order('order_index', { ascending: true })
+      .returns<
+        Array<{
+          id: string
+          title: string
+          description: string | null
+          cohorts: string[] | null
+          order_index: number
+        }>
+      >(),
     supabase
       .from('modules')
       .select('id, phase_id, title, description, cohorts, order_index')
-      .eq('phase_id', phaseId)
       .order('order_index', { ascending: true })
       .returns<
         Array<{
@@ -98,13 +100,13 @@ export async function loadCurriculumTree(
     supabase
       .from('labs')
       .select(
-        'id, module_id, title, category, cohorts, duration_minutes, order_index',
+        'id, year_id, module_id, title, category, cohorts, duration_minutes, order_index',
       )
-      .eq('year_id', phaseId)
       .order('order_index', { ascending: true })
       .returns<
         Array<{
           id: string
+          year_id: string
           module_id: string | null
           title: string
           category: string | null
@@ -113,42 +115,53 @@ export async function loadCurriculumTree(
           order_index: number
         }>
       >(),
-    // RLS limits this to the current user's rows. We still scope by id
-    // so we don't pull every completion the user has across phases.
+    // RLS already restricts this to the current user's rows.
     supabase
       .from('user_content_completions')
       .select('content_id')
       .returns<Array<{ content_id: string }>>(),
   ])
 
-  if (!phase) notFound()
-  if (isFellow && !canFellowSeePhase(phase.cohorts, userCohort)) notFound()
+  const completedSet = new Set((completionRows ?? []).map((c) => c.content_id))
 
-  const completedSet = new Set(
-    (completions ?? []).map((c) => c.content_id),
+  // Phase visibility filter.
+  const visiblePhases = (phaseRows ?? []).filter((p) =>
+    !isFellow ? true : canFellowSeePhase(p.cohorts, userCohort),
   )
+  const phaseCohortById = new Map<string, string[] | null>()
+  for (const p of visiblePhases) phaseCohortById.set(p.id, p.cohorts)
 
-  // Filter modules by phase-cascade visibility.
-  const visibleModules = (modules ?? []).filter((m) =>
-    !isFellow ? true : canFellowSeeModule(m.cohorts, phase.cohorts, userCohort),
-  )
+  // Module visibility filter, grouped under their phase.
+  const modulesByPhase = new Map<string, typeof moduleRows>()
   const moduleCohortById = new Map<string, string[] | null>()
-  for (const m of visibleModules) moduleCohortById.set(m.id, m.cohorts)
+  for (const m of moduleRows ?? []) {
+    const phaseCohorts = phaseCohortById.get(m.phase_id)
+    if (phaseCohorts === undefined) continue // phase not visible
+    if (
+      isFellow &&
+      !canFellowSeeModule(m.cohorts, phaseCohorts, userCohort)
+    ) {
+      continue
+    }
+    moduleCohortById.set(m.id, m.cohorts)
+    const list = modulesByPhase.get(m.phase_id) ?? []
+    list.push(m)
+    modulesByPhase.set(m.phase_id, list)
+  }
 
-  // Group visible items under their module.
+  // Item visibility filter, grouped under their module.
   const itemsByModule = new Map<string, CurriculumItem[]>()
-  for (const m of visibleModules) itemsByModule.set(m.id, [])
-
-  for (const item of items ?? []) {
+  for (const item of itemRows ?? []) {
     if (!item.module_id) continue
-    if (!item.category) continue // legacy/draft rows without a category
+    if (!item.category) continue // legacy/draft rows
     const moduleCohorts = moduleCohortById.get(item.module_id)
-    if (moduleCohorts === undefined) continue // module not visible to user
+    if (moduleCohorts === undefined) continue // module not visible
+    const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
     if (isFellow) {
       if (
         !canFellowSeeContent(
           item.cohorts,
-          phase.cohorts,
+          phaseCohorts,
           userCohort,
           moduleCohorts,
         )
@@ -156,29 +169,40 @@ export async function loadCurriculumTree(
         continue
       }
     }
-    itemsByModule.get(item.module_id)!.push({
+    const list = itemsByModule.get(item.module_id) ?? []
+    list.push({
       id: item.id,
       title: item.title,
       durationMinutes: item.duration_minutes,
-      href: `/phases/${phase.id}/modules/${item.module_id}/items/${item.id}`,
+      href: `/phases/${item.year_id}/modules/${item.module_id}/items/${item.id}`,
       isCompleted: completedSet.has(item.id),
     })
+    itemsByModule.set(item.module_id, list)
   }
 
-  return {
-    phase: {
-      id: phase.id,
-      title: phase.title,
-      description: phase.description,
-      href: `/phases/${phase.id}`,
-    },
-    modules: visibleModules.map((m) => ({
+  // Stitch everything together in display order.
+  const phases: CurriculumPhase[] = visiblePhases.map((p) => {
+    const modules = (modulesByPhase.get(p.id) ?? []).map((m) => ({
       id: m.id,
       title: m.title,
       description: m.description,
-      href: `/phases/${phase.id}/modules/${m.id}`,
       items: itemsByModule.get(m.id) ?? [],
-    })),
-    isPrivileged: !isFellow,
-  }
+    }))
+    let itemCount = 0
+    let completedCount = 0
+    for (const m of modules) {
+      itemCount += m.items.length
+      for (const i of m.items) if (i.isCompleted) completedCount += 1
+    }
+    return {
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      modules,
+      itemCount,
+      completedCount,
+    }
+  })
+
+  return { phases, isPrivileged: !isFellow }
 }
