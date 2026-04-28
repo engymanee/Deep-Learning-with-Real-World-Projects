@@ -53,6 +53,14 @@ export interface CurriculumPhase {
   itemCount: number
   /** Total items the user has marked complete. */
   completedCount: number
+  /**
+   * True when the phase exists in the curriculum but the current
+   * fellow's cohort isn't assigned to it. Locked phases are kept in
+   * the tree so the UI can show them as gated, but their modules
+   * array is intentionally empty - admins/facilitators always see
+   * `isLocked: false`.
+   */
+  isLocked: boolean
 }
 
 export interface FullCurriculum {
@@ -138,19 +146,32 @@ async function _loadFullCurriculum(): Promise<FullCurriculum> {
 
   const completedSet = new Set((completionRows ?? []).map((c) => c.content_id))
 
-  // Phase visibility filter.
-  const visiblePhases = (phaseRows ?? []).filter((p) =>
-    !isFellow ? true : canFellowSeePhase(p.cohorts, userCohort),
-  )
+  // Phase visibility. Fellows still see every phase in the tree,
+  // but unassigned ones are flagged `isLocked` so the UI can render
+  // them as gated cards instead of hiding them. Privileged users
+  // never see a locked phase.
+  const allPhases = phaseRows ?? []
+  const lockedPhaseIds = new Set<string>()
+  if (isFellow) {
+    for (const p of allPhases) {
+      if (!canFellowSeePhase(p.cohorts, userCohort)) {
+        lockedPhaseIds.add(p.id)
+      }
+    }
+  }
   const phaseCohortById = new Map<string, string[] | null>()
-  for (const p of visiblePhases) phaseCohortById.set(p.id, p.cohorts)
+  for (const p of allPhases) phaseCohortById.set(p.id, p.cohorts)
 
-  // Module visibility filter, grouped under their phase.
+  // Module visibility filter, grouped under their phase. Modules
+  // under a locked phase are dropped entirely - we render the phase
+  // as a "locked" stub with no children, so loading them would just
+  // be wasted work and could leak titles into the client bundle.
   const modulesByPhase = new Map<string, typeof moduleRows>()
   const moduleCohortById = new Map<string, string[] | null>()
   for (const m of moduleRows ?? []) {
     const phaseCohorts = phaseCohortById.get(m.phase_id)
-    if (phaseCohorts === undefined) continue // phase not visible
+    if (phaseCohorts === undefined) continue // phase not in curriculum
+    if (lockedPhaseIds.has(m.phase_id)) continue
     if (
       isFellow &&
       !canFellowSeeModule(m.cohorts, phaseCohorts, userCohort)
@@ -195,14 +216,19 @@ async function _loadFullCurriculum(): Promise<FullCurriculum> {
     itemsByModule.set(item.module_id, list)
   }
 
-  // Stitch everything together in display order.
-  const phases: CurriculumPhase[] = visiblePhases.map((p) => {
-    const modules = (modulesByPhase.get(p.id) ?? []).map((m) => ({
-      id: m.id,
-      title: m.title,
-      description: m.description,
-      items: itemsByModule.get(m.id) ?? [],
-    }))
+  // Stitch everything together in display order. Locked phases
+  // come back with empty modules + zero counts so the UI can render
+  // a gated stub without further conditionals.
+  const phases: CurriculumPhase[] = allPhases.map((p) => {
+    const isLocked = lockedPhaseIds.has(p.id)
+    const modules = isLocked
+      ? []
+      : (modulesByPhase.get(p.id) ?? []).map((m) => ({
+          id: m.id,
+          title: m.title,
+          description: m.description,
+          items: itemsByModule.get(m.id) ?? [],
+        }))
     let itemCount = 0
     let completedCount = 0
     for (const m of modules) {
@@ -212,10 +238,13 @@ async function _loadFullCurriculum(): Promise<FullCurriculum> {
     return {
       id: p.id,
       title: p.title,
-      description: p.description,
+      // Don't leak descriptive copy for phases the fellow can't
+      // access - just the title is enough to convey "this exists".
+      description: isLocked ? null : p.description,
       modules,
       itemCount,
       completedCount,
+      isLocked,
     }
   })
 

@@ -62,10 +62,16 @@ export async function loadTeamProgress(): Promise<TeamProgressData> {
   // their teammates' meters.
   const curriculum = await loadFullCurriculum()
 
+  // Locked phases have no accessible items for this fellow, so
+  // they're dropped from the progress meters - they belong on the
+  // curriculum tree (where they read as "Locked"), not on a 0%
+  // meter card. Privileged users never get `isLocked: true`.
+  const accessiblePhases = curriculum.phases.filter((p) => !p.isLocked)
+
   // Build a contentId -> phaseId index for O(1) bucket assignment.
   const phaseByItem = new Map<string, string>()
   const itemCountByPhase = new Map<string, number>()
-  for (const phase of curriculum.phases) {
+  for (const phase of accessiblePhases) {
     let count = 0
     for (const module of phase.modules) {
       for (const item of module.items) {
@@ -130,7 +136,7 @@ export async function loadTeamProgress(): Promise<TeamProgressData> {
     perProfile.set(phaseId, (perProfile.get(phaseId) ?? 0) + 1)
   }
 
-  const phases: PhaseProgress[] = curriculum.phases.map((phase) => {
+  const phases: PhaseProgress[] = accessiblePhases.map((phase) => {
     const total = itemCountByPhase.get(phase.id) ?? 0
     const myCompleted = tally.get(user.id)?.get(phase.id) ?? 0
 

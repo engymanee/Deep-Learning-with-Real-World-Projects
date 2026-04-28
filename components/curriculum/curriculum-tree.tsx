@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CompletionRadio } from './completion-radio'
 import type { CurriculumItem, CurriculumPhase } from '@/lib/curriculum-tree'
@@ -184,6 +184,39 @@ export function CurriculumTree({ phases }: Props) {
   return (
     <nav aria-label="Curriculum" className="flex flex-col gap-3">
       {phases.map((phase) => {
+        // Locked phases render as a flat, non-interactive stub:
+        // no children loaded, no toggle, just a clear "you don't
+        // have access yet" affordance. Fellows still see the phase
+        // exists so they know the rest of the program is coming.
+        if (phase.isLocked) {
+          return (
+            <section
+              key={phase.id}
+              id={`phase-${phase.id}`}
+              aria-label={`${phase.title} (locked)`}
+              className="rounded-lg border border-dashed border-border bg-muted/30"
+            >
+              <div className="flex w-full items-center justify-between gap-3 px-5 py-4">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-serif text-xl leading-tight text-muted-foreground">
+                    {phase.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Not yet assigned to your cohort.
+                  </p>
+                </div>
+                <span
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                  title="Locked"
+                >
+                  <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                  Locked
+                </span>
+              </div>
+            </section>
+          )
+        }
+
         const phaseOpen = openIds.has(phase.id)
         return (
           <section

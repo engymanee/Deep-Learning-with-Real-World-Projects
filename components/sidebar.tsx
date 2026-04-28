@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Layers, ShieldCheck } from 'lucide-react'
+import { Layers, Lock, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -17,6 +17,9 @@ interface PhaseRow {
   title: string
   order_index: number
   cohorts: string[] | null
+  /** Per-fellow flag: true when the phase is not assigned to the
+   *  viewer's cohort. Privileged users always see `false`. */
+  isLocked: boolean
 }
 
 interface ModuleRow {
@@ -107,13 +110,24 @@ export function Sidebar({
 
       const isFellowRole = currentRole === 'fellow'
 
-      // Filter phases by cohort access for fellows; everyone else sees all.
-      const visiblePhases = (phaseRows ?? []).filter((p) =>
-        !isFellowRole
-          ? true
-          : canFellowSeePhase(p.cohorts as string[] | null, userCohort),
+      // Fellows still see every phase in the sidebar; ones that
+      // their cohort isn't assigned to are flagged `isLocked` so
+      // the row renders as a non-link gated entry rather than
+      // disappearing.
+      const visiblePhases: PhaseRow[] = (phaseRows ?? []).map((p) => ({
+        id: p.id,
+        title: p.title,
+        order_index: p.order_index,
+        cohorts: (p.cohorts as string[] | null) ?? null,
+        isLocked: isFellowRole
+          ? !canFellowSeePhase(p.cohorts as string[] | null, userCohort)
+          : false,
+      }))
+      // Counts only consider unlocked phases - locked ones have no
+      // accessible content for this viewer.
+      const visiblePhaseIds = new Set(
+        visiblePhases.filter((p) => !p.isLocked).map((p) => p.id),
       )
-      const visiblePhaseIds = new Set(visiblePhases.map((p) => p.id))
 
       // Tally per-phase content count using the full Phase -> Module
       // -> Content cascade. We delegate the visibility rule to the
@@ -213,6 +227,34 @@ export function Sidebar({
           phases.map((phase, idx) => {
             const isCurrent = currentYearId === phase.id
             const count = counts.get(phase.id) ?? 0
+
+            // Locked phases render as a non-clickable disabled row
+            // with a small lock affordance instead of a count - so
+            // fellows see the full curriculum spine, just gated.
+            if (phase.isLocked) {
+              return (
+                <div
+                  key={phase.id}
+                  aria-disabled="true"
+                  title="Not assigned to your cohort"
+                  className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-text-muted opacity-70"
+                >
+                  <span
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-border/40 text-[10px] font-semibold text-text-muted"
+                    aria-hidden="true"
+                  >
+                    {idx + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{phase.title}</span>
+                  <Lock
+                    className="h-3.5 w-3.5 shrink-0 text-text-muted"
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">Locked</span>
+                </div>
+              )
+            }
+
             return (
               <Link
                 key={phase.id}
