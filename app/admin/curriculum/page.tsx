@@ -10,6 +10,7 @@ type YearRow = {
   title: string
   description: string | null
   order_index: number
+  cohorts: string[] | null
 }
 
 type LabRow = {
@@ -18,6 +19,7 @@ type LabRow = {
   title: string
   description: string | null
   order_index: number
+  cohorts: string[] | null
 }
 
 export default async function AdminCurriculumPage() {
@@ -27,11 +29,11 @@ export default async function AdminCurriculumPage() {
   const [{ data: years }, { data: labs }, { data: blockCounts }] = await Promise.all([
     supabase
       .from('years')
-      .select('id, title, description, order_index')
+      .select('id, title, description, order_index, cohorts')
       .order('order_index', { ascending: true }),
     supabase
       .from('labs')
-      .select('id, year_id, title, description, order_index')
+      .select('id, year_id, title, description, order_index, cohorts')
       .order('order_index', { ascending: true }),
     supabase.from('lab_content_blocks').select('lab_id'),
   ])
@@ -55,11 +57,13 @@ export default async function AdminCurriculumPage() {
     id: year.id,
     title: year.title,
     description: year.description,
+    cohorts: year.cohorts ?? [],
     items: (labsByYear.get(year.id) ?? []).map((lab) => ({
       id: lab.id,
       year_id: lab.year_id,
       title: lab.title,
       description: lab.description,
+      cohorts: lab.cohorts ?? [],
       block_count: blockCountByLab.get(lab.id) ?? 0,
     })),
   }))

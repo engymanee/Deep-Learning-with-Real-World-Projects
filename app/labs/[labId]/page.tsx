@@ -5,6 +5,7 @@ import { AppShell } from '@/components/app-shell'
 import { LabBlockCard, type BlockType } from '@/components/lab-block-card'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
+import { fellowCanAccess } from '@/lib/cohorts'
 
 type Phase = 'before' | 'during' | 'after'
 
@@ -14,7 +15,8 @@ interface LabRow {
   description: string | null
   year_id: string
   order_index: number
-  years: { id: string; title: string } | null
+  cohorts: string[] | null
+  years: { id: string; title: string; cohorts: string[] | null } | null
 }
 
 interface BlockRow {
@@ -59,11 +61,23 @@ export default async function LabPage({
   // Lab + year
   const { data: lab } = await supabase
     .from('labs')
-    .select('id, title, description, year_id, order_index, years(id, title)')
+    .select(
+      'id, title, description, year_id, order_index, cohorts, years(id, title, cohorts)',
+    )
     .eq('id', labId)
     .maybeSingle<LabRow>()
 
   if (!lab) notFound()
+
+  // Cohort gating. Fellows can only see labs whose lab- and phase-level
+  // cohort lists allow their cohort. Admins / facilitators always pass.
+  // Treated as "not found" (rather than a 403) so the URL doesn't leak
+  // the existence of restricted content.
+  if (user.role === 'fellow') {
+    const labOk = fellowCanAccess(lab.cohorts, user.cohort)
+    const yearOk = fellowCanAccess(lab.years?.cohorts ?? null, user.cohort)
+    if (!labOk || !yearOk) notFound()
+  }
 
   // Blocks for this lab (ordered by phase -> order_index)
   const { data: blocksData } = await supabase

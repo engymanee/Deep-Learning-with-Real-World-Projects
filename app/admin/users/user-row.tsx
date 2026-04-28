@@ -33,15 +33,17 @@ import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 import { MoreHorizontal, Mail, Trash2, UserX, UserCheck } from 'lucide-react'
 import { ROLE_LABELS, type Role } from '@/lib/roles'
+import { COHORTS, type Cohort } from '@/lib/cohorts'
 import {
   deleteUserAction,
   resendInviteAction,
   toggleDeactivateAction,
   updateCohortAction,
+  updateCohortLetterAction,
   updateRoleAction,
 } from './actions'
 
-type Cohort = { id: string; name: string }
+type SchoolTeam = { id: string; name: string }
 
 type UserRowData = {
   id: string
@@ -49,6 +51,7 @@ type UserRowData = {
   email: string | null
   title: string | null
   role: Role
+  cohort: Cohort | null
   deactivated_at: string | null
   cohort_id: string | null
   cohort_name: string | null
@@ -57,13 +60,15 @@ type UserRowData = {
   email_confirmed_at: string | null
 }
 
-const NONE_COHORT = '__none__'
+const NONE_TEAM = '__none__'
+const NONE_COHORT = '__none_cohort__'
 
-export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[] }) {
+export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: SchoolTeam[] }) {
   const [pending, startTransition] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
   const [role, setRole] = useState<Role>(user.role)
-  const [cohortId, setCohortId] = useState<string>(user.cohort_id ?? NONE_COHORT)
+  const [schoolTeamId, setSchoolTeamId] = useState<string>(user.cohort_id ?? NONE_TEAM)
+  const [cohortLetter, setCohortLetter] = useState<string>(user.cohort ?? NONE_COHORT)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleteErr, setDeleteErr] = useState<string | null>(null)
@@ -85,12 +90,20 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
     run(() => updateRoleAction(fd))
   }
 
-  function handleCohortChange(next: string) {
-    setCohortId(next)
+  function handleSchoolTeamChange(next: string) {
+    setSchoolTeamId(next)
     const fd = new FormData()
     fd.set('userId', user.id)
-    fd.set('cohortId', next === NONE_COHORT ? '' : next)
+    fd.set('cohortId', next === NONE_TEAM ? '' : next)
     run(() => updateCohortAction(fd))
+  }
+
+  function handleCohortLetterChange(next: string) {
+    setCohortLetter(next)
+    const fd = new FormData()
+    fd.set('userId', user.id)
+    fd.set('cohort', next === NONE_COHORT ? '' : next)
+    run(() => updateCohortLetterAction(fd))
   }
 
   function handleResend() {
@@ -142,7 +155,7 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
 
   return (
     <li className="grid grid-cols-12 items-center gap-4 px-5 py-4">
-      <div className="col-span-12 flex items-center gap-3 md:col-span-4">
+      <div className="col-span-12 flex items-center gap-3 md:col-span-3">
         <Avatar className="h-9 w-9">
           <AvatarFallback className="bg-primary/10 text-xs text-primary">
             {initials}
@@ -182,15 +195,39 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
       </div>
 
       <div className="col-span-6 md:col-span-3">
-        <Select value={cohortId} onValueChange={handleCohortChange} disabled={pending}>
+        <Select
+          value={schoolTeamId}
+          onValueChange={handleSchoolTeamChange}
+          disabled={pending}
+        >
           <SelectTrigger className="h-9">
-            <SelectValue />
+            <SelectValue placeholder="No team" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE_COHORT}>No cohort</SelectItem>
+            <SelectItem value={NONE_TEAM}>No team</SelectItem>
             {cohorts.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="col-span-6 md:col-span-1">
+        <Select
+          value={cohortLetter}
+          onValueChange={handleCohortLetterChange}
+          disabled={pending}
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="—" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE_COHORT}>—</SelectItem>
+            {COHORTS.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c}
               </SelectItem>
             ))}
           </SelectContent>
@@ -272,7 +309,7 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
               Delete {user.full_name ?? user.email ?? 'this user'}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the account, their profile, cohort membership,
+              This permanently removes the account, their profile, school team membership,
               and all progress records. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

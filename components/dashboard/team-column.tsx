@@ -9,8 +9,8 @@ export function TeamColumn({ team }: { team: DashboardTeam | null }) {
       <div className="space-y-4">
         <h3 className="font-serif text-lg text-primary">Your team</h3>
         <p className="text-sm text-text-muted">
-          You&apos;re not yet assigned to a cohort. Your facilitator will add
-          you soon.
+          You&apos;re not yet assigned to a school team. Your facilitator will
+          add you soon.
         </p>
       </div>
     )
@@ -27,7 +27,7 @@ export function TeamColumn({ team }: { team: DashboardTeam | null }) {
 
       {visible.length === 0 ? (
         <p className="text-sm text-text-muted">
-          You&apos;re the only member of this cohort so far.
+          You&apos;re the only member of this school team so far.
         </p>
       ) : (
         <div className="space-y-3">

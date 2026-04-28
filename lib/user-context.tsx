@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext } from 'react'
 import { UserRole } from './roles'
+import type { Cohort } from './cohorts'
 
 export interface CurrentUser {
   id: string
@@ -12,6 +13,12 @@ export interface CurrentUser {
   schoolTeamId?: string
   profileImageUrl?: string
   bio?: string
+  /**
+   * High-level cohort label (A / B / C). Used purely for access gating
+   * on phases, items, and library resources. Not surfaced to fellows in
+   * the UI, only consumed by server-side filtering.
+   */
+  cohort?: Cohort | null
 }
 
 interface UserContextType {

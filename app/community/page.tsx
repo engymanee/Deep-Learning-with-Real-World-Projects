@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { CalendarDays, ExternalLink, MapPin, Mic, FileText, Shield, BookMarked } from 'lucide-react'
 import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
+import { fellowCanAccess } from '@/lib/cohorts'
 import { TopBar } from '@/components/top-bar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -33,14 +34,21 @@ export default async function CommunityPage() {
       .limit(6),
     supabase
       .from('community_resources')
-      .select('id, title, description, url, category')
+      .select('id, title, description, url, category, cohorts')
       .order('created_at', { ascending: false })
       .limit(12),
   ])
 
   const events = eventsRes.data ?? []
   const posts = postsRes.data ?? []
-  const resources = resourcesRes.data ?? []
+  // Fellows see only resources whose cohort list includes them (or an
+  // empty list, meaning "open to all"). Admins / facilitators see every
+  // resource so they can curate without context-switching to /admin.
+  const allResources = resourcesRes.data ?? []
+  const resources =
+    user.role === 'fellow'
+      ? allResources.filter((r) => fellowCanAccess(r.cohorts as string[] | null, user.cohort))
+      : allResources
 
   return (
     <div className="min-h-screen bg-background">

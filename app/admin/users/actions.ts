@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth-server'
 import type { Role } from '@/lib/roles'
+import { isCohort, type Cohort } from '@/lib/cohorts'
 
 const ROLES: readonly Role[] = ['fellow', 'facilitator', 'admin'] as const
 
@@ -52,7 +53,12 @@ export async function inviteUserAction(formData: FormData): Promise<ActionResult
     const fullName = String(formData.get('fullName') ?? '').trim()
     const title = String(formData.get('title') ?? '').trim()
     const role = String(formData.get('role') ?? 'fellow')
-    const cohortId = String(formData.get('cohortId') ?? '')
+    // schoolTeamId comes from the existing "cohorts" table, surfaced
+    // in the UI as "School Team". cohortLetter is the new A/B/C label
+    // stored on profiles.cohort.
+    const schoolTeamId = String(formData.get('cohortId') ?? '')
+    const cohortLetterRaw = String(formData.get('cohortLetter') ?? '')
+    const cohortLetter: Cohort | null = isCohort(cohortLetterRaw) ? cohortLetterRaw : null
 
     if (!email) return fail('Email is required')
     if (!fullName) return fail('Full name is required')
@@ -82,17 +88,18 @@ export async function inviteUserAction(formData: FormData): Promise<ActionResult
         full_name: fullName,
         title: title || null,
         role,
+        cohort: cohortLetter,
       })
       .eq('id', userId)
 
     if (profErr) return fail(`Invited, but failed to save profile: ${profErr.message}`)
 
-    if (cohortId) {
+    if (schoolTeamId) {
       const { error: memErr } = await admin
         .from('cohort_members')
-        .insert({ cohort_id: cohortId, profile_id: userId })
+        .insert({ cohort_id: schoolTeamId, profile_id: userId })
       if (memErr && !memErr.message.includes('duplicate')) {
-        return fail(`Invited, but failed to add to cohort: ${memErr.message}`)
+        return fail(`Invited, but failed to add to school team: ${memErr.message}`)
       }
     }
 
@@ -122,6 +129,40 @@ export async function updateRoleAction(formData: FormData): Promise<ActionResult
   }
 }
 
+/**
+ * Updates the high-level cohort label (A/B/C) stored on profiles.cohort.
+ * Empty string clears the cohort. This is the field that gates phase /
+ * item / resource access for fellows in the user-facing UI.
+ */
+export async function updateCohortLetterAction(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const userId = String(formData.get('userId') ?? '')
+    const raw = String(formData.get('cohort') ?? '')
+    if (!userId) return fail('Missing user id')
+
+    const cohort: Cohort | null = isCohort(raw) ? raw : null
+    if (raw && !cohort) return fail('Invalid cohort')
+
+    const admin = createAdminClient()
+    const { error } = await admin
+      .from('profiles')
+      .update({ cohort })
+      .eq('id', userId)
+    if (error) return fail(error.message)
+
+    revalidatePath('/admin/users')
+    return ok(cohort ? `Cohort set to ${cohort}` : 'Cohort cleared')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+/**
+ * Updates a fellow's School Team membership. Kept under the legacy
+ * "updateCohortAction" name and "cohortId" form field so older callers
+ * (and the cohort_members table itself) don't need to be renamed.
+ */
 export async function updateCohortAction(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin()

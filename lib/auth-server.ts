@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { UserRole } from '@/lib/roles'
+import { isCohort } from '@/lib/cohorts'
 import type { CurrentUser } from '@/lib/user-context'
 
 export interface ProfileRow {
@@ -13,6 +14,7 @@ export interface ProfileRow {
   role: UserRole
   school_id: string | null
   deactivated_at: string | null
+  cohort: string | null
   // Embedded school via FK relationship - one extra join, no extra round-trip.
   schools: { name: string | null } | null
 }
@@ -40,7 +42,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'id, full_name, email, title, avatar_url, role, school_id, deactivated_at, schools(name)',
+      'id, full_name, email, title, avatar_url, role, school_id, deactivated_at, cohort, schools(name)',
     )
     .eq('id', user.id)
     .maybeSingle<ProfileRow>()
@@ -68,6 +70,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     schoolName: profile.schools?.name ?? '',
     profileImageUrl: profile.avatar_url ?? undefined,
     bio: profile.title ?? undefined,
+    cohort: isCohort(profile.cohort) ? profile.cohort : null,
   }
 })
 

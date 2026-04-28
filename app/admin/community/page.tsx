@@ -18,7 +18,7 @@ export default async function AdminCommunityPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('community_resources')
-      .select('id, title, description, url, category, created_at')
+      .select('id, title, description, url, category, cohorts, created_at')
       .order('created_at', { ascending: false }),
   ])
 

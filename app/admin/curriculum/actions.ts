@@ -3,6 +3,24 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
+import { COHORTS } from '@/lib/cohorts'
+
+/**
+ * Pull the cohort selections out of a form. The CohortAccessField
+ * component submits one entry per ticked cohort using the same name
+ * (default: "cohorts"). We coerce to strings, dedupe, and reject any
+ * value that isn't one of A/B/C so an empty array always means
+ * "open to every cohort".
+ */
+function readCohorts(formData: FormData, name = 'cohorts'): string[] {
+  const raw = formData.getAll(name)
+  const allowed = new Set(COHORTS as readonly string[])
+  const out = new Set<string>()
+  for (const v of raw) {
+    if (typeof v === 'string' && allowed.has(v)) out.add(v)
+  }
+  return Array.from(out)
+}
 
 // ============================================================================
 // Types
@@ -68,13 +86,14 @@ export async function updateYear(formData: FormData): Promise<ActionResult> {
     const id = String(formData.get('id') ?? '').trim()
     const title = String(formData.get('title') ?? '').trim()
     const description = nullable(formData.get('description'))
+    const cohorts = readCohorts(formData)
     if (!id) return fail('Missing year id')
     if (!title) return fail('Title is required')
 
     const supabase = await createClient()
     const { error } = await supabase
       .from('years')
-      .update({ title, description })
+      .update({ title, description, cohorts })
       .eq('id', id)
     if (error) return fail(error.message)
 
@@ -96,6 +115,7 @@ export async function createYear(formData: FormData): Promise<ActionResult> {
     await requireAdmin()
     const title = String(formData.get('title') ?? '').trim()
     const description = nullable(formData.get('description'))
+    const cohorts = readCohorts(formData)
     if (!title) return fail('Title is required')
 
     const slug = title
@@ -133,7 +153,7 @@ export async function createYear(formData: FormData): Promise<ActionResult> {
 
     const { error } = await supabase
       .from('years')
-      .insert({ id: candidate, title, description, order_index: nextIndex })
+      .insert({ id: candidate, title, description, order_index: nextIndex, cohorts })
     if (error) return fail(error.message)
 
     revalidatePath('/admin/curriculum')
@@ -206,6 +226,7 @@ export async function createLab(formData: FormData): Promise<ActionResult> {
     const id = String(formData.get('id') ?? '').trim()
     const title = String(formData.get('title') ?? '').trim()
     const description = nullable(formData.get('description'))
+    const cohorts = readCohorts(formData)
     if (!year_id) return fail('Year is required')
     if (!id) return fail('Lab id (slug) is required')
     if (!title) return fail('Title is required')
@@ -224,7 +245,7 @@ export async function createLab(formData: FormData): Promise<ActionResult> {
 
     const { error } = await supabase
       .from('labs')
-      .insert({ id, year_id, title, description, order_index: nextIndex })
+      .insert({ id, year_id, title, description, order_index: nextIndex, cohorts })
     if (error) return fail(error.message)
 
     revalidatePath('/admin/curriculum')
@@ -240,13 +261,14 @@ export async function updateLab(formData: FormData): Promise<ActionResult> {
     const id = String(formData.get('id') ?? '').trim()
     const title = String(formData.get('title') ?? '').trim()
     const description = nullable(formData.get('description'))
+    const cohorts = readCohorts(formData)
     if (!id) return fail('Missing lab id')
     if (!title) return fail('Title is required')
 
     const supabase = await createClient()
     const { error } = await supabase
       .from('labs')
-      .update({ title, description })
+      .update({ title, description, cohorts })
       .eq('id', id)
     if (error) return fail(error.message)
 

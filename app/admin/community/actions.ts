@@ -3,6 +3,21 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
+import { COHORTS } from '@/lib/cohorts'
+
+/**
+ * Pull the cohort selections out of a form. Mirrors the helper in
+ * curriculum/actions.ts: empty array == open to every fellow.
+ */
+function readCohorts(formData: FormData, name = 'cohorts'): string[] {
+  const raw = formData.getAll(name)
+  const allowed = new Set(COHORTS as readonly string[])
+  const out = new Set<string>()
+  for (const v of raw) {
+    if (typeof v === 'string' && allowed.has(v)) out.add(v)
+  }
+  return Array.from(out)
+}
 
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string }
 const ok = (message: string): ActionResult => ({ ok: true, message })
@@ -155,6 +170,7 @@ export async function createResource(formData: FormData): Promise<ActionResult> 
     const description = String(formData.get('description') ?? '').trim() || null
     const url = String(formData.get('url') ?? '').trim()
     const category = String(formData.get('category') ?? '').trim() || null
+    const cohorts = readCohorts(formData)
 
     if (!title) return fail('Title is required')
     if (!url) return fail('URL is required')
@@ -170,6 +186,7 @@ export async function createResource(formData: FormData): Promise<ActionResult> 
       description,
       url,
       category,
+      cohorts,
       created_by: me.id,
     })
     if (error) return fail(error.message)

@@ -31,11 +31,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { LabRow, type CurriculumItem } from './lab-row'
 import { createLab, deleteYear, updateYear, type ActionResult } from './actions'
+import { CohortAccessField, CohortBadge } from '@/components/admin/cohort-access-field'
 
 export type Phase = {
   id: string
   title: string
   description: string | null
+  cohorts: string[]
 }
 
 /**
@@ -54,7 +56,10 @@ export function PhaseColumn({ phase, items }: { phase: Phase; items: CurriculumI
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Phase
           </p>
-          <h2 className="font-serif text-xl text-foreground">{phase.title}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-serif text-xl text-foreground">{phase.title}</h2>
+            <CohortBadge cohorts={phase.cohorts} />
+          </div>
           {phase.description && (
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               {phase.description}
@@ -157,6 +162,11 @@ function EditPhaseDialog({ phase }: { phase: Phase }) {
                 Shown on the curriculum landing page and program overview.
               </FieldDescription>
             </Field>
+            <CohortAccessField
+              defaultValue={phase.cohorts}
+              idPrefix={`phase-cohort-${phase.id}`}
+              description="Leave all unchecked to make this phase visible to every fellow. Tick one or more cohorts to restrict it."
+            />
             {msg && (
               <p
                 role="status"
@@ -374,6 +384,10 @@ function AddItemDialog({ phaseId }: { phaseId: string }) {
                 placeholder="A short summary fellows will see above the item content."
               />
             </Field>
+            <CohortAccessField
+              idPrefix={`new-item-cohort-${phaseId}`}
+              description="Leave all unchecked to make this item visible to every fellow. Tick one or more to restrict it."
+            />
             {msg && (
               <p
                 role="status"

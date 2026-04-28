@@ -42,12 +42,14 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { deleteLab, updateLab, type ActionResult } from './actions'
+import { CohortAccessField, CohortBadge } from '@/components/admin/cohort-access-field'
 
 export type CurriculumItem = {
   id: string
   year_id: string
   title: string
   description: string | null
+  cohorts: string[]
   block_count: number
 }
 
@@ -113,7 +115,10 @@ export function LabRow({ item }: { item: CurriculumItem }) {
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+          <CohortBadge cohorts={item.cohorts} />
+        </div>
         <p className="truncate text-xs text-muted-foreground">
           {item.block_count} {item.block_count === 1 ? 'block' : 'blocks'}
           {item.description ? ` - ${item.description}` : ''}
@@ -276,6 +281,11 @@ function EditLabDialog({
                 rows={3}
               />
             </Field>
+            <CohortAccessField
+              defaultValue={item.cohorts}
+              idPrefix={`lab-cohort-${item.id}`}
+              description="Leave all unchecked to keep this item visible to every fellow. Tick one or more cohorts to restrict it."
+            />
             {msg && (
               <p
                 role="status"

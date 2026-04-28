@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
+import { fellowCanAccess } from '@/lib/cohorts'
 import type { CurrentUser } from '@/lib/user-context'
 
 // ============================================================================
@@ -107,16 +108,29 @@ export async function getDashboardData(): Promise<DashboardData> {
   const [{ data: yearRows }, { data: labRows }] = await Promise.all([
     supabase
       .from('years')
-      .select('id, order_index, title')
+      .select('id, order_index, title, cohorts')
       .order('order_index'),
     supabase
       .from('labs')
-      .select('id, year_id, order_index, title')
+      .select('id, year_id, order_index, title, cohorts')
       .order('order_index'),
   ])
 
-  const allYears = yearRows ?? []
-  const allLabs = labRows ?? []
+  // Fellows only see phases / items whose cohort gating allows them.
+  // Admins and facilitators see everything regardless. We keep the data
+  // shape downstream identical, just trimmed before progress is computed
+  // so locked / hidden phases never confuse the position logic.
+  const isFellow = user.role === 'fellow'
+  const userCohort = user.cohort ?? null
+  const allYears = (yearRows ?? []).filter((y) =>
+    !isFellow ? true : fellowCanAccess(y.cohorts as string[] | null, userCohort),
+  )
+  const visibleYearIds = new Set(allYears.map((y) => y.id))
+  const allLabs = (labRows ?? []).filter((l) => {
+    if (!visibleYearIds.has(l.year_id)) return false
+    if (!isFellow) return true
+    return fellowCanAccess(l.cohorts as string[] | null, userCohort)
+  })
   const labsByYear = new Map<string, typeof allLabs>()
   for (const lab of allLabs) {
     const list = labsByYear.get(lab.year_id) ?? []

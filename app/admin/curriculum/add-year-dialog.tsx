@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { createYear } from './actions'
+import { CohortAccessField } from '@/components/admin/cohort-access-field'
 
 /**
  * Admin-only action to create a new curriculum label (a row in `years`).
@@ -91,6 +92,10 @@ export function AddYearDialog() {
                 placeholder="A short summary fellows will see on the program overview."
               />
             </Field>
+            <CohortAccessField
+              idPrefix="new-phase-cohort"
+              description="Leave all unchecked to make this phase visible to every fellow. Tick one or more to restrict it."
+            />
             {msg && (
               <p
                 role="status"

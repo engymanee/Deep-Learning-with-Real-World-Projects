@@ -55,6 +55,7 @@ import {
   togglePostPublished,
   type ActionResult,
 } from './actions'
+import { CohortAccessField, CohortBadge } from '@/components/admin/cohort-access-field'
 
 type EventRow = {
   id: string
@@ -85,6 +86,7 @@ type ResourceRow = {
   description: string | null
   url: string
   category: string | null
+  cohorts: string[] | null
   created_at: string
 }
 
@@ -498,13 +500,14 @@ function ResourceCard({ resource }: { resource: ResourceRow }) {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {resource.category && (
               <Badge variant="outline" className="text-[10px] uppercase">
                 {resource.category}
               </Badge>
             )}
             <CardTitle className="font-serif text-base">{resource.title}</CardTitle>
+            <CohortBadge cohorts={resource.cohorts} />
           </div>
           <a
             href={resource.url}
@@ -581,6 +584,11 @@ function AddResourceDialog() {
           <FormRow label="Description (optional)" htmlFor="res-desc">
             <Textarea id="res-desc" name="description" rows={3} />
           </FormRow>
+
+          <CohortAccessField
+            idPrefix="new-resource-cohort"
+            description="Leave all unchecked to share with every fellow. Tick one or more to limit access."
+          />
 
           {err && (
             <p role="alert" className="text-sm text-destructive">

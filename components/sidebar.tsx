@@ -11,11 +11,13 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { fellowCanAccess, isCohort, type Cohort } from '@/lib/cohorts'
 
 interface YearRow {
   id: string
   title: string
   order_index: number
+  cohorts: string[] | null
 }
 
 interface LabRow {
@@ -23,6 +25,7 @@ interface LabRow {
   title: string
   year_id: string
   order_index: number
+  cohorts: string[] | null
 }
 
 interface LabProgressRow {
@@ -112,15 +115,16 @@ export function Sidebar({
       const [{ data: yearsData }, { data: labsData }] = await Promise.all([
         supabase
           .from('years')
-          .select('id, title, order_index')
+          .select('id, title, order_index, cohorts')
           .order('order_index', { ascending: true }),
         supabase
           .from('labs')
-          .select('id, title, year_id, order_index')
+          .select('id, title, year_id, order_index, cohorts')
           .order('order_index', { ascending: true }),
       ])
 
       let currentRole: Role = null
+      let userCohort: Cohort | null = null
       let yearProgress: YearProgressRow[] = []
       let labProgress: LabProgressRow[] = []
 
@@ -128,9 +132,9 @@ export function Sidebar({
         const [{ data: profileRow }, { data: yp }, { data: lp }] = await Promise.all([
           supabase
             .from('profiles')
-            .select('role')
+            .select('role, cohort')
             .eq('id', user.id)
-            .maybeSingle<{ role: Role }>(),
+            .maybeSingle<{ role: Role; cohort: string | null }>(),
           supabase
             .from('user_year_progress')
             .select('year_id, status')
@@ -141,15 +145,30 @@ export function Sidebar({
             .eq('profile_id', user.id),
         ])
         currentRole = profileRow?.role ?? null
+        userCohort = isCohort(profileRow?.cohort) ? profileRow!.cohort : null
         yearProgress = (yp ?? []) as YearProgressRow[]
         labProgress = (lp ?? []) as LabProgressRow[]
       }
 
       if (cancelled) return
 
-      const allYears = yearsData ?? []
-      setYears(allYears)
-      setLabs(labsData ?? [])
+      // Fellows only see phases / labs whose cohort gating allows them.
+      // Admins and facilitators get the full curriculum so they can
+      // navigate any cohort's content from the sidebar.
+      const isFellowRole = currentRole === 'fellow'
+      const visibleYears = (yearsData ?? []).filter((y) =>
+        !isFellowRole ? true : fellowCanAccess(y.cohorts as string[] | null, userCohort),
+      )
+      const visibleYearIds = new Set(visibleYears.map((y) => y.id))
+      const visibleLabs = (labsData ?? []).filter((l) => {
+        if (!visibleYearIds.has(l.year_id)) return false
+        if (!isFellowRole) return true
+        return fellowCanAccess(l.cohorts as string[] | null, userCohort)
+      })
+
+      const allYears = visibleYears
+      setYears(visibleYears)
+      setLabs(visibleLabs)
       setRole(currentRole)
       setCompleted(
         new Set(
