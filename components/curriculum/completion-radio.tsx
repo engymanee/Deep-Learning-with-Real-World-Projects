@@ -35,16 +35,24 @@ export function CompletionRadio({ contentId, isCompleted, itemTitle }: Props) {
     setOptimistic(isCompleted)
   }
 
+  // When the server rejects (e.g. the fellow hasn't opened the link
+  // or submitted a required reflection), we revert the optimistic
+  // tick AND surface the message via the button's `title` so they
+  // get a hover hint without us having to plumb a toast through the
+  // tree. The full UX lives on the item page itself.
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
   function onClick(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault()
     e.stopPropagation()
+    setErrorMessage(null)
     const next = !optimistic
     setOptimistic(next)
     startTransition(async () => {
       const res = await toggleContentCompletion(contentId, next)
       if (!res.ok) {
-        // Revert on error.
         setOptimistic(!next)
+        setErrorMessage(res.message)
         return
       }
       router.refresh()
@@ -61,7 +69,7 @@ export function CompletionRadio({ contentId, isCompleted, itemTitle }: Props) {
       role="checkbox"
       aria-checked={optimistic}
       aria-label={label}
-      title={label}
+      title={errorMessage ?? label}
       onClick={onClick}
       disabled={pending}
       className={cn(

@@ -223,6 +223,8 @@ function ContentRowItem({
                 body: item.body ?? '',
                 url: item.url ?? '',
                 duration_minutes: item.duration_minutes,
+                reflection_enabled: item.reflection_enabled,
+                reflection_prompt: item.reflection_prompt,
                 cohorts: item.cohorts,
               }}
               onSaved={() => setEditOpen(false)}

@@ -325,6 +325,8 @@ interface ContentInputs {
   body: string | null
   url: string | null
   durationMinutes: number | null
+  reflectionEnabled: boolean
+  reflectionPrompt: string | null
   cohorts: string[] | null
 }
 
@@ -369,6 +371,16 @@ function readContentInputs(formData: FormData): ContentInputs | string {
     durationMinutes = n
   }
 
+  // Reflection gate. The toggle is a checkbox - "on" means required.
+  // When required we MUST have a non-empty prompt or the fellow has
+  // nothing to respond to.
+  const reflectionEnabled = trim(formData.get('reflection_enabled')) === 'on'
+  const reflectionPromptRaw = nullable(formData.get('reflection_prompt'))
+  if (reflectionEnabled && !reflectionPromptRaw) {
+    return 'Add a reflection prompt before requiring a reflection'
+  }
+  const reflectionPrompt = reflectionEnabled ? reflectionPromptRaw : null
+
   return {
     phaseId,
     moduleId,
@@ -379,6 +391,8 @@ function readContentInputs(formData: FormData): ContentInputs | string {
     body,
     url,
     durationMinutes,
+    reflectionEnabled,
+    reflectionPrompt,
     cohorts,
   }
 }
@@ -415,6 +429,8 @@ export async function createContent(formData: FormData): Promise<ActionResult> {
       body: parsed.body,
       url: parsed.url,
       duration_minutes: parsed.durationMinutes,
+      reflection_enabled: parsed.reflectionEnabled,
+      reflection_prompt: parsed.reflectionPrompt,
       cohorts: parsed.cohorts,
       order_index: nextIndex,
     })
@@ -475,6 +491,8 @@ export async function updateContent(formData: FormData): Promise<ActionResult> {
         body: parsed.body,
         url: parsed.url,
         duration_minutes: parsed.durationMinutes,
+        reflection_enabled: parsed.reflectionEnabled,
+        reflection_prompt: parsed.reflectionPrompt,
         cohorts: parsed.cohorts,
         ...(nextOrderIndex !== undefined
           ? { order_index: nextOrderIndex }

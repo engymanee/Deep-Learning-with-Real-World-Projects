@@ -33,6 +33,13 @@ export interface ContentItemDraft {
   /** Optional estimated duration in minutes; null when not set. */
   duration_minutes: number | null
   /**
+   * Per-item reflection gate. When enabled the fellow must submit a
+   * response to `reflection_prompt` before they can mark the item
+   * complete.
+   */
+  reflection_enabled: boolean
+  reflection_prompt: string | null
+  /**
    * `null`  -> inherit from the module
    * `[]`    -> locked (no fellows)
    * `[...]` -> override with this exact list
@@ -70,12 +77,17 @@ export function ContentItemForm({
   const bodyId = useId()
   const urlId = useId()
   const durationId = useId()
+  const reflectionToggleId = useId()
+  const reflectionPromptId = useId()
 
   const [category, setCategory] = useState<ContentCategory>(
     initial?.category ?? defaultCategory ?? CONTENT_CATEGORIES[0].value,
   )
   const [resourceType, setResourceType] = useState<ResourceType>(
     initial?.resource_type ?? 'reading',
+  )
+  const [reflectionEnabled, setReflectionEnabled] = useState<boolean>(
+    initial?.reflection_enabled ?? false,
   )
   // Default new items to "inherit"; for edits, use whatever the row stored.
   const [inherit, setInherit] = useState<boolean>(
@@ -90,6 +102,7 @@ export function ContentItemForm({
     formData.set('module_id', moduleId)
     formData.set('category', category)
     formData.set('resource_type', resourceType)
+    if (reflectionEnabled) formData.set('reflection_enabled', 'on')
     if (inherit) formData.set('cohorts_inherit', 'on')
     if (isEdit) formData.set('id', initial!.id!)
 
@@ -242,6 +255,52 @@ export function ContentItemForm({
           defaultValue={initial?.body ?? ''}
           placeholder="Plain-text body shown directly on the content page. Use this for prompts, instructions, or short readings."
         />
+      </div>
+
+      {/* Reflection gate. Toggle controls whether fellows must
+          submit a written reflection before they can mark the item
+          complete. The prompt textarea is required when the toggle
+          is on - both the form and the server action enforce that. */}
+      <div className="space-y-3 rounded-md border border-border bg-muted/30 p-4">
+        <label
+          htmlFor={reflectionToggleId}
+          className="flex items-start gap-2 text-sm"
+        >
+          <input
+            id={reflectionToggleId}
+            type="checkbox"
+            checked={reflectionEnabled}
+            onChange={(e) => setReflectionEnabled(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-medium text-foreground">
+              Require a reflection
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Fellows will see the prompt below on the content page and
+              must submit a response before they can mark the item
+              complete.
+            </span>
+          </span>
+        </label>
+        {reflectionEnabled && (
+          <div className="space-y-2 pt-1">
+            <Label htmlFor={reflectionPromptId}>Reflection prompt</Label>
+            <Textarea
+              id={reflectionPromptId}
+              name="reflection_prompt"
+              rows={3}
+              required
+              defaultValue={initial?.reflection_prompt ?? ''}
+              placeholder="e.g. What surprised you in this lesson? Where did you see your own thinking shift?"
+            />
+            <p className="text-xs text-muted-foreground">
+              Plain text. The fellow&apos;s answer is private to them and
+              the program team.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2 rounded-md border border-border bg-muted/30 p-4">

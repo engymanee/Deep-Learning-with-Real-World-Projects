@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
@@ -64,8 +65,14 @@ export interface FullCurriculum {
  * Load every visible phase + nested modules + items for the current
  * user, in display order. Single helper used by the dashboard's
  * collapsible curriculum tree.
+ *
+ * Wrapped in `cache()` so when both the layout and a sibling page
+ * call it during the same render the database round-trip happens
+ * once.
  */
-export async function loadFullCurriculum(): Promise<FullCurriculum> {
+export const loadFullCurriculum = cache(_loadFullCurriculum)
+
+async function _loadFullCurriculum(): Promise<FullCurriculum> {
   const user = await requireUser()
   const supabase = await createClient()
   const isFellow = user.role === 'fellow'
@@ -213,4 +220,37 @@ export async function loadFullCurriculum(): Promise<FullCurriculum> {
   })
 
   return { phases, isPrivileged: !isFellow }
+}
+
+/**
+ * Flatten a curriculum into its visible items in render order.
+ * Useful for prev/next navigation.
+ */
+export function flattenCurriculumItems(
+  curriculum: FullCurriculum,
+): CurriculumItem[] {
+  const flat: CurriculumItem[] = []
+  for (const phase of curriculum.phases) {
+    for (const module of phase.modules) {
+      for (const item of module.items) flat.push(item)
+    }
+  }
+  return flat
+}
+
+/**
+ * Compute the previous and next visible items relative to a given
+ * content id. Used by the viewer's "Continue" button.
+ */
+export function findAdjacentItems(
+  curriculum: FullCurriculum,
+  contentId: string,
+): { prev: CurriculumItem | null; next: CurriculumItem | null } {
+  const flat = flattenCurriculumItems(curriculum)
+  const idx = flat.findIndex((i) => i.id === contentId)
+  if (idx === -1) return { prev: null, next: null }
+  return {
+    prev: idx > 0 ? flat[idx - 1] : null,
+    next: idx < flat.length - 1 ? flat[idx + 1] : null,
+  }
 }

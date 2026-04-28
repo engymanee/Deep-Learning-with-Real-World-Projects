@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
-import { ExternalLink } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { CompletionRadio } from '@/components/curriculum/completion-radio'
+import { LessonFooter } from '@/components/curriculum/lesson-footer'
+import { LinkOpenButton } from '@/components/curriculum/link-open-button'
+import { ReflectionForm } from '@/components/curriculum/reflection-form'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
@@ -12,6 +12,10 @@ import {
   type ContentCategory,
   type ResourceType,
 } from '@/lib/curriculum'
+import {
+  findAdjacentItems,
+  loadFullCurriculum,
+} from '@/lib/curriculum-tree'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +40,8 @@ interface ContentRow {
   resource_type: ResourceType | null
   cohorts: string[] | null
   duration_minutes: number | null
+  reflection_enabled: boolean
+  reflection_prompt: string | null
 }
 
 function formatDuration(mins: number | null): string | null {
@@ -77,7 +83,7 @@ export default async function ContentItemPage({
     supabase
       .from('labs')
       .select(
-        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes',
+        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes, reflection_enabled, reflection_prompt',
       )
       .eq('id', itemId)
       .eq('module_id', moduleId)
@@ -104,20 +110,55 @@ export default async function ContentItemPage({
     }
   }
 
-  // Look up whether the user has already completed this item, so the
-  // toggle below renders in the right initial state.
-  const { data: completion } = await supabase
-    .from('user_content_completions')
-    .select('content_id')
-    .eq('profile_id', user.id)
-    .eq('content_id', item.id)
-    .maybeSingle<{ content_id: string }>()
+  // Look up per-user state for the gates and the completion radio.
+  // All three are scoped to the current user via RLS, so we just
+  // ask for the rows that exist.
+  const [
+    { data: completion },
+    { data: linkClick },
+    { data: reflection },
+    curriculum,
+  ] = await Promise.all([
+    supabase
+      .from('user_content_completions')
+      .select('content_id')
+      .eq('profile_id', user.id)
+      .eq('content_id', item.id)
+      .maybeSingle<{ content_id: string }>(),
+    supabase
+      .from('user_content_link_clicks')
+      .select('content_id')
+      .eq('profile_id', user.id)
+      .eq('content_id', item.id)
+      .maybeSingle<{ content_id: string }>(),
+    supabase
+      .from('user_content_reflections')
+      .select('response')
+      .eq('profile_id', user.id)
+      .eq('content_id', item.id)
+      .maybeSingle<{ response: string }>(),
+    // Used only to compute the "Continue" target. Wrapped in
+    // React.cache so the layout's call doesn't double-fetch.
+    loadFullCurriculum(),
+  ])
 
   const isCompleted = !!completion
+  const linkClicked = !!linkClick
+  const reflectionResponse = reflection?.response ?? null
   const resource = item.resource_type ? getResourceType(item.resource_type) : null
   const duration = formatDuration(item.duration_minutes)
   const hasBody = !!item.body && item.body.trim().length > 0
   const hasUrl = !!item.url
+  const reflectionRequired =
+    item.reflection_enabled && !!item.reflection_prompt?.trim()
+
+  const { next } = findAdjacentItems(curriculum, item.id)
+
+  // Gate states: only block the FIRST completion - once an item is
+  // already complete the fellow can freely uncheck without having to
+  // re-open the link or re-submit the reflection.
+  const needsLinkClick = !isCompleted && hasUrl && !linkClicked
+  const needsReflection = !isCompleted && reflectionRequired && !reflectionResponse
 
   return (
     <article className="mx-auto max-w-2xl space-y-8">
@@ -153,8 +194,8 @@ export default async function ContentItemPage({
         </div>
       )}
 
-      {/* External resource CTA. Live sessions get specialised copy
-          so the join button is unambiguous to fellows. */}
+      {/* External resource CTA. Click tracking on the button feeds the
+          completion gate. */}
       {hasUrl && (
         <div className="rounded-lg border border-border bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -170,22 +211,17 @@ export default async function ContentItemPage({
                 {item.url}
               </p>
             </div>
-            <Button asChild>
-              <a
-                href={item.url!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5"
-              >
-                {item.resource_type === 'live_session' ? 'Join now' : 'Open'}
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
-            </Button>
+            <LinkOpenButton
+              contentId={item.id}
+              url={item.url!}
+              isLiveSession={item.resource_type === 'live_session'}
+              alreadyClicked={linkClicked}
+            />
           </div>
         </div>
       )}
 
-      {!hasBody && !hasUrl && (
+      {!hasBody && !hasUrl && !reflectionRequired && (
         <div className="rounded-lg border border-dashed border-border p-8 text-center">
           <p className="text-sm text-muted-foreground">
             This item has no content attached yet.
@@ -193,17 +229,24 @@ export default async function ContentItemPage({
         </div>
       )}
 
-      {/* Completion control */}
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
-        <CompletionRadio
+      {/* Reflection prompt + response. Required to complete the
+          item when enabled. */}
+      {reflectionRequired && (
+        <ReflectionForm
           contentId={item.id}
-          isCompleted={isCompleted}
-          itemTitle={item.title}
+          prompt={item.reflection_prompt!.trim()}
+          initialResponse={reflectionResponse}
         />
-        <p className="text-sm text-foreground">
-          {isCompleted ? 'Completed' : 'Mark as complete'}
-        </p>
-      </div>
+      )}
+
+      {/* Footer pairs Mark-as-complete with Continue. */}
+      <LessonFooter
+        contentId={item.id}
+        isCompleted={isCompleted}
+        needsLinkClick={needsLinkClick}
+        needsReflection={needsReflection}
+        nextHref={next?.href ?? null}
+      />
     </article>
   )
 }

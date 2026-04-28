@@ -35,6 +35,12 @@ export type ContentRow = {
   resource_type: ResourceType
   cohorts: string[] | null
   duration_minutes: number | null
+  /**
+   * When true, fellows must submit a reflection (using
+   * `reflection_prompt`) before they can mark this item complete.
+   */
+  reflection_enabled: boolean
+  reflection_prompt: string | null
   order_index: number
 }
 
@@ -62,7 +68,7 @@ export default async function AdminModuleDetailPage({
     supabase
       .from('labs')
       .select(
-        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes, order_index',
+        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes, reflection_enabled, reflection_prompt, order_index',
       )
       .eq('module_id', moduleId)
       .order('order_index', { ascending: true })
