@@ -113,49 +113,31 @@ export function ContentItemForm({
 
   return (
     <form action={onSubmit} className="flex flex-col gap-5">
-      {/* Category is only chooseable on create. On edit, the previously
-          assigned category is preserved silently. */}
-      {!isEdit ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Category</Label>
-            <Select
-              value={category}
-              onValueChange={(v) => setCategory(v as ContentCategory)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CONTENT_CATEGORIES.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Resource type</Label>
-            <Select
-              value={resourceType}
-              onValueChange={(v) => setResourceType(v as ResourceType)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {RESOURCE_TYPES.map((r) => (
-                  <SelectItem key={r.value} value={r.value}>
-                    {r.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Category and Resource type are both editable. Changing the
+          category on save moves the item into a different lab bucket
+          (Before / During / After) and re-indexes it at the tail of
+          the destination bucket; that's handled server-side in
+          updateContent. */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Category</Label>
+          <Select
+            value={category}
+            onValueChange={(v) => setCategory(v as ContentCategory)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CONTENT_CATEGORIES.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      ) : (
+
         <div className="space-y-2">
           <Label>Resource type</Label>
           <Select
@@ -174,7 +156,7 @@ export function ContentItemForm({
             </SelectContent>
           </Select>
         </div>
-      )}
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor={titleId}>Title</Label>

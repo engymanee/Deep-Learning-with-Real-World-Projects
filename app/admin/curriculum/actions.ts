@@ -439,6 +439,32 @@ export async function updateContent(formData: FormData): Promise<ActionResult> {
     if (typeof parsed === 'string') return fail(parsed)
 
     const supabase = await createClient()
+
+    // If the admin changed the category, move the item to the tail
+    // of the destination (module, category) bucket. order_index is
+    // unique-by-bucket - reusing the old index would collide with an
+    // existing item in the new bucket and produce ambiguous order.
+    const { data: existing, error: fetchError } = await supabase
+      .from('labs')
+      .select('category')
+      .eq('id', id)
+      .maybeSingle<{ category: ContentCategory }>()
+    if (fetchError) return fail(fetchError.message)
+    if (!existing) return fail('Content not found')
+
+    let nextOrderIndex: number | undefined
+    if (existing.category !== parsed.category) {
+      const { data: maxRow } = await supabase
+        .from('labs')
+        .select('order_index')
+        .eq('module_id', parsed.moduleId)
+        .eq('category', parsed.category)
+        .order('order_index', { ascending: false })
+        .limit(1)
+        .maybeSingle<{ order_index: number }>()
+      nextOrderIndex = (maxRow?.order_index ?? 0) + 1
+    }
+
     const { error } = await supabase
       .from('labs')
       .update({
@@ -450,6 +476,9 @@ export async function updateContent(formData: FormData): Promise<ActionResult> {
         url: parsed.url,
         duration_minutes: parsed.durationMinutes,
         cohorts: parsed.cohorts,
+        ...(nextOrderIndex !== undefined
+          ? { order_index: nextOrderIndex }
+          : {}),
       })
       .eq('id', id)
     if (error) return fail(error.message)
