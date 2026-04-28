@@ -41,9 +41,11 @@ export default async function CommunityPage() {
 
   const events = eventsRes.data ?? []
   const posts = postsRes.data ?? []
-  // Fellows see only resources whose cohort list includes them (or an
-  // empty list, meaning "open to all"). Admins / facilitators see every
-  // resource so they can curate without context-switching to /admin.
+  // Fellows see only resources explicitly assigned to their cohort.
+  // Resources with no cohort assignment are unassigned and hidden from
+  // every fellow until an admin assigns them. Admins / facilitators
+  // bypass the filter and see every resource so they can curate without
+  // context-switching to /admin.
   const allResources = resourcesRes.data ?? []
   const resources =
     user.role === 'fellow'

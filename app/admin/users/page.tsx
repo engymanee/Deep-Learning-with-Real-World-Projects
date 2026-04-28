@@ -76,7 +76,7 @@ export default async function AdminUsersPage() {
         <div>
           <h2 className="text-xl font-serif text-foreground">Users</h2>
           <p className="text-sm text-muted-foreground">
-            {users.length} total · Invite new people, adjust roles, and assign school teams &amp; cohorts.
+            {users.length} total · Invite new people, adjust roles, and assign cohorts to fellows.
           </p>
         </div>
         <InviteUserDialog cohorts={cohortList} />

@@ -20,9 +20,12 @@ type Props = {
 /**
  * Reusable A / B / C cohort selector for the admin UI.
  *
- * Behavior matches the convention used app-wide:
- *  - Zero boxes checked  -> available to every cohort
- *  - Any box checked     -> restricted to those cohorts only
+ * Strict assigned-only behavior, app-wide:
+ *  - Zero boxes checked  -> no fellows can see it (unassigned)
+ *  - Any box checked     -> visible only to fellows in those cohorts
+ *
+ * Admins / facilitators always see every piece of content regardless,
+ * and are never themselves bound to a cohort.
  *
  * The component renders one hidden input per selected cohort using
  * `name` (default "cohorts"), so server actions can read the field
@@ -33,7 +36,7 @@ export function CohortAccessField({
   name = 'cohorts',
   defaultValue = [],
   idPrefix = 'cohort',
-  description = 'Leave all unchecked to make this available to every fellow. Tick one or more to restrict access.',
+  description = 'Tick one or more cohorts to assign this content. Fellows only see content assigned to their cohort - leaving all unchecked hides it from every fellow.',
   label = 'Cohort access',
 }: Props) {
   const [selected, setSelected] = useState<Set<Cohort>>(
@@ -88,18 +91,28 @@ export function CohortAccessField({
 }
 
 /**
- * Compact read-only badge for showing which cohorts a row is gated to.
- * Returns null when there's no gating (i.e. open to all cohorts) so
- * callers can drop it inline without an extra wrapper conditional.
+ * Compact read-only badge showing which cohorts content is assigned to.
+ * Renders an "Unassigned" pill when nothing is selected so admins can
+ * tell at a glance that no fellows can currently see the row.
  */
 export function CohortBadge({ cohorts }: { cohorts: readonly string[] | null | undefined }) {
-  if (!cohorts || cohorts.length === 0) return null
+  if (!cohorts || cohorts.length === 0) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+        title="No cohorts assigned - hidden from every fellow"
+      >
+        <span className="sr-only">Cohort assignment:</span>
+        Unassigned
+      </span>
+    )
+  }
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
-      title="Visible only to listed cohorts"
+      title="Visible only to assigned cohorts"
     >
-      <span className="sr-only">Visible to cohorts</span>
+      <span className="sr-only">Assigned cohorts:</span>
       {cohorts.join(' · ')}
     </span>
   )

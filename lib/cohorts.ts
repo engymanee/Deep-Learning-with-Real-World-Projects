@@ -19,21 +19,24 @@ export function isCohort(value: unknown): value is Cohort {
 
 /**
  * Returns true if a fellow with `userCohort` should be allowed to see
- * content gated by `targetCohorts`. The convention used everywhere in
- * the app:
+ * content gated by `targetCohorts`. Strict assigned-only access:
  *
- *  - empty `targetCohorts` array  -> open to every fellow
+ *  - empty `targetCohorts` array  -> NOT visible to any fellow
+ *                                    (curriculum is not assigned to
+ *                                    anyone yet)
  *  - non-empty                   -> only fellows whose cohort is listed
- *  - fellow with no cohort set   -> only sees "open to all" content
+ *  - fellow with no cohort set   -> can never see gated content;
+ *                                    they must be assigned a cohort
+ *                                    first
  *
  * Admins / facilitators bypass this check at the call site (they always
- * see everything).
+ * see everything regardless of cohort and never carry a cohort value).
  */
 export function fellowCanAccess(
   targetCohorts: readonly string[] | null | undefined,
   userCohort: Cohort | null | undefined,
 ): boolean {
-  if (!targetCohorts || targetCohorts.length === 0) return true
+  if (!targetCohorts || targetCohorts.length === 0) return false
   if (!userCohort) return false
   return targetCohorts.includes(userCohort)
 }

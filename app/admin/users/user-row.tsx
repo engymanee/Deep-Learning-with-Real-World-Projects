@@ -83,7 +83,14 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: SchoolT
   }
 
   function handleRoleChange(next: string) {
-    setRole(next as Role)
+    const nextRole = next as Role
+    setRole(nextRole)
+    // Promotion off the fellow role implicitly clears the cohort - the
+    // server enforces this too via a CHECK constraint, but we mirror the
+    // change locally so the UI stays in sync without a refetch.
+    if (nextRole !== 'fellow') {
+      setCohortLetter(NONE_COHORT)
+    }
     const fd = new FormData()
     fd.set('userId', user.id)
     fd.set('role', next)
@@ -215,23 +222,34 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: SchoolT
       </div>
 
       <div className="col-span-6 md:col-span-1">
-        <Select
-          value={cohortLetter}
-          onValueChange={handleCohortLetterChange}
-          disabled={pending}
-        >
-          <SelectTrigger className="h-9">
-            <SelectValue placeholder="—" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE_COHORT}>—</SelectItem>
-            {COHORTS.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {role === 'fellow' ? (
+          <Select
+            value={cohortLetter}
+            onValueChange={handleCohortLetterChange}
+            disabled={pending}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="—" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_COHORT}>—</SelectItem>
+              {COHORTS.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          // Admins and facilitators are not cohort-scoped: they always
+          // have full access to every phase, item, and library resource.
+          <span
+            className="flex h-9 items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground"
+            title={`${role === 'admin' ? 'Admins' : 'Facilitators'} have unrestricted access and aren't assigned to a cohort`}
+          >
+            n/a
+          </span>
+        )}
       </div>
 
       <div className="col-span-10 md:col-span-2">

@@ -587,7 +587,7 @@ function AddResourceDialog() {
 
           <CohortAccessField
             idPrefix="new-resource-cohort"
-            description="Leave all unchecked to share with every fellow. Tick one or more to limit access."
+            description="Assign this resource to one or more cohorts. Only fellows in the assigned cohort(s) can see it."
           />
 
           {err && (

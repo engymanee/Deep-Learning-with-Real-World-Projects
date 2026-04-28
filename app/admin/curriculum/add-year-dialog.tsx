@@ -94,7 +94,7 @@ export function AddYearDialog() {
             </Field>
             <CohortAccessField
               idPrefix="new-phase-cohort"
-              description="Leave all unchecked to make this phase visible to every fellow. Tick one or more to restrict it."
+              description="Assign this phase to one or more cohorts. Only fellows in the assigned cohort(s) can see it."
             />
             {msg && (
               <p

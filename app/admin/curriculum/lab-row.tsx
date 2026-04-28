@@ -284,7 +284,7 @@ function EditLabDialog({
             <CohortAccessField
               defaultValue={item.cohorts}
               idPrefix={`lab-cohort-${item.id}`}
-              description="Leave all unchecked to keep this item visible to every fellow. Tick one or more cohorts to restrict it."
+              description="Assign this item to one or more cohorts. Only fellows in the assigned cohort(s) can see it. Leaving all unchecked hides it from every fellow."
             />
             {msg && (
               <p

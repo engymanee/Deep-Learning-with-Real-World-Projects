@@ -165,7 +165,7 @@ function EditPhaseDialog({ phase }: { phase: Phase }) {
             <CohortAccessField
               defaultValue={phase.cohorts}
               idPrefix={`phase-cohort-${phase.id}`}
-              description="Leave all unchecked to make this phase visible to every fellow. Tick one or more cohorts to restrict it."
+              description="Assign this phase to one or more cohorts. Only fellows in the assigned cohort(s) can see it. Leaving all unchecked hides the phase from every fellow."
             />
             {msg && (
               <p
@@ -386,7 +386,7 @@ function AddItemDialog({ phaseId }: { phaseId: string }) {
             </Field>
             <CohortAccessField
               idPrefix={`new-item-cohort-${phaseId}`}
-              description="Leave all unchecked to make this item visible to every fellow. Tick one or more to restrict it."
+              description="Assign this item to one or more cohorts. Only fellows in the assigned cohort(s) can see it."
             />
             {msg && (
               <p

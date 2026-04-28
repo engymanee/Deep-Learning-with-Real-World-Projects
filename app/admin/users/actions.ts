@@ -54,15 +54,21 @@ export async function inviteUserAction(formData: FormData): Promise<ActionResult
     const title = String(formData.get('title') ?? '').trim()
     const role = String(formData.get('role') ?? 'fellow')
     // schoolTeamId comes from the existing "cohorts" table, surfaced
-    // in the UI as "School Team". cohortLetter is the new A/B/C label
-    // stored on profiles.cohort.
+    // in the UI as "School Team". cohortLetter is the A/B/C label
+    // stored on profiles.cohort - only valid for fellows.
     const schoolTeamId = String(formData.get('cohortId') ?? '')
     const cohortLetterRaw = String(formData.get('cohortLetter') ?? '')
-    const cohortLetter: Cohort | null = isCohort(cohortLetterRaw) ? cohortLetterRaw : null
 
     if (!email) return fail('Email is required')
     if (!fullName) return fail('Full name is required')
     assertRole(role)
+
+    // Cohorts are exclusively a program-fellow concept. Admins and
+    // facilitators have unrestricted access to all curriculum and are
+    // never bound to a cohort, so we silently drop any cohort value
+    // submitted with a non-fellow role.
+    const cohortLetter: Cohort | null =
+      role === 'fellow' && isCohort(cohortLetterRaw) ? cohortLetterRaw : null
 
     const admin = createAdminClient()
 
@@ -119,7 +125,15 @@ export async function updateRoleAction(formData: FormData): Promise<ActionResult
     assertRole(role)
 
     const admin = createAdminClient()
-    const { error } = await admin.from('profiles').update({ role }).eq('id', userId)
+
+    // Cohort labels are fellow-only. Promoting a fellow to facilitator
+    // or admin must clear their cohort - both to keep the data model
+    // consistent (there's a CHECK constraint enforcing this) and to
+    // reflect that admins/facilitators have unrestricted access.
+    const update: { role: Role; cohort?: null } =
+      role === 'fellow' ? { role } : { role, cohort: null }
+
+    const { error } = await admin.from('profiles').update(update).eq('id', userId)
     if (error) return fail(error.message)
 
     revalidatePath('/admin/users')
@@ -133,6 +147,10 @@ export async function updateRoleAction(formData: FormData): Promise<ActionResult
  * Updates the high-level cohort label (A/B/C) stored on profiles.cohort.
  * Empty string clears the cohort. This is the field that gates phase /
  * item / resource access for fellows in the user-facing UI.
+ *
+ * Refuses to set a cohort on any non-fellow profile. Admins and
+ * facilitators are never cohort-scoped: they have full unrestricted
+ * access to every curriculum item and library resource.
  */
 export async function updateCohortLetterAction(formData: FormData): Promise<ActionResult> {
   try {
@@ -145,6 +163,23 @@ export async function updateCohortLetterAction(formData: FormData): Promise<Acti
     if (raw && !cohort) return fail('Invalid cohort')
 
     const admin = createAdminClient()
+
+    // Verify the target is actually a fellow before assigning a cohort.
+    // (Clearing a cohort - cohort === null - is always allowed so we
+    // can recover from any pre-constraint legacy data.)
+    if (cohort) {
+      const { data: target, error: tErr } = await admin
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle<{ role: Role }>()
+      if (tErr) return fail(tErr.message)
+      if (!target) return fail('User not found')
+      if (target.role !== 'fellow') {
+        return fail('Cohorts can only be assigned to fellows.')
+      }
+    }
+
     const { error } = await admin
       .from('profiles')
       .update({ cohort })
