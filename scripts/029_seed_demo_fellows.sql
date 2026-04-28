@@ -18,7 +18,12 @@ create extension if not exists pgcrypto;
 do $$
 declare
   cohort_label   constant text := 'A';
-  password_hash  text := crypt('password123', gen_salt('bf'));
+  -- Cost factor MUST be 10+. Supabase GoTrue rejects bcrypt
+  -- hashes below cost 10 as "Invalid login credentials" - and
+  -- pgcrypto's gen_salt('bf') defaults to cost 6, which silently
+  -- produces unusable hashes. Always pin to 10 to match Supabase's
+  -- own admin-created users.
+  password_hash  text := crypt('password123', gen_salt('bf', 10));
 
   -- (email, full name) tuples we want to (re)seed.
   demo_users constant text[][] := array[
