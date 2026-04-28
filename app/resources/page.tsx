@@ -19,50 +19,54 @@ interface Resource {
   forRoles?: string[]
 }
 
+// Latin placeholders, per Karen's request. Real titles + URLs will
+// replace these when the curated library is finalised; until then
+// the obviously-fake copy makes it clear that nothing here is a
+// production resource yet.
 const MOCK_RESOURCES: Resource[] = [
   {
     id: '1',
-    title: 'Leadership Fundamentals Guide',
-    description: 'Comprehensive guide covering core leadership competencies and practices',
+    title: 'Lorem ipsum dolor sit amet',
+    description: 'Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.',
     resourceType: 'document',
-    url: 'https://example.com/docs/leadership-guide.pdf',
+    url: '#',
   },
   {
     id: '2',
-    title: 'Building Trust in Teams Video',
-    description: 'Expert video on creating psychological safety and building trust',
+    title: 'Ut enim ad minim veniam',
+    description: 'Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo.',
     resourceType: 'video',
-    url: 'https://example.com/videos/trust-building',
+    url: '#',
   },
   {
     id: '3',
-    title: 'Team Reflection Template',
-    description: 'Template for facilitating team reflections after modules',
+    title: 'Duis aute irure dolor',
+    description: 'In reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla.',
     resourceType: 'template',
-    url: 'https://example.com/templates/reflection.docx',
+    url: '#',
     forRoles: ['facilitator', 'admin'],
   },
   {
     id: '4',
-    title: 'Facilitator Resource Hub',
-    description: 'Collection of facilitator resources and guides',
+    title: 'Excepteur sint occaecat cupidatat',
+    description: 'Non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
     resourceType: 'link',
-    url: 'https://example.com/facilitator-hub',
+    url: '#',
     forRoles: ['facilitator', 'admin'],
   },
   {
     id: '5',
-    title: 'Data Analysis Workbook',
-    description: 'Interactive workbook for analyzing school performance data',
+    title: 'Sed ut perspiciatis unde omnis',
+    description: 'Iste natus error sit voluptatem accusantium doloremque laudantium totam rem.',
     resourceType: 'document',
-    url: 'https://example.com/workbook/data-analysis.xlsx',
+    url: '#',
   },
   {
     id: '6',
-    title: 'Change Management Strategies',
-    description: 'Video series on leading organizational change',
+    title: 'Nemo enim ipsam voluptatem',
+    description: 'Quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni.',
     resourceType: 'video',
-    url: 'https://example.com/videos/change-management',
+    url: '#',
   },
 ]
 

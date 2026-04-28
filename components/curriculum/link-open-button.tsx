@@ -11,6 +11,13 @@ interface Props {
   url: string
   /** Renders different copy ("Join now" vs "Open") for live sessions. */
   isLiveSession: boolean
+  /**
+   * Custom button label. When omitted falls back to the live
+   * session / non-live default copy. Used to put the resource
+   * type into the CTA so the button is self-describing without
+   * a separate "Open this resource" header above it.
+   */
+  label?: string
   /** Whether the current user has already opened this link. */
   alreadyClicked: boolean
 }
@@ -28,6 +35,7 @@ export function LinkOpenButton({
   contentId,
   url,
   isLiveSession,
+  label,
   alreadyClicked,
 }: Props) {
   const router = useRouter()
@@ -57,9 +65,10 @@ export function LinkOpenButton({
   // No visible "Opened" indicator - the click is tracked internally
   // (`optimistic` + `recordLinkClick`) so the lesson footer's gate
   // can clear, but nothing is surfaced inline on the link card.
+  const text = label ?? (isLiveSession ? 'Join now' : 'Open')
   return (
     <Button onClick={handleClick} className="inline-flex items-center gap-1.5">
-      {isLiveSession ? 'Join now' : 'Open'}
+      <span className="capitalize">{text}</span>
       <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
     </Button>
   )

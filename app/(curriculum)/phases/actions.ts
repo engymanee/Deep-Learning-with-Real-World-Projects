@@ -7,6 +7,7 @@ import {
   canFellowSeeContent,
   canFellowSeeModule,
   canFellowSeePhase,
+  type ResourceType,
 } from '@/lib/curriculum'
 import {
   MIN_REFLECTION_WORDS,
@@ -23,6 +24,7 @@ interface ItemWithCascade {
   year_id: string
   module_id: string | null
   url: string | null
+  resource_type: ResourceType | null
   reflection_enabled: boolean
   cohorts: string[] | null
   modules: { cohorts: string[] | null } | null
@@ -48,7 +50,7 @@ async function loadVisibleItem(
   const { data: item, error } = await supabase
     .from('labs')
     .select(
-      'id, year_id, module_id, url, reflection_enabled, cohorts, modules:module_id (cohorts), years:year_id (cohorts)',
+      'id, year_id, module_id, url, resource_type, reflection_enabled, cohorts, modules:module_id (cohorts), years:year_id (cohorts)',
     )
     .eq('id', contentId)
     .maybeSingle<ItemWithCascade>()
@@ -107,8 +109,13 @@ export async function toggleContentCompletion(
     const { item } = visible
 
     if (nextCompleted) {
-      // Gate 1: link click (if there's a link to click).
-      if (item.url) {
+      // Gate 1: link click. Live sessions are exempt - the fellow
+      // may have joined via Google Calendar or the email invite, so
+      // forcing them to also click the in-app link before marking
+      // the session attended is needlessly clunky. The reflection
+      // gate (gate 2) still applies if the admin enabled one.
+      const linkGated = !!item.url && item.resource_type !== 'live_session'
+      if (linkGated) {
         const { data: clickRow } = await supabase
           .from('user_content_link_clicks')
           .select('content_id')
@@ -230,7 +237,7 @@ export async function recordLinkClick(
 // ----------------------------------------------------------------------------
 
 export type ReflectionResult =
-  | { ok: true }
+  | { ok: true; completed?: boolean }
   | { ok: false; message: string }
 
 const MAX_REFLECTION_LENGTH = 5000
@@ -238,10 +245,19 @@ const MAX_REFLECTION_LENGTH = 5000
 /**
  * Save (or update) the current user's reflection for a content item.
  * Only valid when the item has `reflection_enabled = true`.
+ *
+ * When `opts.markComplete` is true, the action also tries to mark
+ * the item completed in the same round-trip - so the fellow only
+ * needs ONE click ("Submit reflection") instead of two ("Submit"
+ * then "Mark as completed"). If a separate gate is still pending
+ * (e.g. the link hasn't been opened yet on a non-live-session
+ * item), the reflection is still saved but completion is silently
+ * skipped; the page footer falls back to the standalone Mark CTA.
  */
 export async function submitReflection(
   contentId: string,
   response: string,
+  opts?: { markComplete?: boolean },
 ): Promise<ReflectionResult> {
   try {
     const user = await requireUser()
@@ -288,10 +304,45 @@ export async function submitReflection(
       )
     if (error) return { ok: false, message: error.message }
 
+    // One-step "submit & complete" flow: only when the caller asks
+    // for it AND the link gate is either absent or already cleared.
+    // We mirror the live-session exemption here so the rules stay
+    // consistent across actions.
+    let completed = false
+    if (opts?.markComplete) {
+      const linkGated = !!item.url && item.resource_type !== 'live_session'
+      let linkOk = !linkGated
+      if (linkGated) {
+        const { data: clickRow } = await supabase
+          .from('user_content_link_clicks')
+          .select('content_id')
+          .eq('profile_id', user.id)
+          .eq('content_id', contentId)
+          .maybeSingle<{ content_id: string }>()
+        linkOk = !!clickRow
+      }
+      if (linkOk) {
+        const { error: completeErr } = await supabase
+          .from('user_content_completions')
+          .upsert(
+            { profile_id: user.id, content_id: contentId },
+            { onConflict: 'profile_id,content_id' },
+          )
+        if (!completeErr) {
+          completed = true
+          revalidatePath('/dashboard')
+        }
+        // Failures here are intentionally swallowed - the
+        // reflection itself saved successfully, so we don't want
+        // to surface a confusing error. The footer will still
+        // render the standalone Mark CTA next refresh.
+      }
+    }
+
     revalidatePath(
       `/phases/${item.year_id}/modules/${item.module_id}/items/${contentId}`,
     )
-    return { ok: true }
+    return { ok: true, completed }
   } catch (e) {
     return {
       ok: false,

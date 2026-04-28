@@ -150,6 +150,7 @@ export default async function ContentItemPage({
   const duration = formatDuration(item.duration_minutes)
   const hasBody = !!item.body && item.body.trim().length > 0
   const hasUrl = !!item.url
+  const isLiveSession = item.resource_type === 'live_session'
   // Reflection is required as soon as the admin toggles it on. The
   // prompt is enforced separately at admin save time, so it'll
   // always be present here in practice - but we don't bypass the
@@ -161,8 +162,11 @@ export default async function ContentItemPage({
   // Gate states. Only block the FIRST completion - once an item is
   // already complete the fellow can freely uncheck/redo. Reflection
   // gate uses the shared 50-word rule so client-side disabled state
-  // matches server-side validation.
-  const needsLinkClick = !isCompleted && hasUrl && !linkClicked
+  // matches server-side validation. Live sessions are exempt from
+  // the click-the-link gate (calendar invites, email RSVPs etc.
+  // make the in-app click unnecessary friction).
+  const needsLinkClick =
+    !isCompleted && hasUrl && !linkClicked && !isLiveSession
   const needsReflection =
     !isCompleted &&
     reflectionRequired &&
@@ -202,30 +206,26 @@ export default async function ContentItemPage({
         </div>
       )}
 
-      {/* External resource CTA. Click tracking on the button feeds the
-          completion gate. */}
+      {/* External resource CTA. The page header above already carries
+          the title + description, so this card is just the action -
+          no redundant "Open this resource" copy and no raw URL on
+          display. The button label adapts to the resource type so
+          the click affordance is self-describing. */}
       {hasUrl && (
-        <div className="rounded-lg border border-border bg-card p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">
-                {item.resource_type === 'live_session'
-                  ? 'Live session link'
-                  : hasBody
-                    ? 'Linked resource'
-                    : 'Open this resource'}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {item.url}
-              </p>
-            </div>
-            <LinkOpenButton
-              contentId={item.id}
-              url={item.url!}
-              isLiveSession={item.resource_type === 'live_session'}
-              alreadyClicked={linkClicked}
-            />
-          </div>
+        <div className="flex">
+          <LinkOpenButton
+            contentId={item.id}
+            url={item.url!}
+            isLiveSession={isLiveSession}
+            label={
+              isLiveSession
+                ? 'Join live session'
+                : resource
+                  ? `Open ${resource.label.toLowerCase()}`
+                  : 'Open resource'
+            }
+            alreadyClicked={linkClicked}
+          />
         </div>
       )}
 
@@ -247,13 +247,21 @@ export default async function ContentItemPage({
         />
       )}
 
-      {/* Footer pairs Mark-as-complete with Continue. */}
+      {/* Footer pairs Mark-as-complete with Continue. The
+          incomplete-CTA hint is used to reassure live-session
+          fellows that they can mark complete without opening the
+          in-app link. */}
       <LessonFooter
         contentId={item.id}
         isCompleted={isCompleted}
         needsLinkClick={needsLinkClick}
         needsReflection={needsReflection}
         nextHref={next?.href ?? null}
+        incompleteHint={
+          isLiveSession && !needsReflection
+            ? 'Mark this complete once you have attended the live session.'
+            : null
+        }
       />
     </article>
   )

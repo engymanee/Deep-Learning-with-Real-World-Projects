@@ -19,6 +19,14 @@ interface Props {
   needsReflection: boolean
   /** Next item href, or null when this is the last item. */
   nextHref: string | null
+  /**
+   * Optional helper sentence shown next to the Mark-as-completed
+   * CTA while the item is still incomplete. Used by live-session
+   * items to reassure fellows that they should mark complete after
+   * attending - even if they joined via Calendar instead of the
+   * in-app link.
+   */
+  incompleteHint?: string | null
 }
 
 /**
@@ -45,6 +53,7 @@ export function LessonFooter({
   needsLinkClick,
   needsReflection,
   nextHref,
+  incompleteHint,
 }: Props) {
   const router = useRouter()
   const [optimistic, setOptimistic] = useState(isCompleted)
@@ -119,11 +128,23 @@ export function LessonFooter({
     </button>
   )
 
+  // Whether the page passed in a per-item helper hint to show
+  // beside the Mark CTA. Only relevant while the lesson is still
+  // incomplete and not gated by reflection/link clicks.
+  const showIncompleteHint =
+    !optimistic && !blocked && !!incompleteHint
+
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-6">
       {!optimistic && blocked && blockMessage && (
         <p className="text-sm text-muted-foreground" role="status">
           {blockMessage}
+        </p>
+      )}
+
+      {showIncompleteHint && (
+        <p className="text-sm text-muted-foreground" role="status">
+          {incompleteHint}
         </p>
       )}
 
@@ -135,17 +156,29 @@ export function LessonFooter({
 
       <div className="flex flex-wrap items-center justify-end gap-3">
         {optimistic ? (
-          // Completed state: navigation button + neutral indicator.
-          // On the last lesson there's no nextHref so we drop the
-          // button and show only the indicator.
+          // Completed state. When there IS a next item we render
+          // the primary nav CTA. When this is the final item in the
+          // module we still want a way out, so a quiet "Back to
+          // dashboard" link replaces the dead-end - alongside the
+          // neutral Completed indicator either way.
           <>
-            {nextHref && (
+            {nextHref ? (
               <Button
                 type="button"
                 onClick={handleContinue}
                 className="inline-flex items-center gap-1.5"
               >
                 Go to next item
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/dashboard')}
+                className="inline-flex items-center gap-1.5"
+              >
+                Back to dashboard
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
