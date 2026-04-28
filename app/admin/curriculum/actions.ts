@@ -4,156 +4,82 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 import { COHORTS } from '@/lib/cohorts'
-
-/**
- * Pull the cohort selections out of a form. The CohortAccessField
- * component submits one entry per ticked cohort using the same name
- * (default: "cohorts"). We coerce to strings, dedupe, and reject any
- * value that isn't one of A/B/C so an empty array always means
- * "open to every cohort".
- */
-function readCohorts(formData: FormData, name = 'cohorts'): string[] {
-  const raw = formData.getAll(name)
-  const allowed = new Set(COHORTS as readonly string[])
-  const out = new Set<string>()
-  for (const v of raw) {
-    if (typeof v === 'string' && allowed.has(v)) out.add(v)
-  }
-  return Array.from(out)
-}
+import {
+  CONTENT_CATEGORY_VALUES,
+  RESOURCE_TYPE_VALUES,
+  isContentCategory,
+  isResourceType,
+  type ContentCategory,
+  type ResourceType,
+} from '@/lib/curriculum'
 
 // ============================================================================
-// Types
+// Helpers
 // ============================================================================
-
-export type Phase = 'before' | 'during' | 'after'
-
-export type BlockType =
-  | 'reading'
-  | 'video'
-  | 'reflection_prompt'
-  | 'protocol'
-  | 'session_link'
-  | 'slides'
-  | 'survey'
-  | 'follow_up_task'
 
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string }
 
-function ok(message: string): ActionResult {
-  return { ok: true, message }
-}
-function fail(message: string): ActionResult {
-  return { ok: false, message }
-}
+const ok = (message: string): ActionResult => ({ ok: true, message })
+const fail = (message: string): ActionResult => ({ ok: false, message })
 
-function nullable(v: FormDataEntryValue | null): string | null {
-  const s = typeof v === 'string' ? v.trim() : ''
+const trim = (v: FormDataEntryValue | null) =>
+  typeof v === 'string' ? v.trim() : ''
+
+const nullable = (v: FormDataEntryValue | null) => {
+  const s = trim(v)
   return s.length === 0 ? null : s
 }
 
-function nullableInt(v: FormDataEntryValue | null): number | null {
-  const n = Number(typeof v === 'string' ? v : '')
-  return Number.isFinite(n) && n >= 0 ? n : null
-}
-
-const PHASES: readonly Phase[] = ['before', 'during', 'after'] as const
-const BLOCK_TYPES: readonly BlockType[] = [
-  'reading',
-  'video',
-  'reflection_prompt',
-  'protocol',
-  'session_link',
-  'slides',
-  'survey',
-  'follow_up_task',
-] as const
-
-function assertPhase(v: unknown): asserts v is Phase {
-  if (!PHASES.includes(v as Phase)) throw new Error(`Invalid phase: ${String(v)}`)
-}
-function assertBlockType(v: unknown): asserts v is BlockType {
-  if (!BLOCK_TYPES.includes(v as BlockType)) throw new Error(`Invalid block type: ${String(v)}`)
-}
-
-// ============================================================================
-// YEARS  (fixed 3, admins can only edit title + description)
-// ============================================================================
-
-export async function updateYear(formData: FormData): Promise<ActionResult> {
-  try {
-    await requireAdmin()
-    const id = String(formData.get('id') ?? '').trim()
-    const title = String(formData.get('title') ?? '').trim()
-    const description = nullable(formData.get('description'))
-    const cohorts = readCohorts(formData)
-    if (!id) return fail('Missing year id')
-    if (!title) return fail('Title is required')
-
-    const supabase = await createClient()
-    const { error } = await supabase
-      .from('years')
-      .update({ title, description, cohorts })
-      .eq('id', id)
-    if (error) return fail(error.message)
-
-    revalidatePath('/admin/curriculum')
-    revalidatePath('/dashboard')
-    return ok('Phase updated')
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : 'Unknown error')
-  }
+/**
+ * Read the cohort selections for a phase from a form. The CohortAccessField
+ * component submits one entry per ticked cohort, so an empty array means
+ * "no cohorts assigned" (= hidden from every fellow).
+ */
+function readPhaseCohorts(formData: FormData, name = 'cohorts'): string[] {
+  const raw = formData.getAll(name)
+  const allowed = new Set(COHORTS as readonly string[])
+  const out = new Set<string>()
+  for (const v of raw) if (typeof v === 'string' && allowed.has(v)) out.add(v)
+  return Array.from(out)
 }
 
 /**
- * Admins can create brand-new curriculum labels (a Year row) from the
- * sidebar. Slug is derived from the title so fellows don't have to think
- * about DB ids. Placed at the end of the curriculum list.
+ * Read cohort access for a content item, honoring the `inherit` flag.
+ *
+ *   inherit=on        -> NULL (item inherits its phase's cohorts)
+ *   inherit absent    -> array of ticked cohorts (may be empty = locked)
  */
-export async function createYear(formData: FormData): Promise<ActionResult> {
+function readContentCohorts(formData: FormData): string[] | null {
+  if (trim(formData.get('cohorts_inherit')) === 'on') return null
+  return readPhaseCohorts(formData)
+}
+
+// ============================================================================
+// Phases (table: years)
+// ============================================================================
+
+export async function createPhase(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin()
-    const title = String(formData.get('title') ?? '').trim()
+    const title = trim(formData.get('title'))
     const description = nullable(formData.get('description'))
-    const cohorts = readCohorts(formData)
-    if (!title) return fail('Title is required')
-
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 40)
-    if (!slug) return fail('Title must contain letters or numbers')
+    const cohorts = readPhaseCohorts(formData)
+    if (!title) return fail('Phase title is required')
 
     const supabase = await createClient()
 
-    // Place at the end.
-    const { data: last } = await supabase
+    // Append at the end of the curriculum.
+    const { data: maxRow } = await supabase
       .from('years')
       .select('order_index')
       .order('order_index', { ascending: false })
       .limit(1)
       .maybeSingle<{ order_index: number }>()
-    const nextIndex = (last?.order_index ?? 0) + 1
-
-    // Resolve any slug collision ("deep-learning", "deep-learning-2", ...).
-    let candidate = slug
-    let suffix = 1
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { data: existing } = await supabase
-        .from('years')
-        .select('id')
-        .eq('id', candidate)
-        .maybeSingle<{ id: string }>()
-      if (!existing) break
-      suffix += 1
-      candidate = `${slug}-${suffix}`
-    }
+    const nextIndex = (maxRow?.order_index ?? 0) + 1
 
     const { error } = await supabase
       .from('years')
-      .insert({ id: candidate, title, description, order_index: nextIndex, cohorts })
+      .insert({ title, description, cohorts, order_index: nextIndex })
     if (error) return fail(error.message)
 
     revalidatePath('/admin/curriculum')
@@ -164,48 +90,43 @@ export async function createYear(formData: FormData): Promise<ActionResult> {
   }
 }
 
-/**
- * Delete a phase (row in `years`) along with every item and content block
- * inside it. We explicitly cascade in code so behavior is identical
- * regardless of the FK's ON DELETE setting, and so we can surface a
- * single error message to the admin if any step fails.
- */
-export async function deleteYear(formData: FormData): Promise<ActionResult> {
+export async function updatePhase(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin()
-    const id = String(formData.get('id') ?? '').trim()
+    const id = trim(formData.get('id'))
+    const title = trim(formData.get('title'))
+    const description = nullable(formData.get('description'))
+    const cohorts = readPhaseCohorts(formData)
+    if (!id) return fail('Missing phase id')
+    if (!title) return fail('Phase title is required')
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('years')
+      .update({ title, description, cohorts })
+      .eq('id', id)
+    if (error) return fail(error.message)
+
+    revalidatePath('/admin/curriculum')
+    revalidatePath(`/admin/curriculum/${id}`)
+    revalidatePath('/dashboard')
+    revalidatePath(`/phases/${id}`)
+    return ok('Phase updated')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export async function deletePhase(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const id = trim(formData.get('id'))
     if (!id) return fail('Missing phase id')
 
     const supabase = await createClient()
-
-    // 1) Find every item in the phase so we can clean up its content blocks.
-    const { data: labs, error: labsErr } = await supabase
-      .from('labs')
-      .select('id')
-      .eq('year_id', id)
-    if (labsErr) return fail(labsErr.message)
-
-    const labIds = (labs ?? []).map((l) => l.id)
-
-    // 2) Delete content blocks belonging to those items.
-    if (labIds.length > 0) {
-      const { error: blocksErr } = await supabase
-        .from('lab_content_blocks')
-        .delete()
-        .in('lab_id', labIds)
-      if (blocksErr) return fail(blocksErr.message)
-    }
-
-    // 3) Delete the items themselves.
-    const { error: labDelErr } = await supabase
-      .from('labs')
-      .delete()
-      .eq('year_id', id)
-    if (labDelErr) return fail(labDelErr.message)
-
-    // 4) Delete the phase row.
-    const { error: yearDelErr } = await supabase.from('years').delete().eq('id', id)
-    if (yearDelErr) return fail(yearDelErr.message)
+    // Cascade is set on labs.year_id, so all content items go with the phase.
+    const { error } = await supabase.from('years').delete().eq('id', id)
+    if (error) return fail(error.message)
 
     revalidatePath('/admin/curriculum')
     revalidatePath('/dashboard')
@@ -215,374 +136,234 @@ export async function deleteYear(formData: FormData): Promise<ActionResult> {
   }
 }
 
-// ============================================================================
-// LABS
-// ============================================================================
-
-export async function createLab(formData: FormData): Promise<ActionResult> {
+export async function reorderPhases(orderedIds: string[]): Promise<ActionResult> {
   try {
     await requireAdmin()
-    const year_id = String(formData.get('year_id') ?? '').trim()
-    const id = String(formData.get('id') ?? '').trim()
-    const title = String(formData.get('title') ?? '').trim()
-    const description = nullable(formData.get('description'))
-    const cohorts = readCohorts(formData)
-    if (!year_id) return fail('Year is required')
-    if (!id) return fail('Lab id (slug) is required')
-    if (!title) return fail('Title is required')
-
     const supabase = await createClient()
 
-    // Place it at the end of the year.
-    const { data: last } = await supabase
+    // Pass 1: bump every affected row out of conflict range so the
+    // unique (order_index) constraint can't bite when shuffling.
+    await Promise.all(
+      orderedIds.map((id, i) =>
+        supabase
+          .from('years')
+          .update({ order_index: 1000 + i })
+          .eq('id', id),
+      ),
+    )
+    // Pass 2: write the final indices.
+    const errors = await Promise.all(
+      orderedIds.map((id, i) =>
+        supabase
+          .from('years')
+          .update({ order_index: i + 1 })
+          .eq('id', id)
+          .then((r) => r.error),
+      ),
+    )
+    const firstError = errors.find(Boolean)
+    if (firstError) return fail(firstError.message)
+
+    revalidatePath('/admin/curriculum')
+    revalidatePath('/dashboard')
+    return ok('Phases reordered')
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+// ============================================================================
+// Content items (table: labs)
+// ============================================================================
+
+function assertCategory(v: string): asserts v is ContentCategory {
+  if (!isContentCategory(v)) throw new Error(`Invalid category: ${v}`)
+}
+function assertResourceType(v: string): asserts v is ResourceType {
+  if (!isResourceType(v)) throw new Error(`Invalid resource type: ${v}`)
+}
+
+interface ContentInputs {
+  yearId: string
+  category: ContentCategory
+  resourceType: ResourceType
+  title: string
+  description: string | null
+  body: string | null
+  url: string | null
+  cohorts: string[] | null
+}
+
+function readContentInputs(formData: FormData): ContentInputs | string {
+  const yearId = trim(formData.get('year_id'))
+  const category = trim(formData.get('category'))
+  const resourceType = trim(formData.get('resource_type'))
+  const title = trim(formData.get('title'))
+  const description = nullable(formData.get('description'))
+  const body = nullable(formData.get('body'))
+  const url = nullable(formData.get('url'))
+  const cohorts = readContentCohorts(formData)
+
+  if (!yearId) return 'Missing phase id'
+  if (!title) return 'Title is required'
+  if (!category) return 'Pick a category'
+  if (!resourceType) return 'Pick a resource type'
+  try {
+    assertCategory(category)
+    assertResourceType(resourceType)
+  } catch (e) {
+    return e instanceof Error ? e.message : 'Invalid selection'
+  }
+  if (url && !/^https?:\/\//i.test(url)) {
+    return 'URL must start with http:// or https://'
+  }
+  return {
+    yearId,
+    category: category as ContentCategory,
+    resourceType: resourceType as ResourceType,
+    title,
+    description,
+    body,
+    url,
+    cohorts,
+  }
+}
+
+export async function createContent(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin()
+    const parsed = readContentInputs(formData)
+    if (typeof parsed === 'string') return fail(parsed)
+    const supabase = await createClient()
+
+    // Append within the (phase, category) bucket.
+    const { data: maxRow } = await supabase
       .from('labs')
       .select('order_index')
-      .eq('year_id', year_id)
+      .eq('year_id', parsed.yearId)
+      .eq('category', parsed.category)
       .order('order_index', { ascending: false })
       .limit(1)
       .maybeSingle<{ order_index: number }>()
-    const nextIndex = (last?.order_index ?? 0) + 1
+    const nextIndex = (maxRow?.order_index ?? 0) + 1
 
-    const { error } = await supabase
-      .from('labs')
-      .insert({ id, year_id, title, description, order_index: nextIndex, cohorts })
+    const { error } = await supabase.from('labs').insert({
+      year_id: parsed.yearId,
+      category: parsed.category,
+      resource_type: parsed.resourceType,
+      title: parsed.title,
+      description: parsed.description,
+      body: parsed.body,
+      url: parsed.url,
+      cohorts: parsed.cohorts,
+      order_index: nextIndex,
+    })
     if (error) return fail(error.message)
 
+    revalidatePath(`/admin/curriculum/${parsed.yearId}`)
     revalidatePath('/admin/curriculum')
-    return ok('Item created')
+    revalidatePath(`/phases/${parsed.yearId}`)
+    return ok('Content added')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
 }
 
-export async function updateLab(formData: FormData): Promise<ActionResult> {
+export async function updateContent(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin()
-    const id = String(formData.get('id') ?? '').trim()
-    const title = String(formData.get('title') ?? '').trim()
-    const description = nullable(formData.get('description'))
-    const cohorts = readCohorts(formData)
-    if (!id) return fail('Missing lab id')
-    if (!title) return fail('Title is required')
+    const id = trim(formData.get('id'))
+    if (!id) return fail('Missing content id')
+    const parsed = readContentInputs(formData)
+    if (typeof parsed === 'string') return fail(parsed)
 
     const supabase = await createClient()
     const { error } = await supabase
       .from('labs')
-      .update({ title, description, cohorts })
+      .update({
+        category: parsed.category,
+        resource_type: parsed.resourceType,
+        title: parsed.title,
+        description: parsed.description,
+        body: parsed.body,
+        url: parsed.url,
+        cohorts: parsed.cohorts,
+      })
       .eq('id', id)
     if (error) return fail(error.message)
 
-    revalidatePath('/admin/curriculum')
-    revalidatePath(`/admin/curriculum/labs/${id}`)
-    revalidatePath(`/labs/${id}`)
-    return ok('Item updated')
+    revalidatePath(`/admin/curriculum/${parsed.yearId}`)
+    revalidatePath(`/phases/${parsed.yearId}`)
+    revalidatePath(`/phases/${parsed.yearId}/items/${id}`)
+    return ok('Content updated')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
 }
 
-export async function deleteLab(formData: FormData): Promise<ActionResult> {
+export async function deleteContent(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin()
-    const id = String(formData.get('id') ?? '').trim()
-    if (!id) return fail('Missing lab id')
+    const id = trim(formData.get('id'))
+    const yearId = trim(formData.get('year_id'))
+    if (!id) return fail('Missing content id')
 
     const supabase = await createClient()
     const { error } = await supabase.from('labs').delete().eq('id', id)
     if (error) return fail(error.message)
 
+    if (yearId) {
+      revalidatePath(`/admin/curriculum/${yearId}`)
+      revalidatePath(`/phases/${yearId}`)
+    }
     revalidatePath('/admin/curriculum')
-    return ok('Item deleted')
+    return ok('Content deleted')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
 }
 
-/**
- * Persist a full drag-and-drop reordering. The client sends one entry per
- * phase whose contents changed, each with the canonical ordered list of
- * item ids. We write in two passes to side-step the UNIQUE
- * (year_id, order_index) constraint: first park every affected row on a
- * unique negative index (also moving it to its new phase), then assign
- * its final positive index. Any id that came in but doesn't exist in the
- * DB is silently ignored so stale client state never 500s the request.
- */
-export async function reorderLabs(
-  orderings: { year_id: string; lab_ids: string[] }[],
+export async function reorderContent(
+  yearId: string,
+  category: ContentCategory,
+  orderedIds: string[],
 ): Promise<ActionResult> {
   try {
     await requireAdmin()
-    if (!Array.isArray(orderings) || orderings.length === 0) {
-      return ok('Nothing to save')
-    }
-
+    if (!isContentCategory(category)) return fail('Invalid category')
     const supabase = await createClient()
-    let temp = -1
 
-    // Pass 1 - stash every row on a temporary negative index so we can freely
-    // rewrite the destination phase's final indexes without colliding.
-    for (const o of orderings) {
-      if (!o?.year_id || !Array.isArray(o.lab_ids)) continue
-      for (const labId of o.lab_ids) {
-        const { error } = await supabase
+    await Promise.all(
+      orderedIds.map((id, i) =>
+        supabase
           .from('labs')
-          .update({ year_id: o.year_id, order_index: temp })
-          .eq('id', labId)
-        if (error) return fail(error.message)
-        temp -= 1
-      }
-    }
-
-    // Pass 2 - apply the final 1..N ordering per phase.
-    for (const o of orderings) {
-      if (!o?.year_id || !Array.isArray(o.lab_ids)) continue
-      for (let i = 0; i < o.lab_ids.length; i++) {
-        const { error } = await supabase
+          .update({ order_index: 10000 + i })
+          .eq('id', id)
+          .eq('year_id', yearId)
+          .eq('category', category),
+      ),
+    )
+    const errors = await Promise.all(
+      orderedIds.map((id, i) =>
+        supabase
           .from('labs')
           .update({ order_index: i + 1 })
-          .eq('id', o.lab_ids[i])
-        if (error) return fail(error.message)
-      }
-    }
+          .eq('id', id)
+          .eq('year_id', yearId)
+          .eq('category', category)
+          .then((r) => r.error),
+      ),
+    )
+    const firstError = errors.find(Boolean)
+    if (firstError) return fail(firstError.message)
 
-    revalidatePath('/admin/curriculum')
-    revalidatePath('/dashboard')
-    return ok('Order saved')
+    revalidatePath(`/admin/curriculum/${yearId}`)
+    revalidatePath(`/phases/${yearId}`)
+    return ok('Content reordered')
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
 }
 
-export async function moveLab(formData: FormData): Promise<ActionResult> {
-  try {
-    await requireAdmin()
-    const id = String(formData.get('id') ?? '').trim()
-    const direction = String(formData.get('direction') ?? '').trim()
-    if (!id) return fail('Missing lab id')
-    if (direction !== 'up' && direction !== 'down') return fail('Bad direction')
-
-    const supabase = await createClient()
-
-    const { data: me } = await supabase
-      .from('labs')
-      .select('id, year_id, order_index')
-      .eq('id', id)
-      .maybeSingle<{ id: string; year_id: string; order_index: number }>()
-    if (!me) return fail('Lab not found')
-
-    const { data: neighbor } = await supabase
-      .from('labs')
-      .select('id, order_index')
-      .eq('year_id', me.year_id)
-      .order('order_index', { ascending: direction === 'down' })
-      .gt(direction === 'down' ? 'order_index' : 'id', direction === 'down' ? me.order_index : '')
-      .limit(1)
-
-    // Simpler: fetch all labs in the year, swap with adjacent.
-    const { data: siblings } = await supabase
-      .from('labs')
-      .select('id, order_index')
-      .eq('year_id', me.year_id)
-      .order('order_index', { ascending: true })
-
-    if (!siblings || siblings.length < 2) return ok('Nothing to reorder')
-
-    const idx = siblings.findIndex((s) => s.id === id)
-    if (idx === -1) return fail('Lab not found in year')
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= siblings.length) return ok('Already at edge')
-
-    const a = siblings[idx]
-    const b = siblings[swapIdx]
-
-    // Swap via a temp value to avoid unique-index collisions.
-    const tempIndex = -Math.abs(a.order_index + b.order_index) - 1
-    await supabase.from('labs').update({ order_index: tempIndex }).eq('id', a.id)
-    await supabase.from('labs').update({ order_index: a.order_index }).eq('id', b.id)
-    const { error: e3 } = await supabase
-      .from('labs')
-      .update({ order_index: b.order_index })
-      .eq('id', a.id)
-    if (e3) return fail(e3.message)
-
-    // Silence the unused-neighbor lookup (kept for future use).
-    void neighbor
-
-    revalidatePath('/admin/curriculum')
-    return ok('Lab reordered')
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : 'Unknown error')
-  }
-}
-
-// ============================================================================
-// BLOCKS
-// ============================================================================
-
-export async function createBlock(formData: FormData): Promise<ActionResult> {
-  try {
-    await requireAdmin()
-    const lab_id = String(formData.get('lab_id') ?? '').trim()
-    const phase = String(formData.get('phase') ?? '').trim()
-    const block_type = String(formData.get('block_type') ?? '').trim()
-    const title = String(formData.get('title') ?? '').trim()
-    const body = nullable(formData.get('body'))
-    const url = nullable(formData.get('url'))
-    const duration_minutes = nullableInt(formData.get('duration_minutes'))
-    const is_optional = String(formData.get('is_optional') ?? '') === 'true'
-    const session_id = nullable(formData.get('session_id'))
-
-    if (!lab_id) return fail('Missing lab id')
-    assertPhase(phase)
-    assertBlockType(block_type)
-    if (!title) return fail('Title is required')
-
-    const supabase = await createClient()
-
-    // Place at end of its phase.
-    const { data: last } = await supabase
-      .from('lab_content_blocks')
-      .select('order_index')
-      .eq('lab_id', lab_id)
-      .eq('phase', phase)
-      .order('order_index', { ascending: false })
-      .limit(1)
-      .maybeSingle<{ order_index: number }>()
-    const nextIndex = (last?.order_index ?? 0) + 1
-
-    const { error } = await supabase.from('lab_content_blocks').insert({
-      lab_id,
-      phase,
-      block_type,
-      order_index: nextIndex,
-      title,
-      body,
-      url,
-      duration_minutes,
-      is_optional,
-      session_id,
-    })
-    if (error) return fail(error.message)
-
-    revalidatePath(`/admin/curriculum/labs/${lab_id}`)
-    revalidatePath(`/labs/${lab_id}`)
-    return ok('Block added')
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : 'Unknown error')
-  }
-}
-
-export async function updateBlock(formData: FormData): Promise<ActionResult> {
-  try {
-    await requireAdmin()
-    const id = String(formData.get('id') ?? '').trim()
-    const lab_id = String(formData.get('lab_id') ?? '').trim()
-    const phase = String(formData.get('phase') ?? '').trim()
-    const block_type = String(formData.get('block_type') ?? '').trim()
-    const title = String(formData.get('title') ?? '').trim()
-    const body = nullable(formData.get('body'))
-    const url = nullable(formData.get('url'))
-    const duration_minutes = nullableInt(formData.get('duration_minutes'))
-    const is_optional = String(formData.get('is_optional') ?? '') === 'true'
-    const session_id = nullable(formData.get('session_id'))
-
-    if (!id) return fail('Missing block id')
-    if (!lab_id) return fail('Missing lab id')
-    assertPhase(phase)
-    assertBlockType(block_type)
-    if (!title) return fail('Title is required')
-
-    const supabase = await createClient()
-    const { error } = await supabase
-      .from('lab_content_blocks')
-      .update({
-        phase,
-        block_type,
-        title,
-        body,
-        url,
-        duration_minutes,
-        is_optional,
-        session_id,
-      })
-      .eq('id', id)
-    if (error) return fail(error.message)
-
-    revalidatePath(`/admin/curriculum/labs/${lab_id}`)
-    revalidatePath(`/labs/${lab_id}`)
-    return ok('Block updated')
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : 'Unknown error')
-  }
-}
-
-export async function deleteBlock(formData: FormData): Promise<ActionResult> {
-  try {
-    await requireAdmin()
-    const id = String(formData.get('id') ?? '').trim()
-    const lab_id = String(formData.get('lab_id') ?? '').trim()
-    if (!id) return fail('Missing block id')
-
-    const supabase = await createClient()
-    const { error } = await supabase.from('lab_content_blocks').delete().eq('id', id)
-    if (error) return fail(error.message)
-
-    revalidatePath(`/admin/curriculum/labs/${lab_id}`)
-    revalidatePath(`/labs/${lab_id}`)
-    return ok('Block deleted')
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : 'Unknown error')
-  }
-}
-
-export async function moveBlock(formData: FormData): Promise<ActionResult> {
-  try {
-    await requireAdmin()
-    const id = String(formData.get('id') ?? '').trim()
-    const lab_id = String(formData.get('lab_id') ?? '').trim()
-    const direction = String(formData.get('direction') ?? '').trim()
-    if (!id || !lab_id) return fail('Missing ids')
-    if (direction !== 'up' && direction !== 'down') return fail('Bad direction')
-
-    const supabase = await createClient()
-
-    const { data: me } = await supabase
-      .from('lab_content_blocks')
-      .select('id, lab_id, phase, order_index')
-      .eq('id', id)
-      .maybeSingle<{ id: string; lab_id: string; phase: Phase; order_index: number }>()
-    if (!me) return fail('Block not found')
-
-    const { data: siblings } = await supabase
-      .from('lab_content_blocks')
-      .select('id, order_index')
-      .eq('lab_id', me.lab_id)
-      .eq('phase', me.phase)
-      .order('order_index', { ascending: true })
-
-    if (!siblings || siblings.length < 2) return ok('Nothing to reorder')
-
-    const idx = siblings.findIndex((s) => s.id === id)
-    if (idx === -1) return fail('Block not found in phase')
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= siblings.length) return ok('Already at edge')
-
-    const a = siblings[idx]
-    const b = siblings[swapIdx]
-
-    const tempIndex = -Math.abs(a.order_index + b.order_index) - 1
-    await supabase.from('lab_content_blocks').update({ order_index: tempIndex }).eq('id', a.id)
-    await supabase.from('lab_content_blocks').update({ order_index: a.order_index }).eq('id', b.id)
-    const { error: e3 } = await supabase
-      .from('lab_content_blocks')
-      .update({ order_index: b.order_index })
-      .eq('id', a.id)
-    if (e3) return fail(e3.message)
-
-    revalidatePath(`/admin/curriculum/labs/${lab_id}`)
-    revalidatePath(`/labs/${lab_id}`)
-    return ok('Block reordered')
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : 'Unknown error')
-  }
-}
+// Re-export so callers don't need a separate import.
+export { CONTENT_CATEGORY_VALUES, RESOURCE_TYPE_VALUES }

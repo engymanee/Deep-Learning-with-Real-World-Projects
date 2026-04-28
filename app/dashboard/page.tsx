@@ -1,77 +1,61 @@
 import { AppShell } from '@/components/app-shell'
 import { getDashboardData } from '@/lib/dashboard-data'
-import { ResumeCard } from '@/components/dashboard/resume-card'
-import { StartYearCard } from '@/components/dashboard/start-year-card'
 import { LiveSessionCard } from '@/components/dashboard/live-session-card'
-import { ProgressColumn } from '@/components/dashboard/progress-column'
-import { TeamColumn } from '@/components/dashboard/team-column'
+import { CurriculumList } from '@/components/dashboard/curriculum-list'
 import { AnnouncementsFeed } from '@/components/dashboard/announcements-feed'
 
-// Always fetch fresh dashboard data per request - progress, sessions, and
-// announcements all change frequently and should never be statically cached.
 export const dynamic = 'force-dynamic'
 
-/**
- * Renders the dashboard welcome subtitle for a learner's current stage.
- * Covers every state a Fellow can be in - from brand new to
- * program-complete.
- */
 function getWelcomeSubtitle(
-  position: { year: number; currentLab: number; totalLabs: number },
-  years: Array<{ orderIndex: number; title: string }>,
-  isNewLearner: boolean,
+  phasesCount: number,
+  contentCount: number,
+  role: string,
 ): string {
-  if (isNewLearner) {
-    return "You're just getting started on your leadership journey"
+  if (role === 'admin') {
+    return phasesCount === 0
+      ? "You're administering the program - start by creating phases under Curriculum"
+      : `Administering ${phasesCount} phase${phasesCount === 1 ? '' : 's'} of curriculum`
   }
-
-  // Program complete.
-  if (position.year > years.length) {
-    return "You've completed the Wisdom At Work Fellowship - congratulations"
+  if (role === 'facilitator') {
+    return phasesCount === 0
+      ? "No curriculum is published yet"
+      : `Reviewing ${phasesCount} phase${phasesCount === 1 ? '' : 's'} of curriculum`
   }
-
-  const currentYear = years.find((y) => y.orderIndex === position.year)
-  const yearLabel = currentYear?.title || 'your current lab'
-
-  return `You're in ${yearLabel}, Lab ${position.currentLab} of ${position.totalLabs}`
+  // fellow
+  if (phasesCount === 0) {
+    return "No curriculum has been assigned to your cohort yet"
+  }
+  return `${phasesCount} phase${phasesCount === 1 ? '' : 's'} available - ${contentCount} item${contentCount === 1 ? '' : 's'} in total`
 }
 
 export default async function DashboardPage() {
   const data = await getDashboardData()
+  const totalContent = data.phases.reduce((sum, p) => sum + p.contentCount, 0)
 
   return (
     <AppShell showSidebar>
       <div className="space-y-8">
-        {/* Welcome Header */}
+        {/* Welcome */}
         <div className="space-y-2">
           <h1 className="font-serif text-4xl text-primary">
             Welcome back, {data.user.fullName}
           </h1>
           <p className="text-text-muted">
-            {getWelcomeSubtitle(data.position, data.years, data.isNewLearner)}
+            {getWelcomeSubtitle(
+              data.phases.length,
+              totalContent,
+              data.user.role,
+            )}
           </p>
         </div>
-
-        {/* Primary CTA: Resume if in-progress, Start if brand new. */}
-        {data.resume ? (
-          <ResumeCard resume={data.resume} />
-        ) : (
-          <StartYearCard
-            yearTitle={data.years[0]?.title ?? 'your first lab'}
-            startLabId={data.startLabId}
-          />
-        )}
 
         {/* Upcoming live session (only within 7 days). */}
         {data.upcomingSession && (
           <LiveSessionCard session={data.upcomingSession} />
         )}
 
-        {/* Two-column: Your progress / Your team */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <ProgressColumn years={data.years} />
-          <TeamColumn team={data.team} />
-        </div>
+        {/* Curriculum overview */}
+        <CurriculumList phases={data.phases} />
 
         {/* Announcements */}
         <AnnouncementsFeed announcements={data.announcements} />

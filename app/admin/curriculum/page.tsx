@@ -1,11 +1,14 @@
+import Link from 'next/link'
+import { ArrowRight, Layers } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
-import { CurriculumBoard } from './curriculum-board'
-import { AddYearDialog } from './add-year-dialog'
+import { CohortBadge } from '@/components/admin/cohort-access-field'
+import { CONTENT_CATEGORIES, type ContentCategory } from '@/lib/curriculum'
+import { CreatePhaseDialog } from './create-phase-dialog'
 
 export const dynamic = 'force-dynamic'
 
-type YearRow = {
+type PhaseRow = {
   id: string
   title: string
   description: string | null
@@ -13,60 +16,41 @@ type YearRow = {
   cohorts: string[] | null
 }
 
-type LabRow = {
-  id: string
+type ContentCountRow = {
   year_id: string
-  title: string
-  description: string | null
-  order_index: number
-  cohorts: string[] | null
+  category: ContentCategory | null
 }
 
 export default async function AdminCurriculumPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const [{ data: years }, { data: labs }, { data: blockCounts }] = await Promise.all([
+  const [{ data: phases }, { data: contents }] = await Promise.all([
     supabase
       .from('years')
       .select('id, title, description, order_index, cohorts')
-      .order('order_index', { ascending: true }),
+      .order('order_index', { ascending: true })
+      .returns<PhaseRow[]>(),
     supabase
       .from('labs')
-      .select('id, year_id, title, description, order_index, cohorts')
-      .order('order_index', { ascending: true }),
-    supabase.from('lab_content_blocks').select('lab_id'),
+      .select('year_id, category')
+      .returns<ContentCountRow[]>(),
   ])
 
-  // Count blocks per item so each row can show how populated it is.
-  const blockCountByLab = new Map<string, number>()
-  for (const row of blockCounts ?? []) {
-    blockCountByLab.set(row.lab_id, (blockCountByLab.get(row.lab_id) ?? 0) + 1)
+  // Tally content count per phase + breakdown per category.
+  const totals = new Map<string, number>()
+  const byCategory = new Map<string, Map<ContentCategory, number>>()
+  for (const row of contents ?? []) {
+    if (!row.year_id) continue
+    totals.set(row.year_id, (totals.get(row.year_id) ?? 0) + 1)
+    if (row.category) {
+      const inner = byCategory.get(row.year_id) ?? new Map<ContentCategory, number>()
+      inner.set(row.category, (inner.get(row.category) ?? 0) + 1)
+      byCategory.set(row.year_id, inner)
+    }
   }
 
-  const labsByYear = new Map<string, LabRow[]>()
-  for (const lab of (labs ?? []) as LabRow[]) {
-    const list = labsByYear.get(lab.year_id) ?? []
-    list.push(lab)
-    labsByYear.set(lab.year_id, list)
-  }
-
-  const yearsList = (years ?? []) as YearRow[]
-
-  const initialPhases = yearsList.map((year) => ({
-    id: year.id,
-    title: year.title,
-    description: year.description,
-    cohorts: year.cohorts ?? [],
-    items: (labsByYear.get(year.id) ?? []).map((lab) => ({
-      id: lab.id,
-      year_id: lab.year_id,
-      title: lab.title,
-      description: lab.description,
-      cohorts: lab.cohorts ?? [],
-      block_count: blockCountByLab.get(lab.id) ?? 0,
-    })),
-  }))
+  const phaseList = phases ?? []
 
   return (
     <div className="flex flex-col gap-8">
@@ -74,20 +58,84 @@ export default async function AdminCurriculumPage() {
         <div className="flex flex-col gap-1">
           <h2 className="font-serif text-xl text-foreground">Phases</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Full program structure: add phases, add contents under each phase, and then
-            click Edit Content to build out the before, during, and after flow for each
-            section.
+            A phase is a top-level grouping of content (e.g. &ldquo;Year 1 -
+            Foundations&rdquo;). Create phases here, then click into one to add
+            content items grouped by category.
           </p>
         </div>
-        <AddYearDialog />
+        <CreatePhaseDialog />
       </div>
 
-      {yearsList.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No phases yet. Click &ldquo;Add phase&rdquo; above to create the first one.
-        </p>
+      {phaseList.length === 0 ? (
+        <div className="rounded-md border border-dashed border-border p-10 text-center">
+          <Layers
+            className="mx-auto mb-3 h-8 w-8 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <p className="text-sm font-medium text-foreground">No phases yet</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            Click &ldquo;New phase&rdquo; above to create the first one. Phases
+            are the top-level scaffolding of the curriculum.
+          </p>
+        </div>
       ) : (
-        <CurriculumBoard initialPhases={initialPhases} />
+        <ol className="flex flex-col gap-3">
+          {phaseList.map((phase, idx) => {
+            const count = totals.get(phase.id) ?? 0
+            const cats = byCategory.get(phase.id) ?? new Map()
+            return (
+              <li key={phase.id}>
+                <Link
+                  href={`/admin/curriculum/${phase.id}`}
+                  className="group block rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/30"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Phase {idx + 1}
+                        </span>
+                        <CohortBadge cohorts={phase.cohorts} />
+                      </div>
+                      <h3 className="mt-1 font-serif text-lg text-foreground">
+                        {phase.title}
+                      </h3>
+                      {phase.description && (
+                        <p className="mt-1 line-clamp-2 max-w-2xl text-sm text-muted-foreground">
+                          {phase.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 self-center text-sm text-muted-foreground">
+                      <span>
+                        {count} {count === 1 ? 'item' : 'items'}
+                      </span>
+                      <ArrowRight
+                        className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </div>
+
+                  {count > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                      {CONTENT_CATEGORIES.map((c) => {
+                        const n = cats.get(c.value) ?? 0
+                        if (n === 0) return null
+                        return (
+                          <span key={c.value} className="inline-flex items-center gap-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-foreground/40" />
+                            {c.short}: {n}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+                </Link>
+              </li>
+            )
+          })}
+        </ol>
       )}
     </div>
   )

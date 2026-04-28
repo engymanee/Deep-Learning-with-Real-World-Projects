@@ -199,9 +199,9 @@ export default async function AdminHomePage() {
         />
         <KpiCard
           icon={<BookOpen className="h-4 w-4" />}
-          label="Lab items"
+          label="Content items"
           value={labsCount.count ?? 0}
-          sub={`Across ${yearsCount.count ?? 0} year phase${yearsCount.count === 1 ? '' : 's'}`}
+          sub={`Across ${yearsCount.count ?? 0} phase${yearsCount.count === 1 ? '' : 's'}`}
           href="/admin/curriculum"
         />
       </section>
