@@ -4,6 +4,8 @@ import {
   canFellowSeeContent,
   canFellowSeeModule,
   canFellowSeePhase,
+  isContentCategory,
+  type ContentCategory,
 } from '@/lib/curriculum'
 
 /**
@@ -21,6 +23,11 @@ import {
 export interface CurriculumItem {
   id: string
   title: string
+  /**
+   * Category drives in-module grouping (Before / During / After Lab,
+   * etc.) - the tree splits items into category buckets per module.
+   */
+  category: ContentCategory
   /** Optional duration in minutes; rendered as "55min" in the tree. */
   durationMinutes: number | null
   /** href for the content viewer page. */
@@ -153,7 +160,7 @@ export async function loadFullCurriculum(): Promise<FullCurriculum> {
   const itemsByModule = new Map<string, CurriculumItem[]>()
   for (const item of itemRows ?? []) {
     if (!item.module_id) continue
-    if (!item.category) continue // legacy/draft rows
+    if (!isContentCategory(item.category)) continue // legacy/draft rows
     const moduleCohorts = moduleCohortById.get(item.module_id)
     if (moduleCohorts === undefined) continue // module not visible
     const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
@@ -173,6 +180,7 @@ export async function loadFullCurriculum(): Promise<FullCurriculum> {
     list.push({
       id: item.id,
       title: item.title,
+      category: item.category,
       durationMinutes: item.duration_minutes,
       href: `/phases/${item.year_id}/modules/${item.module_id}/items/${item.id}`,
       isCompleted: completedSet.has(item.id),
