@@ -78,20 +78,43 @@ export function LessonFooter({
     })
   }
 
+  // Re-open a lesson the fellow has already finished. Server gates
+  // only block incomplete -> complete, so flipping back to false is
+  // always allowed and won't trip the link/reflection checks.
+  function handleReopen() {
+    setError(null)
+    setOptimistic(false)
+    startTransition(async () => {
+      const res = await toggleContentCompletion(contentId, false)
+      if (!res.ok) {
+        setOptimistic(true)
+        setError(res.message)
+        return
+      }
+      router.refresh()
+    })
+  }
+
   function handleContinue() {
     if (nextHref) router.push(nextHref)
   }
 
-  // Reusable "Completed" indicator - shown alongside the Go-to-next
-  // button, or alone on the final lesson. Neutral tones only.
+  // "Completed" indicator. Doubles as the re-open affordance: hover
+  // surfaces a "Mark as not completed" hint and clicking it flips
+  // the lesson back to incomplete. Neutral tones only - no green.
   const completedBadge = (
-    <span
-      className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
-      aria-label="Completed"
+    <button
+      type="button"
+      onClick={handleReopen}
+      disabled={pending}
+      title="Mark as not completed"
+      aria-label="Mark as not completed"
+      className="group inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
     >
       <Check className="h-4 w-4" aria-hidden="true" />
-      Completed
-    </span>
+      <span className="group-hover:hidden">Completed</span>
+      <span className="hidden group-hover:inline">Mark as not completed</span>
+    </button>
   )
 
   return (
