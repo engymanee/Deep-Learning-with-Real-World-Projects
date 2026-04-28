@@ -1,12 +1,12 @@
 import Link from 'next/link'
-import { CalendarDays, ExternalLink, MapPin, Mic, FileText, Shield, BookMarked } from 'lucide-react'
+import { CalendarDays, ExternalLink, MapPin, Mic, FileText, Shield, Users } from 'lucide-react'
 import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
-import { fellowCanAccess } from '@/lib/cohorts'
 import { TopBar } from '@/components/top-bar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 /**
  * Fellow-facing Community of Practice hub. Intentionally simple:
@@ -19,7 +19,12 @@ export default async function CommunityPage() {
 
   const nowIso = new Date().toISOString()
 
-  const [eventsRes, postsRes, resourcesRes] = await Promise.all([
+  // Curated resources used to live on this page as a "Shared library"
+  // section. Karen flagged that as a confusing duplicate of /resources,
+  // so the section was replaced with a community Members directory -
+  // fellows and facilitators across the program. The /resources route
+  // remains the single home for the shared library.
+  const [eventsRes, postsRes, membersRes] = await Promise.all([
     supabase
       .from('community_events')
       .select('id, title, description, starts_at, ends_at, location, join_url')
@@ -32,25 +37,20 @@ export default async function CommunityPage() {
       .not('published_at', 'is', null)
       .order('published_at', { ascending: false })
       .limit(6),
+    // Active fellows + facilitators only: admins are program staff,
+    // not peers, and deactivated profiles drop off the directory.
     supabase
-      .from('community_resources')
-      .select('id, title, description, url, category, cohorts')
-      .order('created_at', { ascending: false })
-      .limit(12),
+      .from('profiles')
+      .select('id, full_name, email, title, avatar_url, role, cohort')
+      .in('role', ['fellow', 'facilitator'])
+      .is('deactivated_at', null)
+      .order('full_name', { ascending: true })
+      .limit(60),
   ])
 
   const events = eventsRes.data ?? []
   const posts = postsRes.data ?? []
-  // Fellows see only resources explicitly assigned to their cohort.
-  // Resources with no cohort assignment are unassigned and hidden from
-  // every fellow until an admin assigns them. Admins / facilitators
-  // bypass the filter and see every resource so they can curate without
-  // context-switching to /admin.
-  const allResources = resourcesRes.data ?? []
-  const resources =
-    user.role === 'fellow'
-      ? allResources.filter((r) => fellowCanAccess(r.cohorts as string[] | null, user.cohort))
-      : allResources
+  const members = membersRes.data ?? []
 
   return (
     <div className="min-h-screen bg-background">
@@ -115,17 +115,28 @@ export default async function CommunityPage() {
         </section>
 
         <section className="flex flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <BookMarked className="h-5 w-5 text-primary" />
-            <h2 className="font-serif text-xl text-foreground">Shared library</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <h2 className="font-serif text-xl text-foreground">Members</h2>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              {/* The shared library lives at /resources, not here -
+                  one canonical home avoids the "what's the difference?"
+                  question Karen surfaced in feedback. */}
+              <Link href="/resources">
+                <FileText className="h-4 w-4" />
+                Shared library
+              </Link>
+            </Button>
           </div>
 
-          {resources.length === 0 ? (
-            <EmptyState copy="No resources curated yet." />
+          {members.length === 0 ? (
+            <EmptyState copy="No members yet." />
           ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {resources.map((r) => (
-                <ResourceRow key={r.id} resource={r} />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {members.map((m) => (
+                <MemberCard key={m.id} member={m} />
               ))}
             </div>
           )}
@@ -246,43 +257,55 @@ function PostCard({
   )
 }
 
-function ResourceRow({
-  resource,
+function MemberCard({
+  member,
 }: {
-  resource: {
+  member: {
     id: string
-    title: string
-    description: string | null
-    url: string
-    category: string | null
+    full_name: string | null
+    email: string | null
+    title: string | null
+    avatar_url: string | null
+    role: string | null
+    cohort: string | null
   }
 }) {
+  const name = member.full_name?.trim() || member.email || 'Unnamed member'
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('') || '?'
+  const roleLabel = member.role === 'facilitator' ? 'Facilitator' : 'Fellow'
+
   return (
-    <a
-      href={resource.url}
-      target="_blank"
-      rel="noreferrer"
-      className="group flex items-start justify-between gap-3 rounded-md border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent"
-    >
+    <div className="flex items-start gap-3 rounded-md border border-border bg-card p-4">
+      <Avatar className="h-10 w-10 shrink-0">
+        {member.avatar_url ? (
+          <AvatarImage src={member.avatar_url} alt="" />
+        ) : null}
+        <AvatarFallback className="text-xs font-medium">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          {resource.category && (
-            <Badge variant="outline" className="text-[10px] uppercase">
-              {resource.category}
+        <p className="truncate text-sm font-medium text-foreground">{name}</p>
+        {member.title && (
+          <p className="truncate text-xs text-muted-foreground">{member.title}</p>
+        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary" className="text-[10px]">
+            {roleLabel}
+          </Badge>
+          {member.cohort && (
+            <Badge variant="outline" className="text-[10px]">
+              Cohort {member.cohort}
             </Badge>
           )}
-          <span className="truncate text-sm font-medium text-foreground group-hover:text-primary">
-            {resource.title}
-          </span>
         </div>
-        {resource.description && (
-          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-            {resource.description}
-          </p>
-        )}
       </div>
-      <ExternalLink className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
-    </a>
+    </div>
   )
 }
 
