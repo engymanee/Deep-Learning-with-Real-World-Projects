@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { UserRole } from '@/lib/roles'
@@ -20,12 +21,14 @@ export interface ProfileRow {
  * Read the signed-in user + their profile + school metadata.
  * Returns null if there is no session.
  *
- * Notes on perf: with the proxy refreshing the auth cookies at the edge
- * (see `proxy.ts`), `auth.getUser()` here resolves locally without
- * round-tripping. The profile + school lookup is one query via the
- * embedded FK select.
+ * Wrapped in React's per-request `cache()` so that calling
+ * `getCurrentUser()` (and through it `requireUser`/`requireAdmin`) from
+ * multiple server components on the same request hits Supabase exactly
+ * once. Without this the dashboard was firing the same `auth.getUser`
+ * + profile lookup pair repeatedly, which both wasted requests and was
+ * fast-tracking the dev server toward OOM crashes.
  */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient()
 
   const {
@@ -66,7 +69,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     profileImageUrl: profile.avatar_url ?? undefined,
     bio: profile.title ?? undefined,
   }
-}
+})
 
 /** Server-side guard: redirect to /auth/login if unauthenticated. */
 export async function requireUser(): Promise<CurrentUser> {
