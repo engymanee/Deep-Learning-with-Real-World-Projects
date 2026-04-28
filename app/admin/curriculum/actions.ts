@@ -324,6 +324,7 @@ interface ContentInputs {
   description: string | null
   body: string | null
   url: string | null
+  durationMinutes: number | null
   cohorts: string[] | null
 }
 
@@ -336,6 +337,7 @@ function readContentInputs(formData: FormData): ContentInputs | string {
   const description = nullable(formData.get('description'))
   const body = nullable(formData.get('body'))
   const url = nullable(formData.get('url'))
+  const durationRaw = nullable(formData.get('duration_minutes'))
   const cohorts = readInheritableCohorts(formData)
 
   if (!phaseId) return 'Missing phase id'
@@ -352,6 +354,16 @@ function readContentInputs(formData: FormData): ContentInputs | string {
   if (url && !/^https?:\/\//i.test(url)) {
     return 'URL must start with http:// or https://'
   }
+
+  let durationMinutes: number | null = null
+  if (durationRaw !== null) {
+    const n = Number(durationRaw)
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+      return 'Duration must be a whole number of minutes (0 or more)'
+    }
+    durationMinutes = n
+  }
+
   return {
     phaseId,
     moduleId,
@@ -361,6 +373,7 @@ function readContentInputs(formData: FormData): ContentInputs | string {
     description,
     body,
     url,
+    durationMinutes,
     cohorts,
   }
 }
@@ -396,6 +409,7 @@ export async function createContent(formData: FormData): Promise<ActionResult> {
       description: parsed.description,
       body: parsed.body,
       url: parsed.url,
+      duration_minutes: parsed.durationMinutes,
       cohorts: parsed.cohorts,
       order_index: nextIndex,
     })
@@ -429,6 +443,7 @@ export async function updateContent(formData: FormData): Promise<ActionResult> {
         description: parsed.description,
         body: parsed.body,
         url: parsed.url,
+        duration_minutes: parsed.durationMinutes,
         cohorts: parsed.cohorts,
       })
       .eq('id', id)

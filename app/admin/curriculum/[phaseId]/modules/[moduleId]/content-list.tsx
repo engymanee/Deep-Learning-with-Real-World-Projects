@@ -222,6 +222,7 @@ function ContentRowItem({
                 description: item.description ?? '',
                 body: item.body ?? '',
                 url: item.url ?? '',
+                duration_minutes: item.duration_minutes,
                 cohorts: item.cohorts,
               }}
               onSaved={() => setEditOpen(false)}

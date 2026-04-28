@@ -30,6 +30,8 @@ export interface ContentItemDraft {
   description: string
   body: string
   url: string
+  /** Optional estimated duration in minutes; null when not set. */
+  duration_minutes: number | null
   /**
    * `null`  -> inherit from the module
    * `[]`    -> locked (no fellows)
@@ -67,6 +69,7 @@ export function ContentItemForm({
   const descId = useId()
   const bodyId = useId()
   const urlId = useId()
+  const durationId = useId()
 
   const [category, setCategory] = useState<ContentCategory>(
     initial?.category ?? defaultCategory ?? CONTENT_CATEGORIES[0].value,
@@ -196,20 +199,43 @@ export function ContentItemForm({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor={urlId}>Link / URL (optional)</Label>
-        <Input
-          id={urlId}
-          name="url"
-          type="url"
-          inputMode="url"
-          defaultValue={initial?.url ?? ''}
-          placeholder="https://..."
-        />
-        <p className="text-xs text-muted-foreground">
-          Use for videos, slide decks, PDFs, surveys, or any link-based
-          resource.
-        </p>
+      <div className="grid gap-4 md:grid-cols-[1fr_140px]">
+        <div className="space-y-2">
+          <Label htmlFor={urlId}>Link / URL (optional)</Label>
+          <Input
+            id={urlId}
+            name="url"
+            type="url"
+            inputMode="url"
+            defaultValue={initial?.url ?? ''}
+            placeholder="https://..."
+          />
+          <p className="text-xs text-muted-foreground">
+            Use for videos, slide decks, PDFs, surveys, or any link-based
+            resource.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={durationId}>Duration (min)</Label>
+          <Input
+            id={durationId}
+            name="duration_minutes"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            defaultValue={
+              initial?.duration_minutes != null
+                ? String(initial.duration_minutes)
+                : ''
+            }
+            placeholder="e.g. 55"
+          />
+          <p className="text-xs text-muted-foreground">
+            Shown to fellows in the curriculum tree.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-2">

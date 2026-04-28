@@ -34,6 +34,7 @@ export type ContentRow = {
   category: ContentCategory
   resource_type: ResourceType
   cohorts: string[] | null
+  duration_minutes: number | null
   order_index: number
 }
 
@@ -61,7 +62,7 @@ export default async function AdminModuleDetailPage({
     supabase
       .from('labs')
       .select(
-        'id, module_id, title, description, body, url, category, resource_type, cohorts, order_index',
+        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes, order_index',
       )
       .eq('module_id', moduleId)
       .order('order_index', { ascending: true })
