@@ -6,6 +6,7 @@ import { Plus, X } from 'lucide-react'
 import { addLibraryResource } from '@/app/resources/actions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Select,
   SelectContent,
@@ -25,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { COHORTS, type Cohort } from '@/lib/cohorts'
 
 const TYPE_OPTIONS = [
   { value: 'document', label: 'Document' },
@@ -33,23 +36,22 @@ const TYPE_OPTIONS = [
   { value: 'link', label: 'Link' },
 ] as const
 
-const COHORT_OPTIONS = [
-  { value: 'all', label: 'All cohorts' },
-  { value: 'A', label: 'Cohort A' },
-  { value: 'B', label: 'Cohort B' },
-] as const
-
 type ResourceType = (typeof TYPE_OPTIONS)[number]['value']
-type CohortChoice = (typeof COHORT_OPTIONS)[number]['value']
+type Visibility = 'cohort' | 'universal'
 
 const MAX_TAGS = 8
 
 /**
  * Admin / facilitator-only entry point for publishing a new Library
  * resource. Lives next to the Library header so curation happens in
- * place - no context switch to /admin. URL-based for now; a later
- * pass can swap the URL field for a Vercel Blob upload widget
- * without changing the action signature.
+ * place - no context switch to /admin.
+ *
+ * Visibility model mirrors the spec:
+ *  - "Further Reading" -> isUniversal=true, lands on the universal
+ *    tab and is visible to everyone.
+ *  - "Cohort-gated"    -> isUniversal=false, plus an A/B/C multi-
+ *    select. Cumulative access (a fellow in B sees A + B) is applied
+ *    by the page based on the selected cohorts.
  */
 export function AddResourceDialog() {
   const router = useRouter()
@@ -63,7 +65,11 @@ export function AddResourceDialog() {
   const [description, setDescription] = useState('')
   const [url, setUrl] = useState('')
   const [resourceType, setResourceType] = useState<ResourceType>('document')
-  const [cohort, setCohort] = useState<CohortChoice>('all')
+  const [visibility, setVisibility] = useState<Visibility>('cohort')
+  // Default to the earliest cohort so the form has a valid state on
+  // open without forcing a click. Most newly-published material is
+  // released for the current cohort first anyway.
+  const [cohorts, setCohorts] = useState<Cohort[]>([COHORTS[0]])
   const [tags, setTags] = useState<string[]>([])
   const [tagDraft, setTagDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -73,7 +79,8 @@ export function AddResourceDialog() {
     setDescription('')
     setUrl('')
     setResourceType('document')
-    setCohort('all')
+    setVisibility('cohort')
+    setCohorts([COHORTS[0]])
     setTags([])
     setTagDraft('')
     setError(null)
@@ -113,6 +120,12 @@ export function AddResourceDialog() {
     }
   }
 
+  function toggleCohort(c: Cohort) {
+    setCohorts((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
+    )
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -121,6 +134,9 @@ export function AddResourceDialog() {
     // instant feedback instead of a round trip.
     if (!title.trim()) return setError('Title is required.')
     if (!url.trim()) return setError('URL is required.')
+    if (visibility === 'cohort' && cohorts.length === 0) {
+      return setError('Pick at least one cohort or switch to Further Reading.')
+    }
 
     // Capture any in-flight tag draft so users don't lose it to
     // muscle memory ("I typed it, why isn't it saving?").
@@ -137,7 +153,8 @@ export function AddResourceDialog() {
         url: url.trim(),
         resourceType,
         tags: finalTags,
-        cohort,
+        isUniversal: visibility === 'universal',
+        cohorts: visibility === 'cohort' ? cohorts : [],
       })
       if (!result.ok) {
         setError(result.message)
@@ -168,8 +185,8 @@ export function AddResourceDialog() {
         <DialogHeader>
           <DialogTitle>Add to library</DialogTitle>
           <DialogDescription>
-            Publish a curated resource. Fellows will see it once the cohort
-            assignment matches their own.
+            Publish a curated resource. Choose Further Reading for materials
+            everyone should see, or Cohort-gated to stage releases by cohort.
           </DialogDescription>
         </DialogHeader>
 
@@ -221,39 +238,95 @@ export function AddResourceDialog() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="library-cohort">Visible to</Label>
-              <Select
-                value={cohort}
-                onValueChange={(v) => setCohort(v as CohortChoice)}
-              >
-                <SelectTrigger id="library-cohort">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COHORT_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="library-url">URL</Label>
+              <Input
+                id="library-url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                required
+                type="url"
+                placeholder="https://..."
+              />
             </div>
           </div>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            File uploads (PDF, MP4) are coming soon. Paste a link for now.
+          </p>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="library-url">URL</Label>
-            <Input
-              id="library-url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              required
-              type="url"
-              placeholder="https://..."
-            />
-            <p className="text-xs text-muted-foreground">
-              File uploads (PDF, MP4) are coming soon. Paste a link for now.
-            </p>
-          </div>
+          {/* Visibility radio + (conditional) cohort multi-select.
+              The cohort row collapses when "Further reading" is
+              picked so the form doesn't ask irrelevant questions. */}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium text-foreground">
+              Visibility
+            </legend>
+            <RadioGroup
+              value={visibility}
+              onValueChange={(v) => setVisibility(v as Visibility)}
+              className="flex flex-col gap-2"
+            >
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5">
+                <RadioGroupItem value="cohort" id="vis-cohort" className="mt-0.5" />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-foreground">
+                    Cohort-gated
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Released by stage. Fellows see everything assigned to their
+                    cohort and earlier ones.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5">
+                <RadioGroupItem value="universal" id="vis-universal" className="mt-0.5" />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-foreground">
+                    Further reading
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Visible to everyone, regardless of cohort. Lands on the
+                    Further Reading tab.
+                  </span>
+                </span>
+              </label>
+            </RadioGroup>
+          </fieldset>
+
+          {visibility === 'cohort' && (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-foreground">
+                Cohorts
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {COHORTS.map((c) => {
+                  const checked = cohorts.includes(c)
+                  return (
+                    <label
+                      key={c}
+                      htmlFor={`cohort-${c}`}
+                      className={
+                        'inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors ' +
+                        (checked
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-card text-muted-foreground hover:bg-muted')
+                      }
+                    >
+                      <Checkbox
+                        id={`cohort-${c}`}
+                        checked={checked}
+                        onCheckedChange={() => toggleCohort(c)}
+                      />
+                      Cohort {c}
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pick the earliest cohort the resource should be released for. A
+                fellow in B will see anything tagged A or B.
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="library-tag-input">

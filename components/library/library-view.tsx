@@ -2,9 +2,13 @@
 
 import { useMemo, useState } from 'react'
 import {
+  ArrowDownAZ,
+  ArrowDownWideNarrow,
   BookOpen,
+  Check,
   ExternalLink,
   FileText,
+  Filter,
   Layers,
   LayoutGrid,
   Link2,
@@ -15,13 +19,24 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { AddResourceDialog } from '@/components/library/add-resource-dialog'
 
 /**
- * Shape returned by the server page after cohort gating. Kept loose
- * so the dashboard can hand us either the raw row or a projection -
- * we only read the fields we render.
+ * Shape returned by the server page after cohort gating. The server
+ * keeps two slices (cohort-gated + universal) and hands both to this
+ * client view; the tab bar drives which slice is rendered.
  */
 export interface LibraryResource {
   id: string
@@ -30,17 +45,26 @@ export interface LibraryResource {
   url: string
   resourceType: 'document' | 'video' | 'link' | 'reading'
   tags: string[]
+  /** Which cohorts the row was released for. Empty for legacy rows. */
+  cohorts: string[]
+  /** True when the row lives on the Further Reading tab. */
+  isUniversal: boolean
   /** ISO timestamp; null when the underlying row is missing one. */
   createdAt: string | null
 }
 
 export interface LibraryViewProps {
-  resources: LibraryResource[]
+  /** Cohort-gated resources, already filtered by cumulative access. */
+  myResources: LibraryResource[]
+  /** Universal "Further Reading" resources, visible to everyone. */
+  furtherReading: LibraryResource[]
   /** Whether to render the admin-only "Add resource" affordance. */
   canManage: boolean
 }
 
-type FilterId = 'all' | 'document' | 'video' | 'link' | 'recent'
+type TypeFilter = 'all' | 'document' | 'video' | 'link' | 'reading'
+type SortMode = 'newest' | 'alpha'
+type TabId = 'mine' | 'further'
 
 /** Keep label + icon decisions in one place so cards and filters
  *  stay consistent without prop-drilling. */
@@ -50,46 +74,64 @@ const TYPE_META: Record<
 > = {
   document: { label: 'Document', Icon: FileText, cta: 'Download' },
   video:    { label: 'Video',    Icon: PlayCircle, cta: 'Watch' },
-  reading:  { label: 'Reading',  Icon: BookOpen,  cta: 'Read' },
-  link:     { label: 'Link',     Icon: Link2,     cta: 'Open' },
+  reading:  { label: 'Reading',  Icon: BookOpen,   cta: 'Read' },
+  link:     { label: 'Link',     Icon: Link2,      cta: 'Open' },
 }
 
-/** Filter-bar definitions. Order is meaningful: All sits first,
- *  Recent sits last as a sort-style toggle. */
-const FILTERS: Array<{ id: FilterId; label: string }> = [
+const TYPE_FILTERS: Array<{ id: TypeFilter; label: string }> = [
   { id: 'all',      label: 'All' },
   { id: 'document', label: 'Documents' },
   { id: 'video',    label: 'Videos' },
   { id: 'link',     label: 'Links' },
-  { id: 'recent',   label: 'Recent' },
+  { id: 'reading',  label: 'Readings' },
 ]
 
-const RECENT_DAYS = 30
-
-export function LibraryView({ resources, canManage }: LibraryViewProps) {
+export function LibraryView({
+  myResources,
+  furtherReading,
+  canManage,
+}: LibraryViewProps) {
+  const [tab, setTab] = useState<TabId>('mine')
   const [view, setView] = useState<'grid' | 'list'>('grid')
-  const [filter, setFilter] = useState<FilterId>('all')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [tagFilter, setTagFilter] = useState<string[]>([])
+  const [sort, setSort] = useState<SortMode>('newest')
   const [query, setQuery] = useState('')
 
-  // Derived list. Three transformations stack: filter -> search ->
-  // sort. Memoised on inputs only so the table doesn't re-render
-  // when an unrelated piece of state (e.g. the dialog) toggles.
+  // The active tab decides which slice we filter against. We keep
+  // the search/filter state shared across tabs because the user is
+  // usually looking for a single thing; switching tabs preserves
+  // the narrowing they've already typed.
+  const activeSource =
+    tab === 'mine' ? myResources : furtherReading
+
+  // Tags are derived from the visible slice so the dropdown only
+  // ever offers tags that can actually narrow the result set.
+  const availableTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of activeSource) for (const t of r.tags) set.add(t)
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [activeSource])
+
+  // Three-stage transformation: filter -> search -> sort. Memoised
+  // on inputs only so the table doesn't re-render when an unrelated
+  // piece of state (e.g. the dialog) toggles.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000
+    let list = activeSource
 
-    let list = resources
+    if (typeFilter !== 'all') {
+      list = list.filter((r) => r.resourceType === typeFilter)
+    }
 
-    if (filter === 'recent') {
-      list = list.filter((r) => {
-        if (!r.createdAt) return false
-        return new Date(r.createdAt).getTime() >= cutoff
-      })
-    } else if (filter !== 'all') {
-      // Map the singular type pill ("document") to the resource's
-      // resource_type. "Reading" content lives under the All pill -
-      // surfacing it as a separate filter would clutter the bar.
-      list = list.filter((r) => r.resourceType === filter)
+    if (tagFilter.length > 0) {
+      // OR semantics: a row matches if ANY of its tags is in the
+      // selected set. This is the friendlier default - users tend
+      // to read multi-select tag pickers as "show me anything in
+      // these buckets" rather than "show me items at the
+      // intersection of these buckets".
+      const want = new Set(tagFilter)
+      list = list.filter((r) => r.tags.some((t) => want.has(t)))
     }
 
     if (q) {
@@ -105,14 +147,22 @@ export function LibraryView({ resources, canManage }: LibraryViewProps) {
       })
     }
 
-    // Always show newest first - "Recent" sharpens the rule but the
-    // baseline ordering is the same so card placement is stable.
     return [...list].sort((a, b) => {
+      if (sort === 'alpha') {
+        return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+      }
+      // newest first
       const at = a.createdAt ? new Date(a.createdAt).getTime() : 0
       const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0
       return bt - at
     })
-  }, [resources, filter, query])
+  }, [activeSource, typeFilter, tagFilter, sort, query])
+
+  function toggleTag(tag: string) {
+    setTagFilter((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,97 +171,205 @@ export function LibraryView({ resources, canManage }: LibraryViewProps) {
         <div>
           <h1 className="font-serif text-2xl text-foreground">Library</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Curated tools, readings, and recordings. Use the search and filters
-            to find what you need.
+            Curated tools, readings, and recordings. Use the tabs to switch
+            between cohort resources and further reading.
           </p>
         </div>
         {canManage && <AddResourceDialog />}
       </header>
 
-      {/* Search */}
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by title, description, or tag..."
-          aria-label="Search the library"
-          className="pl-9"
-        />
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="flex flex-col gap-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="mine">
+            My Resources
+            <Badge variant="secondary" className="ml-2 text-[10px]">
+              {myResources.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="further">
+            Further Reading
+            <Badge variant="secondary" className="ml-2 text-[10px]">
+              {furtherReading.length}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Filter pills + view toggle on one row, wrapping below sm. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div
-          role="tablist"
-          aria-label="Filter resources"
-          className="flex flex-wrap items-center gap-2"
-        >
-          {FILTERS.map((f) => {
-            const active = filter === f.id
-            return (
-              <button
-                key={f.id}
-                role="tab"
-                aria-selected={active}
-                onClick={() => setFilter(f.id)}
-                className={cn(
-                  'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
-                  active
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card text-muted-foreground hover:bg-muted',
-                )}
+        {/* Search + filter row. Visible on both tabs since the state
+            is shared. */}
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by title, description, or tag..."
+              aria-label="Search the library"
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div
+              role="tablist"
+              aria-label="Filter by type"
+              className="flex flex-wrap items-center gap-2"
+            >
+              {TYPE_FILTERS.map((f) => {
+                const active = typeFilter === f.id
+                return (
+                  <button
+                    key={f.id}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTypeFilter(f.id)}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+                      active
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-card text-muted-foreground hover:bg-muted',
+                    )}
+                  >
+                    {f.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <TagFilterPopover
+                available={availableTags}
+                selected={tagFilter}
+                onToggle={toggleTag}
+                onClear={() => setTagFilter([])}
+              />
+              <SortToggle value={sort} onChange={setSort} />
+              <div
+                role="group"
+                aria-label="View mode"
+                className="inline-flex items-center rounded-md border border-border bg-card p-0.5"
               >
-                {f.label}
-              </button>
-            )
-          })}
+                <ViewToggleButton
+                  active={view === 'grid'}
+                  onClick={() => setView('grid')}
+                  label="Grid view"
+                  Icon={LayoutGrid}
+                />
+                <ViewToggleButton
+                  active={view === 'list'}
+                  onClick={() => setView('list')}
+                  label="List view"
+                  Icon={List}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Selected tag chips, with quick-remove. Mirrors the
+              popover state so users always know what's narrowing
+              the results without opening the dropdown. */}
+          {tagFilter.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Filtering by:</span>
+              {tagFilter.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggleTag(t)}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                  aria-label={`Remove tag ${t}`}
+                >
+                  {t}
+                  <span aria-hidden="true">×</span>
+                </button>
+              ))}
+              {tagFilter.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setTagFilter([])}
+                  className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        <div
-          role="group"
-          aria-label="View mode"
-          className="inline-flex items-center rounded-md border border-border bg-card p-0.5"
-        >
-          <ViewToggleButton
-            active={view === 'grid'}
-            onClick={() => setView('grid')}
-            label="Grid view"
-            Icon={LayoutGrid}
+        {/* Same results body for both tabs - the active source is
+            already swapped at the top of this component. */}
+        <TabsContent value="mine" className="mt-0">
+          <ResultsBody
+            tab="mine"
+            view={view}
+            filtered={filtered}
+            totalForTab={myResources.length}
+            query={query}
+            typeFilter={typeFilter}
+            tagFilter={tagFilter}
           />
-          <ViewToggleButton
-            active={view === 'list'}
-            onClick={() => setView('list')}
-            label="List view"
-            Icon={List}
+        </TabsContent>
+        <TabsContent value="further" className="mt-0">
+          <ResultsBody
+            tab="further"
+            view={view}
+            filtered={filtered}
+            totalForTab={furtherReading.length}
+            query={query}
+            typeFilter={typeFilter}
+            tagFilter={tagFilter}
           />
-        </div>
-      </div>
-
-      {/* Results */}
-      {filtered.length === 0 ? (
-        <EmptyState
-          query={query}
-          filter={filter}
-          totalResources={resources.length}
-        />
-      ) : view === 'grid' ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((r) => (
-            <GridCard key={r.id} resource={r} />
-          ))}
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {filtered.map((r) => (
-            <ListRow key={r.id} resource={r} />
-          ))}
-        </ul>
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
+  )
+}
+
+function ResultsBody({
+  tab,
+  view,
+  filtered,
+  totalForTab,
+  query,
+  typeFilter,
+  tagFilter,
+}: {
+  tab: TabId
+  view: 'grid' | 'list'
+  filtered: LibraryResource[]
+  totalForTab: number
+  query: string
+  typeFilter: TypeFilter
+  tagFilter: string[]
+}) {
+  if (filtered.length === 0) {
+    return (
+      <EmptyState
+        tab={tab}
+        query={query}
+        typeFilter={typeFilter}
+        tagFilter={tagFilter}
+        totalForTab={totalForTab}
+      />
+    )
+  }
+  if (view === 'grid') {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {filtered.map((r) => (
+          <GridCard key={r.id} resource={r} />
+        ))}
+      </div>
+    )
+  }
+  return (
+    <ul className="flex flex-col gap-2">
+      {filtered.map((r) => (
+        <ListRow key={r.id} resource={r} />
+      ))}
+    </ul>
   )
 }
 
@@ -241,6 +399,119 @@ function ViewToggleButton({
     >
       <Icon className="h-4 w-4" />
     </button>
+  )
+}
+
+function SortToggle({
+  value,
+  onChange,
+}: {
+  value: SortMode
+  onChange: (next: SortMode) => void
+}) {
+  // Two-state pill button: clicking flips sort. Compact enough to
+  // sit beside the view toggle without crowding the bar; the icon
+  // changes to communicate the active mode.
+  const isAlpha = value === 'alpha'
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(isAlpha ? 'newest' : 'alpha')}
+      aria-label={`Sort: ${isAlpha ? 'A to Z' : 'Newest first'} (click to switch)`}
+      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
+    >
+      {isAlpha ? (
+        <ArrowDownAZ className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <ArrowDownWideNarrow className="h-4 w-4" aria-hidden="true" />
+      )}
+      <span className="hidden sm:inline">{isAlpha ? 'A–Z' : 'Newest'}</span>
+    </button>
+  )
+}
+
+function TagFilterPopover({
+  available,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  available: string[]
+  selected: string[]
+  onToggle: (tag: string) => void
+  onClear: () => void
+}) {
+  // When there are no tags on any visible row the dropdown becomes
+  // a no-op, so we render it disabled rather than pop up an empty
+  // panel. Common case once the library has just a few items.
+  const empty = available.length === 0
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={empty}
+          className="inline-flex h-8 items-center gap-1.5 px-2.5"
+          aria-label="Filter by tag"
+        >
+          <Filter className="h-4 w-4" />
+          <span className="hidden sm:inline">Tags</span>
+          {selected.length > 0 && (
+            <Badge
+              variant="secondary"
+              className="ml-1 h-5 min-w-[20px] justify-center px-1 text-[10px]"
+            >
+              {selected.length}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-56 p-0">
+        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          <span className="text-xs font-medium text-foreground">
+            Filter by tag
+          </span>
+          {selected.length > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <ul className="max-h-64 overflow-y-auto p-1" role="listbox">
+          {available.map((tag) => {
+            const active = selected.includes(tag)
+            return (
+              <li key={tag}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => onToggle(tag)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted',
+                    active && 'bg-muted',
+                  )}
+                >
+                  <span className="truncate">{tag}</span>
+                  {active && (
+                    <Check
+                      className="h-3.5 w-3.5 text-primary"
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -277,6 +548,8 @@ function GridCard({ resource }: { resource: LibraryResource }) {
           </p>
         )}
       </div>
+
+      <CohortBadgeRow resource={resource} />
 
       {resource.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -325,6 +598,7 @@ function ListRow({ resource }: { resource: LibraryResource }) {
             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
               {meta.label}
             </Badge>
+            <CohortBadgeRow resource={resource} compact />
           </div>
           {resource.description && (
             <p className="mt-1 line-clamp-1 text-sm leading-relaxed text-muted-foreground">
@@ -354,6 +628,34 @@ function ListRow({ resource }: { resource: LibraryResource }) {
   )
 }
 
+/** Cohort label chips. Suppressed for universal rows because every
+ *  Further Reading item is, by definition, visible to all cohorts -
+ *  the chips would just be noise. Cohort-gated rows render one chip
+ *  per assigned label (A / B / C). */
+function CohortBadgeRow({
+  resource,
+  compact = false,
+}: {
+  resource: LibraryResource
+  compact?: boolean
+}) {
+  if (resource.isUniversal) return null
+  if (resource.cohorts.length === 0) return null
+  return (
+    <div className={cn('flex flex-wrap gap-1.5', compact && 'inline-flex')}>
+      {resource.cohorts.map((c) => (
+        <Badge
+          key={c}
+          variant="outline"
+          className="border-primary/40 bg-primary/5 text-[10px] font-medium text-primary"
+        >
+          Cohort {c}
+        </Badge>
+      ))}
+    </div>
+  )
+}
+
 function DateLabel({ iso }: { iso: string | null }) {
   if (!iso) return <span aria-hidden="true">&nbsp;</span>
   // Server can ship an ISO string; rendering it via Intl keeps the
@@ -368,25 +670,36 @@ function DateLabel({ iso }: { iso: string | null }) {
 }
 
 function EmptyState({
+  tab,
   query,
-  filter,
-  totalResources,
+  typeFilter,
+  tagFilter,
+  totalForTab,
 }: {
+  tab: TabId
   query: string
-  filter: FilterId
-  totalResources: number
+  typeFilter: TypeFilter
+  tagFilter: string[]
+  totalForTab: number
 }) {
   // Three subtly-different empty messages keep the page from
-  // misleading users: nothing curated yet vs. nothing matches the
-  // current narrowing. Worded so the action to recover is obvious.
-  const isLibraryEmpty = totalResources === 0
-  const message = isLibraryEmpty
-    ? "There are no resources in the library yet. Once a facilitator publishes one, it'll show up here."
-    : query
-      ? 'No resources match your search. Try different keywords or clear the filter.'
-      : filter !== 'all'
-        ? 'No resources match this filter yet. Switch to "All" to see everything.'
-        : 'No resources to show.'
+  // misleading users. The first message wins so we order from most-
+  // specific (active narrowing) to least (genuinely empty tab).
+  const isNarrowing =
+    !!query.trim() || typeFilter !== 'all' || tagFilter.length > 0
+
+  let message: string
+  if (totalForTab === 0) {
+    message =
+      tab === 'mine'
+        ? 'No cohort resources have been published for you yet. Check back soon, or try Further Reading.'
+        : "There's no further reading yet. New universal resources will show up here when published."
+  } else if (isNarrowing) {
+    message =
+      'No resources match your current filters. Try clearing a filter or searching for something else.'
+  } else {
+    message = 'No resources to show.'
+  }
 
   return (
     <div className="rounded-lg border border-dashed border-border bg-muted/30 px-6 py-12 text-center">

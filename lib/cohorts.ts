@@ -40,3 +40,40 @@ export function fellowCanAccess(
   if (!userCohort) return false
   return targetCohorts.includes(userCohort)
 }
+
+/**
+ * Cumulative-access variant of {@link fellowCanAccess}.
+ *
+ * Used by the Library page where Karen wants "stage-up" semantics:
+ * a fellow in Cohort B can see resources released for A *and* B; a
+ * fellow in C sees A + B + C. The simplest way to model that on top
+ * of the existing `cohorts text[]` column is to interpret each entry
+ * as the stage at which the resource was released, and visibility =
+ * "any of those stages is at or below the user's stage".
+ *
+ *  - row.cohorts = ['A']     -> visible to A, B, C
+ *  - row.cohorts = ['B']     -> visible to B, C
+ *  - row.cohorts = ['C']     -> visible to C only
+ *  - row.cohorts = ['A','B'] -> visible to A, B, C (driven by 'A')
+ *  - row.cohorts empty/null  -> NOT visible (unassigned, same as
+ *                                fellowCanAccess)
+ *
+ * Curriculum gating still uses {@link fellowCanAccess} so that a
+ * phase pinned to "B only" stays B-only - the cumulative rule is a
+ * Library-only concession.
+ */
+export function cohortReleasedFor(
+  targetCohorts: readonly string[] | null | undefined,
+  userCohort: Cohort | null | undefined,
+): boolean {
+  if (!targetCohorts || targetCohorts.length === 0) return false
+  if (!userCohort) return false
+  const userIdx = COHORTS.indexOf(userCohort)
+  if (userIdx < 0) return false
+  // Visible if any of the target labels is at or before the user's
+  // stage in the canonical A < B < C ordering.
+  return targetCohorts.some((label) => {
+    const idx = COHORTS.indexOf(label as Cohort)
+    return idx >= 0 && idx <= userIdx
+  })
+}

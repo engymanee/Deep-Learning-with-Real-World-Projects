@@ -1,5 +1,5 @@
 import { requireUser } from '@/lib/auth-server'
-import { fellowCanAccess } from '@/lib/cohorts'
+import { cohortReleasedFor } from '@/lib/cohorts'
 import { createClient } from '@/lib/supabase/server'
 import { TopBar } from '@/components/top-bar'
 import {
@@ -18,12 +18,14 @@ const VALID_TYPES = new Set(['document', 'video', 'link', 'reading'])
 
 /**
  * Library route. Server component: pulls every published resource,
- * applies cohort gating for fellows, then hands the list off to the
- * client `<LibraryView>` for search / filter / view-toggle.
+ * splits Further Reading (universal) from My Resources (cohort-gated),
+ * applies cumulative cohort access for fellows, then hands the lists
+ * to the client `<LibraryView>` for tabs / search / filters.
  *
- * Cohort rules:
- *  - Fellows: only resources where cohorts contains the fellow's own
- *    cohort label (per `fellowCanAccess`).
+ * Cohort rules (see lib/cohorts.ts):
+ *  - Universal rows: visible to every authenticated user.
+ *  - Cohort-gated rows for fellows: cumulative - a fellow in B sees A + B,
+ *    a fellow in C sees A + B + C (`cohortReleasedFor`).
  *  - Facilitators / admins: see every resource so they can curate.
  */
 export default async function LibraryPage() {
@@ -32,36 +34,52 @@ export default async function LibraryPage() {
   const user = await requireUser()
   const supabase = await createClient()
 
-  // Pull just the columns the view consumes. Sorting newest-first
-  // upfront means the "Recent" filter and the default order match
-  // out of the box, even before the client memo re-sorts.
   const { data: rows } = await supabase
     .from('community_resources')
-    .select('id, title, description, url, resource_type, tags, cohorts, created_at')
+    .select(
+      'id, title, description, url, resource_type, tags, cohorts, is_universal, created_at',
+    )
     .order('created_at', { ascending: false })
 
   const all = rows ?? []
-  const visible =
-    user.role === 'fellow'
-      ? all.filter((r) =>
-          fellowCanAccess(r.cohorts as string[] | null, user.cohort ?? null),
-        )
-      : all
+  const isFellow = user.role === 'fellow'
+
+  // Two parallel slices, each gated independently. Universal rows
+  // are visible to everyone authenticated, so the only check is the
+  // is_universal flag. Cohort-gated rows go through the cumulative
+  // helper for fellows; staff bypass.
+  const universalRows = all.filter((r) => r.is_universal === true)
+  const cohortGatedRows = all
+    .filter((r) => r.is_universal !== true)
+    .filter((r) => {
+      if (!isFellow) return true
+      return cohortReleasedFor(
+        r.cohorts as string[] | null,
+        user.cohort ?? null,
+      )
+    })
 
   // Map raw rows -> view shape. Old rows that pre-date 033 may have
   // an unexpected resource_type from a hand edit; we coerce anything
   // unknown to 'reading' so the icon picker is always defined.
-  const resources: LibraryResource[] = visible.map((r) => ({
-    id: r.id,
-    title: r.title,
-    description: r.description,
-    url: r.url,
-    resourceType: VALID_TYPES.has(r.resource_type)
-      ? (r.resource_type as LibraryResource['resourceType'])
-      : 'reading',
-    tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
-    createdAt: r.created_at,
-  }))
+  function toResource(r: (typeof all)[number]): LibraryResource {
+    return {
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      url: r.url,
+      resourceType: VALID_TYPES.has(r.resource_type)
+        ? (r.resource_type as LibraryResource['resourceType'])
+        : 'reading',
+      tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
+      cohorts: Array.isArray(r.cohorts) ? (r.cohorts as string[]) : [],
+      isUniversal: r.is_universal === true,
+      createdAt: r.created_at,
+    }
+  }
+
+  const myResources: LibraryResource[] = cohortGatedRows.map(toResource)
+  const furtherReading: LibraryResource[] = universalRows.map(toResource)
 
   const canManage = user.role === 'admin' || user.role === 'facilitator'
 
@@ -69,7 +87,11 @@ export default async function LibraryPage() {
     <div className="min-h-screen bg-background">
       <TopBar />
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-10">
-        <LibraryView resources={resources} canManage={canManage} />
+        <LibraryView
+          myResources={myResources}
+          furtherReading={furtherReading}
+          canManage={canManage}
+        />
       </main>
     </div>
   )

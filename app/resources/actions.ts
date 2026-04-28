@@ -15,6 +15,8 @@ export type LibraryActionResult =
 
 /** Allowed values must mirror the CHECK constraint on the column. */
 const VALID_TYPES = new Set(['document', 'video', 'link', 'reading'])
+/** Canonical cohort labels accepted by the visibility multi-select. */
+const VALID_COHORTS = new Set(['A', 'B', 'C'])
 
 const MAX_TITLE_LEN = 200
 const MAX_DESC_LEN = 1_000
@@ -24,11 +26,14 @@ const MAX_TAG_LEN = 32
 /**
  * Add a resource to the shared Library. Admin / facilitator only.
  *
- * Cohort visibility:
- *  - The form sends 'all' (default) or a specific cohort label.
- *  - Persisted as text[]: 'all' -> ['A','B'], otherwise [label].
- *  - The cohorts column on community_resources is NOT NULL, so we
- *    always emit a non-empty array.
+ * Visibility model:
+ *  - `isUniversal=true` -> rendered on the "Further Reading" tab,
+ *    visible to every authenticated user. Cohort labels are still
+ *    accepted on the wire (for future filtering), but stored as the
+ *    full A/B/C set so RLS / non-cumulative consumers don't accidentally
+ *    hide the row.
+ *  - `isUniversal=false` -> "My Resources" tab, cohort-gated using
+ *    the cumulative-access rule (`cohortReleasedFor`).
  *
  * URL-only for the first cut. File upload via Vercel Blob is the
  * natural follow-up; when wired, it'll PUT the blob and pass the
@@ -41,7 +46,8 @@ export async function addLibraryResource(
     url: string
     resourceType: string
     tags?: string[]
-    cohort?: 'all' | 'A' | 'B'
+    isUniversal?: boolean
+    cohorts?: string[]
   },
 ): Promise<LibraryActionResult> {
   try {
@@ -93,9 +99,34 @@ export async function addLibraryResource(
       if (tags.length >= MAX_TAGS) break
     }
 
-    const cohort = input.cohort ?? 'all'
-    const cohorts: string[] =
-      cohort === 'A' ? ['A'] : cohort === 'B' ? ['B'] : ['A', 'B']
+    const isUniversal = input.isUniversal === true
+
+    // Cohort assignment: universal rows always store the full A/B/C
+    // set so any consumer that bypasses the `is_universal` flag (e.g.
+    // RLS policies) still allows them through. Cohort-gated rows
+    // require at least one valid label; we dedupe and clamp to the
+    // canonical A/B/C set.
+    let cohorts: string[]
+    if (isUniversal) {
+      cohorts = ['A', 'B', 'C']
+    } else {
+      const seenC = new Set<string>()
+      const cleaned: string[] = []
+      for (const raw of input.cohorts ?? []) {
+        const label = (raw ?? '').trim().toUpperCase()
+        if (!VALID_COHORTS.has(label)) continue
+        if (seenC.has(label)) continue
+        seenC.add(label)
+        cleaned.push(label)
+      }
+      if (cleaned.length === 0) {
+        return {
+          ok: false,
+          message: 'Select at least one cohort or mark this as Further Reading.',
+        }
+      }
+      cohorts = cleaned
+    }
 
     const supabase = await createClient()
     const { error } = await supabase.from('community_resources').insert({
@@ -105,6 +136,7 @@ export async function addLibraryResource(
       resource_type: resourceType,
       tags,
       cohorts,
+      is_universal: isUniversal,
     })
     if (error) return { ok: false, message: error.message }
 
