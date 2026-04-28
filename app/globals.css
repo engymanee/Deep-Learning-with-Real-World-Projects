@@ -4,19 +4,36 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* WaW Design System - Navy/Blue Scheme */
-  --primary: #1E3A5F;           /* deep navy — primary actions, headers */
-  --primary-light: #2C5282;     /* hover states */
-  --accent: #3B82F6;            /* links, focus rings */
-  --bg: #FFFFFF;                /* page background */
-  --bg-subtle: #F8FAFC;         /* card background, sidebar */
-  --bg-muted: #D6E4F0;          /* highlight blocks, e.g. callouts */
-  --text: #1F2937;              /* body text */
-  --text-muted: #64748B;        /* metadata, timestamps */
-  --border: #E2E8F0;            /* dividers, card borders */
-  --success: #10B981;           /* completion states */
-  --warning: #F59E0B;           /* at-risk, deadlines */
-  
+  /* Brand palette
+     ---------------------------------------------------------------
+     Five-color system. Everything else (borders, neutrals, sidebar,
+     charts) is derived from these five so the UI never strays.
+
+       #264c83  primary           - the "main main" brand blue
+       #0c4a80  primary-light     - deeper press/hover variant
+       #bb4658  accent            - links, focus, destructive
+       #ddd4dc  bg-muted          - soft callouts, highlight surfaces
+       #000000  text              - body copy
+     --------------------------------------------------------------- */
+  --primary: #264c83;           /* primary actions, headers */
+  --primary-light: #0c4a80;     /* hover / pressed state */
+  --accent: #bb4658;            /* links, focus rings, destructive */
+  --bg: #ffffff;                /* page background */
+  --bg-subtle: #faf8fa;         /* cards, sidebar - barely off-white,
+                                   tuned to harmonise with bg-muted */
+  --bg-muted: #ddd4dc;          /* highlight blocks, callouts */
+  --text: #000000;              /* body text */
+  --text-muted: #5b5862;        /* metadata, timestamps - neutral
+                                   warm gray that pairs with #ddd4dc */
+  --border: #e5e3e7;            /* dividers, card borders - derived
+                                   neutral, slightly warm */
+
+  /* Functional indicators - kept outside the brand 5 because they
+     carry semantic meaning (done / at-risk) that fellows expect to
+     read at a glance. */
+  --success: #10b981;
+  --warning: #f59e0b;
+
   /* Legacy tokens for shadcn compatibility */
   --background: var(--bg);
   --foreground: var(--text);
@@ -25,32 +42,36 @@
   --popover: var(--bg);
   --popover-foreground: var(--text);
   --primary-token: var(--primary);
-  --primary-foreground: #FFFFFF;
+  --primary-foreground: #ffffff;
   --secondary: var(--bg-subtle);
   --secondary-foreground: var(--text);
   --muted: var(--bg-muted);
   --muted-foreground: var(--text-muted);
   --accent-token: var(--accent);
-  --accent-foreground: #FFFFFF;
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
+  --accent-foreground: #ffffff;
+  /* Destructive uses the same rose as the accent so we don't introduce
+     a sixth brand colour for error states. */
+  --destructive: var(--accent);
+  --destructive-foreground: #ffffff;
   --border-token: var(--border);
   --input: var(--border);
   --ring: var(--accent);
-  --chart-1: #3B82F6;
-  --chart-2: #10B981;
-  --chart-3: #F59E0B;
-  --chart-4: #8B5CF6;
-  --chart-5: #EC4899;
+  /* Charts: brand-first ordering. Functional success/warning come
+     last so brand-coloured series dominate by default. */
+  --chart-1: #264c83;
+  --chart-2: #bb4658;
+  --chart-3: #0c4a80;
+  --chart-4: #ddd4dc;
+  --chart-5: #10b981;
   --radius: 0.5rem;
-  
+
   /* Sidebar tokens */
   --sidebar: var(--bg-subtle);
   --sidebar-foreground: var(--text);
   --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--accent);
-  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-accent-foreground: #ffffff;
   --sidebar-border: var(--border);
   --sidebar-ring: var(--accent);
 }
@@ -77,6 +98,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-border: var(--border-token);
   --color-input: var(--input);
   --color-ring: var(--ring);

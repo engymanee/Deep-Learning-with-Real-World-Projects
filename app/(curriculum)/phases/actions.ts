@@ -1,0 +1,353 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth-server'
+import {
+  canFellowSeeContent,
+  canFellowSeeModule,
+  canFellowSeePhase,
+} from '@/lib/curriculum'
+import {
+  MIN_REFLECTION_WORDS,
+  countWords,
+  reflectionMeetsMinimum,
+} from '@/lib/reflections'
+
+// ----------------------------------------------------------------------------
+// Visibility helper
+// ----------------------------------------------------------------------------
+
+interface ItemWithCascade {
+  id: string
+  year_id: string
+  module_id: string | null
+  url: string | null
+  reflection_enabled: boolean
+  cohorts: string[] | null
+  modules: { cohorts: string[] | null } | null
+  years: { cohorts: string[] | null } | null
+}
+
+/**
+ * Look up the content row plus its parent module and phase cohort
+ * lists in a single round-trip. Returns the row, or `null` plus an
+ * error message when the row is missing or the user can't see it.
+ *
+ * Centralising this check keeps every fellow-side action enforcing
+ * the exact same Phase -> Module -> Content cascade.
+ */
+async function loadVisibleItem(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  contentId: string,
+  user: Awaited<ReturnType<typeof requireUser>>,
+): Promise<
+  | { ok: true; item: ItemWithCascade }
+  | { ok: false; message: string }
+> {
+  const { data: item, error } = await supabase
+    .from('labs')
+    .select(
+      'id, year_id, module_id, url, reflection_enabled, cohorts, modules:module_id (cohorts), years:year_id (cohorts)',
+    )
+    .eq('id', contentId)
+    .maybeSingle<ItemWithCascade>()
+
+  if (error) return { ok: false, message: error.message }
+  if (!item || !item.module_id) {
+    return { ok: false, message: 'Content not found' }
+  }
+  if (user.role === 'fellow') {
+    const userCohort = user.cohort ?? null
+    const phaseCohorts = item.years?.cohorts ?? null
+    const moduleCohorts = item.modules?.cohorts ?? null
+    if (
+      !canFellowSeePhase(phaseCohorts, userCohort) ||
+      !canFellowSeeModule(moduleCohorts, phaseCohorts, userCohort) ||
+      !canFellowSeeContent(item.cohorts, phaseCohorts, userCohort, moduleCohorts)
+    ) {
+      return { ok: false, message: 'Not allowed' }
+    }
+  }
+  return { ok: true, item }
+}
+
+// ----------------------------------------------------------------------------
+// Mark complete / not-complete
+// ----------------------------------------------------------------------------
+
+export type ToggleResult =
+  | { ok: true; completed: boolean }
+  | { ok: false; message: string }
+
+/**
+ * Toggle the current user's completion of a content item.
+ *
+ * Going from incomplete -> complete enforces the per-item gates the
+ * admin configured:
+ *
+ *   - If the item has a URL, the fellow must have opened it (a row
+ *     in `user_content_link_clicks`).
+ *   - If `reflection_enabled` is true, the fellow must have submitted
+ *     a reflection (a row in `user_content_reflections`).
+ *
+ * Going the other direction (uncheck) always works.
+ */
+export async function toggleContentCompletion(
+  contentId: string,
+  nextCompleted: boolean,
+): Promise<ToggleResult> {
+  try {
+    const user = await requireUser()
+    const supabase = await createClient()
+    if (!contentId) return { ok: false, message: 'Missing content id' }
+
+    const visible = await loadVisibleItem(supabase, contentId, user)
+    if (!visible.ok) return { ok: false, message: visible.message }
+    const { item } = visible
+
+    if (nextCompleted) {
+      // Gate 1: link click (if there's a link to click).
+      if (item.url) {
+        const { data: clickRow } = await supabase
+          .from('user_content_link_clicks')
+          .select('content_id')
+          .eq('profile_id', user.id)
+          .eq('content_id', contentId)
+          .maybeSingle<{ content_id: string }>()
+        if (!clickRow) {
+          return {
+            ok: false,
+            message: 'Open the linked resource before marking complete.',
+          }
+        }
+      }
+      // Gate 2: reflection submitted AND long enough (if required).
+      // Mirrors the client-side disable on the combined CTA so a
+      // motivated tab-clicker can't bypass the word-count rule.
+      if (item.reflection_enabled) {
+        const { data: reflectionRow } = await supabase
+          .from('user_content_reflections')
+          .select('response')
+          .eq('profile_id', user.id)
+          .eq('content_id', contentId)
+          .maybeSingle<{ response: string }>()
+        if (!reflectionRow) {
+          return {
+            ok: false,
+            message: 'Submit your reflection before marking complete.',
+          }
+        }
+        if (!reflectionMeetsMinimum(reflectionRow.response)) {
+          return {
+            ok: false,
+            message: `Your reflection needs at least ${MIN_REFLECTION_WORDS} words before you can mark this complete.`,
+          }
+        }
+      }
+
+      const { error: insertError } = await supabase
+        .from('user_content_completions')
+        .upsert(
+          { profile_id: user.id, content_id: contentId },
+          { onConflict: 'profile_id,content_id' },
+        )
+      if (insertError) return { ok: false, message: insertError.message }
+    } else {
+      const { error: deleteError } = await supabase
+        .from('user_content_completions')
+        .delete()
+        .eq('profile_id', user.id)
+        .eq('content_id', contentId)
+      if (deleteError) return { ok: false, message: deleteError.message }
+    }
+
+    revalidatePath('/dashboard')
+    revalidatePath(
+      `/phases/${item.year_id}/modules/${item.module_id}/items/${contentId}`,
+    )
+    return { ok: true, completed: nextCompleted }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Unknown error',
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Track that the fellow opened the linked resource
+// ----------------------------------------------------------------------------
+
+export type LinkClickResult =
+  | { ok: true }
+  | { ok: false; message: string }
+
+/**
+ * Record that the current user clicked the external link for a
+ * content item. Idempotent - calling twice is a no-op. Fired by the
+ * `LinkOpenButton` client component on the viewer page.
+ */
+export async function recordLinkClick(
+  contentId: string,
+): Promise<LinkClickResult> {
+  try {
+    const user = await requireUser()
+    const supabase = await createClient()
+    if (!contentId) return { ok: false, message: 'Missing content id' }
+
+    const visible = await loadVisibleItem(supabase, contentId, user)
+    if (!visible.ok) return { ok: false, message: visible.message }
+    const { item } = visible
+
+    if (!item.url) {
+      // Nothing to track. Treat as success so the client can no-op.
+      return { ok: true }
+    }
+
+    const { error } = await supabase
+      .from('user_content_link_clicks')
+      .upsert(
+        { profile_id: user.id, content_id: contentId },
+        { onConflict: 'profile_id,content_id' },
+      )
+    if (error) return { ok: false, message: error.message }
+
+    revalidatePath(
+      `/phases/${item.year_id}/modules/${item.module_id}/items/${contentId}`,
+    )
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Unknown error',
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Submit / update the fellow's reflection
+// ----------------------------------------------------------------------------
+
+export type ReflectionResult =
+  | { ok: true }
+  | { ok: false; message: string }
+
+const MAX_REFLECTION_LENGTH = 5000
+
+/**
+ * Save (or update) the current user's reflection for a content item.
+ * Only valid when the item has `reflection_enabled = true`.
+ */
+export async function submitReflection(
+  contentId: string,
+  response: string,
+): Promise<ReflectionResult> {
+  try {
+    const user = await requireUser()
+    const supabase = await createClient()
+    if (!contentId) return { ok: false, message: 'Missing content id' }
+
+    const trimmed = response.trim()
+    if (!trimmed) return { ok: false, message: 'Reflection cannot be empty' }
+    if (trimmed.length > MAX_REFLECTION_LENGTH) {
+      return {
+        ok: false,
+        message: `Reflection is too long (max ${MAX_REFLECTION_LENGTH} characters)`,
+      }
+    }
+    const words = countWords(trimmed)
+    if (words < MIN_REFLECTION_WORDS) {
+      return {
+        ok: false,
+        message: `Reflection needs at least ${MIN_REFLECTION_WORDS} words (you have ${words}).`,
+      }
+    }
+
+    const visible = await loadVisibleItem(supabase, contentId, user)
+    if (!visible.ok) return { ok: false, message: visible.message }
+    const { item } = visible
+
+    if (!item.reflection_enabled) {
+      return {
+        ok: false,
+        message: 'This content does not require a reflection.',
+      }
+    }
+
+    const { error } = await supabase
+      .from('user_content_reflections')
+      .upsert(
+        {
+          profile_id: user.id,
+          content_id: contentId,
+          response: trimmed,
+          submitted_at: new Date().toISOString(),
+        },
+        { onConflict: 'profile_id,content_id' },
+      )
+    if (error) return { ok: false, message: error.message }
+
+    revalidatePath(
+      `/phases/${item.year_id}/modules/${item.module_id}/items/${contentId}`,
+    )
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Wipe the current user's reflection for a content item AND any
+ * completion row that depended on it. Triggered when the fellow
+ * clears the reflection textbox - they have to re-submit a fresh
+ * reflection (>= MIN_REFLECTION_WORDS) before the lesson can be
+ * marked complete again.
+ *
+ * Idempotent: deleting a row that doesn't exist is a no-op.
+ */
+export async function deleteReflection(
+  contentId: string,
+): Promise<ReflectionResult> {
+  try {
+    const user = await requireUser()
+    const supabase = await createClient()
+    if (!contentId) return { ok: false, message: 'Missing content id' }
+
+    const visible = await loadVisibleItem(supabase, contentId, user)
+    if (!visible.ok) return { ok: false, message: visible.message }
+    const { item } = visible
+
+    const { error: refErr } = await supabase
+      .from('user_content_reflections')
+      .delete()
+      .eq('profile_id', user.id)
+      .eq('content_id', contentId)
+    if (refErr) return { ok: false, message: refErr.message }
+
+    // A completion that was only valid because of the reflection
+    // shouldn't outlive it - drop it too so the gate re-engages.
+    if (item.reflection_enabled) {
+      const { error: compErr } = await supabase
+        .from('user_content_completions')
+        .delete()
+        .eq('profile_id', user.id)
+        .eq('content_id', contentId)
+      if (compErr) return { ok: false, message: compErr.message }
+    }
+
+    revalidatePath('/dashboard')
+    revalidatePath(
+      `/phases/${item.year_id}/modules/${item.module_id}/items/${contentId}`,
+    )
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Unknown error',
+    }
+  }
+}

@@ -1,93 +1,120 @@
+import Link from 'next/link'
+import { ArrowRight, Layers } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
-import { YearSection } from './year-section'
-import { AddYearDialog } from './add-year-dialog'
+import { CohortBadge } from '@/components/admin/cohort-access-field'
+import { CreatePhaseDialog } from './create-phase-dialog'
 
 export const dynamic = 'force-dynamic'
 
-type YearRow = {
+type PhaseRow = {
   id: string
   title: string
   description: string | null
   order_index: number
+  cohorts: string[] | null
 }
 
-type LabRow = {
-  id: string
+type ContentCountRow = {
   year_id: string
-  title: string
-  description: string | null
-  order_index: number
 }
 
 export default async function AdminCurriculumPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const [{ data: years }, { data: labs }, { data: blockCounts }] = await Promise.all([
+  const [{ data: phases }, { data: contents }] = await Promise.all([
     supabase
       .from('years')
-      .select('id, title, description, order_index')
-      .order('order_index', { ascending: true }),
+      .select('id, title, description, order_index, cohorts')
+      .order('order_index', { ascending: true })
+      .returns<PhaseRow[]>(),
     supabase
       .from('labs')
-      .select('id, year_id, title, description, order_index')
-      .order('order_index', { ascending: true }),
-    supabase.from('lab_content_blocks').select('lab_id'),
+      .select('year_id')
+      .returns<ContentCountRow[]>(),
   ])
 
-  // Count blocks per lab so each row can show how populated it is.
-  const blockCountByLab = new Map<string, number>()
-  for (const row of blockCounts ?? []) {
-    blockCountByLab.set(row.lab_id, (blockCountByLab.get(row.lab_id) ?? 0) + 1)
+  // Tally content count per phase. Categories deliberately aren't
+  // surfaced anywhere outside the create dialog, so we don't compute a
+  // per-category breakdown here.
+  const totals = new Map<string, number>()
+  for (const row of contents ?? []) {
+    if (!row.year_id) continue
+    totals.set(row.year_id, (totals.get(row.year_id) ?? 0) + 1)
   }
 
-  const labsByYear = new Map<string, LabRow[]>()
-  for (const lab of (labs ?? []) as LabRow[]) {
-    const list = labsByYear.get(lab.year_id) ?? []
-    list.push(lab)
-    labsByYear.set(lab.year_id, list)
-  }
-
-  const yearsList = (years ?? []) as YearRow[]
+  const phaseList = phases ?? []
 
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="font-serif text-xl text-foreground">Curriculum</h2>
+          <h2 className="font-serif text-xl text-foreground">Phases</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            The full program structure. Add labels, add labs under each label, then click
-            &ldquo;Edit content&rdquo; to build out the before / during / after flow for each lab.
+            A phase is a top-level grouping of content (e.g. &ldquo;Year One:
+            Deep Learning&rdquo;). Create phases here, then click into one to
+            add content.
           </p>
         </div>
-        <AddYearDialog />
+        <CreatePhaseDialog />
       </div>
 
-      {yearsList.map((year, i) => {
-        const yearLabs = (labsByYear.get(year.id) ?? []).map((lab) => ({
-          id: lab.id,
-          year_id: lab.year_id,
-          title: lab.title,
-          description: lab.description,
-          order_index: lab.order_index,
-          block_count: blockCountByLab.get(lab.id) ?? 0,
-        }))
-        return (
-          <YearSection
-            key={year.id}
-            year={{ id: year.id, title: year.title, description: year.description }}
-            labs={yearLabs}
-            isFirst={i === 0}
-            isLast={i === yearsList.length - 1}
+      {phaseList.length === 0 ? (
+        <div className="rounded-md border border-dashed border-border p-10 text-center">
+          <Layers
+            className="mx-auto mb-3 h-8 w-8 text-muted-foreground"
+            aria-hidden="true"
           />
-        )
-      })}
+          <p className="text-sm font-medium text-foreground">No phases yet</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            Click &ldquo;New phase&rdquo; above to create the first one. Phases
+            are the top-level scaffolding of the curriculum.
+          </p>
+        </div>
+      ) : (
+        <ol className="flex flex-col gap-3">
+          {phaseList.map((phase, idx) => {
+            const count = totals.get(phase.id) ?? 0
+            return (
+              <li key={phase.id}>
+                <Link
+                  href={`/admin/curriculum/${phase.id}`}
+                  className="group block rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/30"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Phase {idx + 1}
+                        </span>
+                        <CohortBadge cohorts={phase.cohorts} />
+                      </div>
+                      <h3 className="mt-1 font-serif text-lg text-foreground">
+                        {phase.title}
+                      </h3>
+                      {phase.description && (
+                        <p className="mt-1 line-clamp-2 max-w-2xl text-sm text-muted-foreground">
+                          {phase.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 self-center text-sm text-muted-foreground">
+                      <span>
+                        {count} {count === 1 ? 'item' : 'items'}
+                      </span>
+                      <ArrowRight
+                        className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </div>
 
-      {yearsList.length === 0 && (
-        <p className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No labels yet. Click &ldquo;Add label&rdquo; above to create the first one.
-        </p>
+                </Link>
+              </li>
+            )
+          })}
+        </ol>
       )}
     </div>
   )

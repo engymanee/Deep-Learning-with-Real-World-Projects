@@ -12,23 +12,38 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
-import { MoreHorizontal, Mail, UserX, UserCheck } from 'lucide-react'
+import { MoreHorizontal, Mail, Trash2, UserX, UserCheck } from 'lucide-react'
 import { ROLE_LABELS, type Role } from '@/lib/roles'
+import { COHORTS, type Cohort } from '@/lib/cohorts'
 import {
+  deleteUserAction,
   resendInviteAction,
   toggleDeactivateAction,
   updateCohortAction,
+  updateCohortLetterAction,
   updateRoleAction,
 } from './actions'
 
-type Cohort = { id: string; name: string }
+type SchoolTeam = { id: string; name: string }
 
 type UserRowData = {
   id: string
@@ -36,6 +51,7 @@ type UserRowData = {
   email: string | null
   title: string | null
   role: Role
+  cohort: Cohort | null
   deactivated_at: string | null
   cohort_id: string | null
   cohort_name: string | null
@@ -44,13 +60,18 @@ type UserRowData = {
   email_confirmed_at: string | null
 }
 
-const NONE_COHORT = '__none__'
+const NONE_TEAM = '__none__'
+const NONE_COHORT = '__none_cohort__'
 
-export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[] }) {
+export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: SchoolTeam[] }) {
   const [pending, startTransition] = useTransition()
   const [toast, setToast] = useState<string | null>(null)
   const [role, setRole] = useState<Role>(user.role)
-  const [cohortId, setCohortId] = useState<string>(user.cohort_id ?? NONE_COHORT)
+  const [schoolTeamId, setSchoolTeamId] = useState<string>(user.cohort_id ?? NONE_TEAM)
+  const [cohortLetter, setCohortLetter] = useState<string>(user.cohort ?? NONE_COHORT)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteErr, setDeleteErr] = useState<string | null>(null)
 
   function run(action: () => Promise<{ ok: boolean; message: string }>) {
     setToast(null)
@@ -62,19 +83,34 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
   }
 
   function handleRoleChange(next: string) {
-    setRole(next as Role)
+    const nextRole = next as Role
+    setRole(nextRole)
+    // Promotion off the fellow role implicitly clears the cohort - the
+    // server enforces this too via a CHECK constraint, but we mirror the
+    // change locally so the UI stays in sync without a refetch.
+    if (nextRole !== 'fellow') {
+      setCohortLetter(NONE_COHORT)
+    }
     const fd = new FormData()
     fd.set('userId', user.id)
     fd.set('role', next)
     run(() => updateRoleAction(fd))
   }
 
-  function handleCohortChange(next: string) {
-    setCohortId(next)
+  function handleSchoolTeamChange(next: string) {
+    setSchoolTeamId(next)
     const fd = new FormData()
     fd.set('userId', user.id)
-    fd.set('cohortId', next === NONE_COHORT ? '' : next)
+    fd.set('cohortId', next === NONE_TEAM ? '' : next)
     run(() => updateCohortAction(fd))
+  }
+
+  function handleCohortLetterChange(next: string) {
+    setCohortLetter(next)
+    const fd = new FormData()
+    fd.set('userId', user.id)
+    fd.set('cohort', next === NONE_COHORT ? '' : next)
+    run(() => updateCohortLetterAction(fd))
   }
 
   function handleResend() {
@@ -91,6 +127,29 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
     run(() => toggleDeactivateAction(fd))
   }
 
+  // Require the admin to retype the email so a permanent delete is
+  // never a single mis-click. Falls back to the name if no email on file.
+  const deleteMatchToken = (user.email ?? user.full_name ?? '').trim()
+  const canConfirmDelete = deleteConfirmText.trim() === deleteMatchToken
+
+  function handleDelete() {
+    if (!canConfirmDelete) return
+    setDeleteErr(null)
+    const fd = new FormData()
+    fd.set('userId', user.id)
+    startTransition(async () => {
+      const res = await deleteUserAction(fd)
+      if (res.ok) {
+        setDeleteOpen(false)
+        setDeleteConfirmText('')
+        setToast(res.message)
+        setTimeout(() => setToast(null), 2500)
+      } else {
+        setDeleteErr(res.message)
+      }
+    })
+  }
+
   const initials = (user.full_name ?? user.email ?? '?')
     .split(' ')
     .map((p) => p[0])
@@ -103,7 +162,7 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
 
   return (
     <li className="grid grid-cols-12 items-center gap-4 px-5 py-4">
-      <div className="col-span-12 flex items-center gap-3 md:col-span-4">
+      <div className="col-span-12 flex items-center gap-3 md:col-span-3">
         <Avatar className="h-9 w-9">
           <AvatarFallback className="bg-primary/10 text-xs text-primary">
             {initials}
@@ -143,12 +202,16 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
       </div>
 
       <div className="col-span-6 md:col-span-3">
-        <Select value={cohortId} onValueChange={handleCohortChange} disabled={pending}>
+        <Select
+          value={schoolTeamId}
+          onValueChange={handleSchoolTeamChange}
+          disabled={pending}
+        >
           <SelectTrigger className="h-9">
-            <SelectValue />
+            <SelectValue placeholder="No team" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE_COHORT}>No cohort</SelectItem>
+            <SelectItem value={NONE_TEAM}>No team</SelectItem>
             {cohorts.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
@@ -156,6 +219,37 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="col-span-6 md:col-span-1">
+        {role === 'fellow' ? (
+          <Select
+            value={cohortLetter}
+            onValueChange={handleCohortLetterChange}
+            disabled={pending}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="—" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_COHORT}>—</SelectItem>
+              {COHORTS.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          // Admins and facilitators are not cohort-scoped: they always
+          // have full access to every phase, item, and library resource.
+          <span
+            className="flex h-9 items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground"
+            title={`${role === 'admin' ? 'Admins' : 'Facilitators'} have unrestricted access and aren't assigned to a cohort`}
+          >
+            n/a
+          </span>
+        )}
       </div>
 
       <div className="col-span-10 md:col-span-2">
@@ -198,10 +292,83 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: Cohort[
                   Deactivate
                 </DropdownMenuItem>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  // Keep the dropdown's focus-return from racing the dialog open.
+                  e.preventDefault()
+                  setDeleteErr(null)
+                  setDeleteConfirmText('')
+                  setDeleteOpen(true)
+                }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete user
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
+
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(v) => {
+          setDeleteOpen(v)
+          if (!v) {
+            setDeleteConfirmText('')
+            setDeleteErr(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {user.full_name ?? user.email ?? 'this user'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the account, their profile, school team membership,
+              and all progress records. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deleteMatchToken ? (
+            <div className="grid gap-2">
+              <Label htmlFor={`confirm-del-${user.id}`}>
+                Type <span className="font-mono">{deleteMatchToken}</span> to confirm
+              </Label>
+              <Input
+                id={`confirm-del-${user.id}`}
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                autoComplete="off"
+                placeholder={deleteMatchToken}
+              />
+            </div>
+          ) : null}
+
+          {deleteErr && (
+            <p role="alert" className="text-sm text-destructive">
+              {deleteErr}
+            </p>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              disabled={!canConfirmDelete || pending}
+              className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20"
+            >
+              {pending && <Spinner className="h-4 w-4" />}
+              Delete user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </li>
   )
 }

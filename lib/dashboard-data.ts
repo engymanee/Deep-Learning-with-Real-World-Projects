@@ -1,35 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
+import {
+  canFellowSeeContent,
+  canFellowSeePhase,
+  type ContentCategory,
+} from '@/lib/curriculum'
 import type { CurrentUser } from '@/lib/user-context'
 
 // ============================================================================
-// Types exposed to dashboard components
+// Types
 // ============================================================================
 
-export interface DashboardYear {
+export interface DashboardPhase {
   id: string
   orderIndex: number
   title: string
-  progress: number // 0-100
-  labsCompleted: number
-  labsTotal: number
-  isLocked: boolean
-}
-
-export interface DashboardPosition {
-  /** Year number: 1..3, or 4 if program complete. */
-  year: number
-  /** 1-based lab index within current year. */
-  currentLab: number
-  totalLabs: number
-}
-
-export interface DashboardResume {
-  labId: string
-  labTitle: string
-  yearTitle: string
-  progress: number // 0-100
-  estimatedMinutesRemaining: number
+  description: string | null
+  contentCount: number
 }
 
 export interface DashboardSessionFacilitator {
@@ -41,23 +28,10 @@ export interface DashboardSessionFacilitator {
 export interface DashboardSession {
   id: string
   title: string
-  startTime: string // ISO
-  endTime: string // ISO
+  startTime: string
+  endTime: string
   joinUrl: string | null
   facilitators: DashboardSessionFacilitator[]
-}
-
-export interface DashboardTeammate {
-  id: string
-  name: string
-  initials: string
-  progress: number // 0-100
-}
-
-export interface DashboardTeam {
-  cohortId: string
-  cohortName: string
-  members: DashboardTeammate[]
 }
 
 export interface DashboardAnnouncement {
@@ -65,21 +39,14 @@ export interface DashboardAnnouncement {
   title: string
   body: string
   pinned: boolean
-  publishedAt: string // ISO
+  publishedAt: string
   author: { name: string; initials: string } | null
 }
 
 export interface DashboardData {
   user: CurrentUser
-  position: DashboardPosition
-  isNewLearner: boolean
-  /** Populated when there's an in-progress / resumable lab. */
-  resume: DashboardResume | null
-  /** First lab of the first unlocked year, for "Get Started". */
-  startLabId: string | null
-  years: DashboardYear[]
+  phases: DashboardPhase[]
   upcomingSession: DashboardSession | null
-  team: DashboardTeam | null
   announcements: DashboardAnnouncement[]
 }
 
@@ -94,7 +61,7 @@ function initialsFor(name: string | null | undefined): string {
 }
 
 // ============================================================================
-// Main loader
+// Loader
 // ============================================================================
 
 export async function getDashboardData(): Promise<DashboardData> {
@@ -102,161 +69,96 @@ export async function getDashboardData(): Promise<DashboardData> {
   const supabase = await createClient()
 
   // ---------------------------------------------------------------------------
-  // 1. Years + labs (global reference data)
+  // Phases + content (filtered for fellows by cohort access)
   // ---------------------------------------------------------------------------
-  const [{ data: yearRows }, { data: labRows }] = await Promise.all([
-    supabase
-      .from('years')
-      .select('id, order_index, title')
-      .order('order_index'),
-    supabase
-      .from('labs')
-      .select('id, year_id, order_index, title')
-      .order('order_index'),
-  ])
+  const isFellow = user.role === 'fellow'
+  const userCohort = user.cohort ?? null
 
-  const allYears = yearRows ?? []
-  const allLabs = labRows ?? []
-  const labsByYear = new Map<string, typeof allLabs>()
-  for (const lab of allLabs) {
-    const list = labsByYear.get(lab.year_id) ?? []
-    list.push(lab)
-    labsByYear.set(lab.year_id, list)
-  }
-
-  // ---------------------------------------------------------------------------
-  // 2. User's year + lab progress
-  // ---------------------------------------------------------------------------
-  const [{ data: yearProgressRows }, { data: labProgressRows }] =
+  const [{ data: phaseRows }, { data: moduleRows }, { data: itemRows }] =
     await Promise.all([
       supabase
-        .from('user_year_progress')
-        .select('year_id, status, progress')
-        .eq('profile_id', user.id),
+        .from('years')
+        .select('id, order_index, title, description, cohorts')
+        .order('order_index', { ascending: true }),
       supabase
-        .from('user_lab_progress')
-        .select('lab_id, status, progress, updated_at')
-        .eq('profile_id', user.id),
+        .from('modules')
+        .select('id, phase_id, cohorts'),
+      supabase
+        .from('labs')
+        .select('id, year_id, module_id, category, cohorts')
+        .returns<
+          Array<{
+            id: string
+            year_id: string
+            module_id: string | null
+            category: ContentCategory | null
+            cohorts: string[] | null
+          }>
+        >(),
     ])
 
-  const yearProgressByYear = new Map(
-    (yearProgressRows ?? []).map((row) => [row.year_id, row]),
-  )
-  const labProgressByLab = new Map(
-    (labProgressRows ?? []).map((row) => [row.lab_id, row]),
-  )
+  const phaseCohortById = new Map<string, string[] | null>()
+  for (const p of phaseRows ?? []) {
+    phaseCohortById.set(p.id, (p.cohorts as string[] | null) ?? null)
+  }
 
-  // ---------------------------------------------------------------------------
-  // 3. Assemble DashboardYear[] with lock logic
-  //    Year N unlocks once Year N-1 is completed (progress >= 100).
-  // ---------------------------------------------------------------------------
-  const years: DashboardYear[] = []
-  let priorYearComplete = true // Year 1 is always unlocked
-  for (const yr of allYears) {
-    const labsInYear = labsByYear.get(yr.id) ?? []
-    const labsTotal = labsInYear.length
-    const labsCompleted = labsInYear.filter((lab) => {
-      const lp = labProgressByLab.get(lab.id)
-      return lp?.status === 'complete' || (lp?.progress ?? 0) >= 100
-    }).length
-    const yp = yearProgressByYear.get(yr.id)
-    const progress = Math.max(
-      yp?.progress ?? 0,
-      labsTotal === 0 ? 0 : Math.round((labsCompleted / labsTotal) * 100),
-    )
-    const isLocked = !priorYearComplete
-    years.push({
-      id: yr.id,
-      orderIndex: yr.order_index,
-      title: yr.title,
-      progress,
-      labsCompleted,
-      labsTotal,
-      isLocked,
+  // For module-level cascading we need quick lookups from module id ->
+  // its parent phase id and its own cohort override.
+  const moduleCohortById = new Map<string, string[] | null>()
+  const modulePhaseById = new Map<string, string>()
+  for (const m of (moduleRows ?? []) as Array<{
+    id: string
+    phase_id: string
+    cohorts: string[] | null
+  }>) {
+    moduleCohortById.set(m.id, m.cohorts)
+    modulePhaseById.set(m.id, m.phase_id)
+  }
+
+  // Tally a per-phase content count, applying per-fellow cohort
+  // visibility through the full Phase -> Module -> Content cascade.
+  const countsByPhase = new Map<string, number>()
+  for (const item of itemRows ?? []) {
+    if (!item.category) continue
+    if (!item.module_id) continue
+    const moduleCohorts = moduleCohortById.get(item.module_id) ?? null
+    const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
+    if (isFellow) {
+      if (
+        !canFellowSeeContent(
+          item.cohorts,
+          phaseCohorts,
+          userCohort,
+          moduleCohorts,
+        )
+      ) {
+        continue
+      }
+    }
+    countsByPhase.set(item.year_id, (countsByPhase.get(item.year_id) ?? 0) + 1)
+  }
+
+  // Build the phase list, hiding phases the fellow can't see at all.
+  const phases: DashboardPhase[] = []
+  for (const p of phaseRows ?? []) {
+    if (isFellow && !canFellowSeePhase(p.cohorts as string[] | null, userCohort)) {
+      continue
+    }
+    phases.push({
+      id: p.id,
+      orderIndex: p.order_index,
+      title: p.title,
+      description: p.description,
+      contentCount: countsByPhase.get(p.id) ?? 0,
     })
-    priorYearComplete = progress >= 100
   }
 
   // ---------------------------------------------------------------------------
-  // 4. Current position + resume card
-  // ---------------------------------------------------------------------------
-  const isNewLearner = (labProgressRows ?? []).length === 0
-
-  // Find first unlocked, incomplete year.
-  const currentYear = years.find((y) => !y.isLocked && y.progress < 100)
-  const completedAllYears = !currentYear && years.every((y) => y.progress >= 100)
-
-  // Within currentYear, find the current lab: first incomplete lab by order.
-  let currentLabEntry: { lab: (typeof allLabs)[number]; index: number } | null =
-    null
-  let startLabId: string | null = null
-  if (currentYear) {
-    const labsInYear = labsByYear.get(currentYear.id) ?? []
-    for (let i = 0; i < labsInYear.length; i++) {
-      const lab = labsInYear[i]
-      const lp = labProgressByLab.get(lab.id)
-      const done = lp?.status === 'complete' || (lp?.progress ?? 0) >= 100
-      if (!done) {
-        currentLabEntry = { lab, index: i + 1 }
-        break
-      }
-    }
-    // For the "Start" CTA on a brand-new learner, point at the first lab.
-    startLabId = labsInYear[0]?.id ?? null
-  }
-
-  const position: DashboardPosition = (() => {
-    if (completedAllYears) {
-      return { year: 4, currentLab: 1, totalLabs: 1 }
-    }
-    if (!currentYear || !currentLabEntry) {
-      return { year: 1, currentLab: 1, totalLabs: Math.max(1, years[0]?.labsTotal ?? 1) }
-    }
-    return {
-      year: currentYear.orderIndex,
-      currentLab: currentLabEntry.index,
-      totalLabs: currentYear.labsTotal,
-    }
-  })()
-
-  // Resume card: only shown when there's an in-progress lab with progress > 0.
-  let resume: DashboardResume | null = null
-  if (currentYear && currentLabEntry) {
-    const lab = currentLabEntry.lab
-    const lp = labProgressByLab.get(lab.id)
-    const progress = lp?.progress ?? 0
-    if (progress > 0) {
-      // Estimate remaining minutes from incomplete blocks.
-      const [{ data: blockRows }, { data: completedRows }] = await Promise.all([
-        supabase
-          .from('lab_content_blocks')
-          .select('id, duration_minutes')
-          .eq('lab_id', lab.id),
-        supabase
-          .from('user_block_completions')
-          .select('block_id')
-          .eq('profile_id', user.id),
-      ])
-      const completedIds = new Set((completedRows ?? []).map((r) => r.block_id))
-      const remainingMinutes = (blockRows ?? [])
-        .filter((b) => !completedIds.has(b.id))
-        .reduce((sum, b) => sum + (b.duration_minutes ?? 0), 0)
-      resume = {
-        labId: lab.id,
-        labTitle: lab.title,
-        yearTitle: currentYear.title,
-        progress,
-        estimatedMinutesRemaining: remainingMinutes,
-      }
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 5. Upcoming session (within 7 days, user's cohort)
+  // Upcoming session (within 7 days, user's cohort)
   // ---------------------------------------------------------------------------
   const { data: cohortMemberships } = await supabase
     .from('cohort_members')
-    .select('cohort_id, cohort:cohorts(id, name)')
+    .select('cohort_id')
     .eq('profile_id', user.id)
 
   const cohortIds = (cohortMemberships ?? []).map((r) => r.cohort_id)
@@ -311,56 +213,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   }
 
   // ---------------------------------------------------------------------------
-  // 6. Team: user's first cohort + members with year progress
-  // ---------------------------------------------------------------------------
-  let team: DashboardTeam | null = null
-  const primaryCohort = (cohortMemberships ?? [])[0]
-  if (primaryCohort?.cohort) {
-    const { data: peers } = await supabase
-      .from('cohort_members')
-      .select('profile_id, profiles:profiles(id, full_name, avatar_url)')
-      .eq('cohort_id', primaryCohort.cohort_id)
-
-    const peerIds = (peers ?? [])
-      .map((p) => p.profile_id)
-      .filter((id) => id !== user.id)
-
-    let peerProgressByProfile = new Map<string, number>()
-    if (peerIds.length > 0 && currentYear) {
-      const { data: peerProgress } = await supabase
-        .from('user_year_progress')
-        .select('profile_id, progress')
-        .eq('year_id', currentYear.id)
-        .in('profile_id', peerIds)
-      peerProgressByProfile = new Map(
-        (peerProgress ?? []).map((row) => [row.profile_id, row.progress ?? 0]),
-      )
-    }
-
-    const members: DashboardTeammate[] = (peers ?? [])
-      .filter((p) => p.profile_id !== user.id && p.profiles)
-      .map((p) => {
-        const fullName = p.profiles?.full_name ?? 'Unknown'
-        return {
-          id: p.profile_id,
-          name: fullName,
-          initials: initialsFor(fullName),
-          progress: peerProgressByProfile.get(p.profile_id) ?? 0,
-        }
-      })
-
-    const cohortRecord = Array.isArray(primaryCohort.cohort)
-      ? primaryCohort.cohort[0]
-      : primaryCohort.cohort
-    team = {
-      cohortId: primaryCohort.cohort_id,
-      cohortName: cohortRecord?.name ?? 'Your cohort',
-      members,
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 7. Announcements (RLS already scopes audience)
+  // Announcements (RLS already scopes audience)
   // ---------------------------------------------------------------------------
   const { data: announcementRows } = await supabase
     .from('announcements')
@@ -390,15 +243,5 @@ export async function getDashboardData(): Promise<DashboardData> {
     },
   )
 
-  return {
-    user,
-    position,
-    isNewLearner,
-    resume,
-    startLabId,
-    years,
-    upcomingSession,
-    team,
-    announcements,
-  }
+  return { user, phases, upcomingSession, announcements }
 }

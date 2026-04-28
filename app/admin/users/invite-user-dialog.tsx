@@ -18,24 +18,37 @@ import { Spinner } from '@/components/ui/spinner'
 import { UserPlus } from 'lucide-react'
 import { inviteUserAction } from './actions'
 import { ROLE_LABELS, type Role } from '@/lib/roles'
+import { COHORTS } from '@/lib/cohorts'
 
 type Props = {
   cohorts: { id: string; name: string }[]
 }
 
-const NONE_COHORT = '__none__'
+const NONE_TEAM = '__none__'
+const NONE_COHORT = '__none_cohort__'
 
 export function InviteUserDialog({ cohorts }: Props) {
   const [open, setOpen] = useState(false)
   const [role, setRole] = useState<Role>('fellow')
-  const [cohortId, setCohortId] = useState<string>(NONE_COHORT)
+  const [schoolTeamId, setSchoolTeamId] = useState<string>(NONE_TEAM)
+  const [cohortLetter, setCohortLetter] = useState<string>(NONE_COHORT)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [pending, startTransition] = useTransition()
+
+  // Cohort labels (A/B/C) only apply to fellows. Admins and facilitators
+  // have unrestricted access to every phase, item, and resource and are
+  // never bound to a cohort - so we hide the field for non-fellow roles
+  // and never submit a value with the form.
+  const isFellow = role === 'fellow'
 
   function onSubmit(formData: FormData) {
     setMessage(null)
     formData.set('role', role)
-    formData.set('cohortId', cohortId === NONE_COHORT ? '' : cohortId)
+    formData.set('cohortId', schoolTeamId === NONE_TEAM ? '' : schoolTeamId)
+    formData.set(
+      'cohortLetter',
+      isFellow && cohortLetter !== NONE_COHORT ? cohortLetter : '',
+    )
     startTransition(async () => {
       const result = await inviteUserAction(formData)
       if (result.ok) {
@@ -58,7 +71,8 @@ export function InviteUserDialog({ cohorts }: Props) {
         if (!v) {
           setMessage(null)
           setRole('fellow')
-          setCohortId(NONE_COHORT)
+          setSchoolTeamId(NONE_TEAM)
+          setCohortLetter(NONE_COHORT)
         }
       }}
     >
@@ -115,13 +129,13 @@ export function InviteUserDialog({ cohorts }: Props) {
               </FieldDescription>
             </Field>
             <Field>
-              <FieldLabel>Cohort (optional)</FieldLabel>
-              <Select value={cohortId} onValueChange={setCohortId}>
+              <FieldLabel>School Team (optional)</FieldLabel>
+              <Select value={schoolTeamId} onValueChange={setSchoolTeamId}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE_COHORT}>No cohort</SelectItem>
+                  <SelectItem value={NONE_TEAM}>No team</SelectItem>
                   {cohorts.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
@@ -129,7 +143,41 @@ export function InviteUserDialog({ cohorts }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+              <FieldDescription>
+                The school the fellow is part of. Used for grouping and team-level reporting.
+              </FieldDescription>
             </Field>
+            {isFellow ? (
+              <Field>
+                <FieldLabel>Cohort (optional)</FieldLabel>
+                <Select value={cohortLetter} onValueChange={setCohortLetter}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_COHORT}>No cohort</SelectItem>
+                    {COHORTS.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        Cohort {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  Cohorts (A, B, C) gate which curriculum phases and library resources
+                  the fellow can see. Fellows only access content assigned to their
+                  cohort.
+                </FieldDescription>
+              </Field>
+            ) : (
+              <Field>
+                <FieldLabel>Cohort</FieldLabel>
+                <p className="text-sm text-muted-foreground">
+                  {role === 'admin' ? 'Admins' : 'Facilitators'} are not assigned to a
+                  cohort and have access to all curriculum and library content.
+                </p>
+              </Field>
+            )}
 
             {message && (
               <p

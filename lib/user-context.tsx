@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext } from 'react'
 import { UserRole } from './roles'
+import type { Cohort } from './cohorts'
 
 export interface CurrentUser {
   id: string
@@ -12,6 +13,30 @@ export interface CurrentUser {
   schoolTeamId?: string
   profileImageUrl?: string
   bio?: string
+  /**
+   * High-level cohort label (A / B / C). Used purely for access gating
+   * on phases, items, and library resources. Not surfaced to fellows in
+   * the UI, only consumed by server-side filtering.
+   */
+  cohort?: Cohort | null
+  /**
+   * Set when an admin is using "Preview as fellow" to view the platform
+   * from a fellow's perspective. The rest of the app receives a fellow-
+   * shaped `CurrentUser` and runs its normal cohort gating, but the
+   * presence of this field tells the UI to (a) keep showing a return-
+   * to-admin banner, and (b) suppress destructive write actions from
+   * the impersonated session.
+   */
+  preview?: PreviewMeta
+}
+
+export interface PreviewMeta {
+  mode: 'by_fellow' | 'by_cohort'
+  /** Display name of the previewed fellow or cohort (e.g. "Ada Lovelace" or "Cohort A"). */
+  label: string
+  /** ID of the actual admin running the preview, used by the banner. */
+  actualAdminId: string
+  actualAdminName: string
 }
 
 interface UserContextType {

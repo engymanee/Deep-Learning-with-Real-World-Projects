@@ -1,0 +1,154 @@
+/**
+ * Per-phase progress meters for the dashboard.
+ *
+ * Pure server component - takes already-loaded `PhaseProgress` rows
+ * and renders one card per phase showing the current user's meter
+ * plus a list of cohort teammates with their meters. No data
+ * fetching here; that's `lib/team-progress.ts`.
+ */
+
+import { Card, CardContent } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import type { PhaseProgress, TeammateProgress } from '@/lib/team-progress'
+
+interface PhaseProgressSectionProps {
+  phases: readonly PhaseProgress[]
+  /** Display name used for "You" row labelling. */
+  meName: string
+  /** Total cohort teammates count for empty-state copy. */
+  teammateCount: number
+}
+
+export function PhaseProgressSection({
+  phases,
+  meName,
+  teammateCount,
+}: PhaseProgressSectionProps) {
+  if (phases.length === 0) return null
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="font-serif text-2xl text-primary">Your progress</h2>
+        {teammateCount > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Tracking alongside {teammateCount}{' '}
+            {teammateCount === 1 ? 'teammate' : 'teammates'} in your cohort
+          </p>
+        )}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {phases.map((phase) => (
+          <PhaseCard key={phase.id} phase={phase} meName={meName} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function PhaseCard({
+  phase,
+  meName,
+}: {
+  phase: PhaseProgress
+  meName: string
+}) {
+  const hasItems = phase.itemCount > 0
+
+  return (
+    <Card className="border-border bg-card">
+      <CardContent className="space-y-5 p-6">
+        <header className="space-y-1">
+          <h3 className="font-serif text-lg leading-tight text-primary">
+            {phase.title}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {hasItems
+              ? `${phase.itemCount} ${phase.itemCount === 1 ? 'item' : 'items'}`
+              : 'No content yet'}
+          </p>
+        </header>
+
+        {/* My meter - the headline number for this card. */}
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-medium text-foreground">You</p>
+            <p className="text-sm tabular-nums text-foreground">
+              {phase.me.percent}%
+            </p>
+          </div>
+          <Progress value={phase.me.percent} className="h-2" />
+          {hasItems && (
+            <p className="text-xs text-muted-foreground">
+              {phase.me.completed} of {phase.itemCount} complete
+            </p>
+          )}
+        </div>
+
+        {/* Teammates list. Hidden when the user is solo. */}
+        {phase.teammates.length > 0 && (
+          <div className="space-y-3 border-t border-border pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Your team
+            </p>
+            <ul className="space-y-3">
+              {phase.teammates.map((tm) => (
+                <TeammateRow
+                  key={tm.id}
+                  teammate={tm}
+                  totalItems={phase.itemCount}
+                />
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Solo state - friendly prompt rather than an empty hole. */}
+        {phase.teammates.length === 0 && hasItems && (
+          <p className="border-t border-border pt-4 text-xs text-muted-foreground">
+            {meName.split(' ')[0] ?? 'You'} is the only fellow in this cohort
+            so far - your team meters will appear here once others join.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function TeammateRow({
+  teammate,
+  totalItems,
+}: {
+  teammate: TeammateProgress
+  totalItems: number
+}) {
+  return (
+    <li className="flex items-center gap-3">
+      <Avatar className="size-8 shrink-0">
+        {teammate.avatarUrl && (
+          <AvatarImage src={teammate.avatarUrl} alt="" />
+        )}
+        <AvatarFallback className="bg-muted text-[11px] font-medium text-foreground">
+          {teammate.initials}
+        </AvatarFallback>
+      </Avatar>
+
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="truncate text-sm text-foreground">{teammate.name}</p>
+          <p className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            {teammate.percent}%
+          </p>
+        </div>
+        <Progress value={teammate.percent} className="h-1" />
+        {totalItems > 0 && (
+          <p className="text-[11px] text-muted-foreground">
+            {teammate.completed} of {totalItems}
+          </p>
+        )}
+      </div>
+    </li>
+  )
+}

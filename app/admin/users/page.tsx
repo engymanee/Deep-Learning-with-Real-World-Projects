@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { InviteUserDialog } from './invite-user-dialog'
 import { UserRow } from './user-row'
 import { ROLE_LABELS, type Role } from '@/lib/roles'
+import { isCohort, type Cohort } from '@/lib/cohorts'
 
 type CohortSummary = { id: string; name: string }
 
@@ -13,6 +14,7 @@ type UserRowData = {
   email: string | null
   title: string | null
   role: Role
+  cohort: Cohort | null
   deactivated_at: string | null
   cohort_id: string | null
   cohort_name: string | null
@@ -36,7 +38,7 @@ export default async function AdminUsersPage() {
     .from('profiles')
     .select(
       `
-        id, full_name, email, title, role, deactivated_at,
+        id, full_name, email, title, role, cohort, deactivated_at,
         cohort_members ( cohort_id, cohorts ( id, name ) )
       `,
     )
@@ -56,6 +58,7 @@ export default async function AdminUsersPage() {
       email: p.email,
       title: p.title,
       role: p.role as Role,
+      cohort: isCohort(p.cohort) ? p.cohort : null,
       deactivated_at: p.deactivated_at,
       cohort_id: cohort?.id ?? null,
       cohort_name: cohort?.name ?? null,
@@ -73,7 +76,7 @@ export default async function AdminUsersPage() {
         <div>
           <h2 className="text-xl font-serif text-foreground">Users</h2>
           <p className="text-sm text-muted-foreground">
-            {users.length} total · Invite new people, adjust roles, and assign cohorts.
+            {users.length} total · Invite new people, adjust roles, and assign cohorts to fellows.
           </p>
         </div>
         <InviteUserDialog cohorts={cohortList} />
@@ -82,9 +85,10 @@ export default async function AdminUsersPage() {
       <Card>
         <CardContent className="p-0">
           <div className="hidden grid-cols-12 gap-4 border-b border-border px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground md:grid">
-            <div className="col-span-4">Name</div>
+            <div className="col-span-3">Name</div>
             <div className="col-span-2">Role</div>
-            <div className="col-span-3">Cohort</div>
+            <div className="col-span-3">School Team</div>
+            <div className="col-span-1">Cohort</div>
             <div className="col-span-2">Status</div>
             <div className="col-span-1 text-right">Actions</div>
           </div>

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { FileText, Video, Link as LinkIcon, Copy } from 'lucide-react'
+import { TopBar } from '@/components/top-bar'
 
 interface Resource {
   id: string
@@ -115,6 +116,7 @@ export default function ResourcesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+      <TopBar />
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="mb-8">
           <Link href="/">

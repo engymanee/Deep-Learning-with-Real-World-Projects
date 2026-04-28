@@ -2,104 +2,67 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import {
-  ChevronDown,
-  ChevronRight,
-  Lock,
-  Check,
-  ShieldCheck,
-} from 'lucide-react'
+import { Layers, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { stripYearPrefix } from '@/lib/year-labels'
+import {
+  canFellowSeeContent,
+  canFellowSeePhase,
+  type ContentCategory,
+} from '@/lib/curriculum'
+import { isCohort, type Cohort } from '@/lib/cohorts'
 
-interface YearRow {
+interface PhaseRow {
   id: string
   title: string
   order_index: number
+  cohorts: string[] | null
 }
 
-interface LabRow {
+interface ModuleRow {
   id: string
-  title: string
+  phase_id: string
+  cohorts: string[] | null
+}
+
+interface ContentRow {
+  id: string
   year_id: string
-  order_index: number
+  module_id: string | null
+  category: ContentCategory | null
+  cohorts: string[] | null
 }
 
-interface LabProgressRow {
-  lab_id: string
-  completed_at: string | null
-}
-
-interface YearProgressRow {
-  year_id: string
-  status: 'locked' | 'in_progress' | 'complete'
-}
-
-type LabStatus = 'complete' | 'in_progress' | 'not_started'
 type Role = 'fellow' | 'facilitator' | 'admin' | null
-
-function CompletionDot({ status }: { status: LabStatus }) {
-  switch (status) {
-    case 'complete':
-      return (
-        <span
-          className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground"
-          aria-label="Completed"
-        >
-          <Check className="h-2.5 w-2.5" aria-hidden="true" />
-        </span>
-      )
-    case 'in_progress':
-      return (
-        <span
-          className="h-2 w-2 rounded-full bg-gradient-to-r from-primary to-transparent"
-          aria-label="In progress"
-        />
-      )
-    case 'not_started':
-    default:
-      return (
-        <span
-          className="h-2 w-2 rounded-full border border-primary"
-          aria-label="Not started"
-        />
-      )
-  }
-}
 
 interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
+  /** Currently-active phase id (highlighted in nav). */
   currentYearId?: string
+  /** Currently-active content item id (drives content-count badge style). */
   currentLabId?: string
 }
 
 /**
- * Dashboard / lab curriculum sidebar.
+ * Curriculum sidebar.
  *
- * Display only - no admin editing lives here. Fellows see a lock icon on
- * years that haven't been unlocked yet; admins and facilitators see every
- * year as open. All curriculum editing (rename, create new labels, reorder,
- * etc.) happens on /admin/curriculum.
+ * Displays every phase the viewer is allowed to see. Fellows are filtered
+ * by their cohort; admins and facilitators always see the full curriculum.
+ * Per the simplified phase -> content-item model there is no nested tree
+ * inside the sidebar - clicking a phase navigates to its detail page,
+ * which is where category-grouped content lives.
  */
 export function Sidebar({
   isOpen = true,
   onClose,
   currentYearId,
-  currentLabId,
+  currentLabId: _currentLabId,
 }: SidebarProps) {
-  const [years, setYears] = useState<YearRow[]>([])
-  const [labs, setLabs] = useState<LabRow[]>([])
-  const [completed, setCompleted] = useState<Set<string>>(new Set())
-  const [unlockedYears, setUnlockedYears] = useState<Set<string>>(new Set())
+  const [phases, setPhases] = useState<PhaseRow[]>([])
+  const [counts, setCounts] = useState<Map<string, number>>(new Map())
   const [role, setRole] = useState<Role>(null)
-  const [expandedYear, setExpandedYear] = useState<string | null>(currentYearId ?? null)
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (currentYearId) setExpandedYear(currentYearId)
-  }, [currentYearId])
 
   useEffect(() => {
     let cancelled = false
@@ -110,74 +73,85 @@ export function Sidebar({
         data: { user },
       } = await supabase.auth.getUser()
 
-      const [{ data: yearsData }, { data: labsData }] = await Promise.all([
+      const [
+        { data: phaseRows },
+        { data: moduleRows },
+        { data: contentRows },
+      ] = await Promise.all([
         supabase
           .from('years')
-          .select('id, title, order_index')
+          .select('id, title, order_index, cohorts')
           .order('order_index', { ascending: true }),
         supabase
+          .from('modules')
+          .select('id, phase_id, cohorts'),
+        supabase
           .from('labs')
-          .select('id, title, year_id, order_index')
-          .order('order_index', { ascending: true }),
+          .select('id, year_id, module_id, category, cohorts'),
       ])
 
       let currentRole: Role = null
-      let yearProgress: YearProgressRow[] = []
-      let labProgress: LabProgressRow[] = []
+      let userCohort: Cohort | null = null
 
       if (user) {
-        const [{ data: profileRow }, { data: yp }, { data: lp }] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .maybeSingle<{ role: Role }>(),
-          supabase
-            .from('user_year_progress')
-            .select('year_id, status')
-            .eq('profile_id', user.id),
-          supabase
-            .from('user_lab_progress')
-            .select('lab_id, completed_at')
-            .eq('profile_id', user.id),
-        ])
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('role, cohort')
+          .eq('id', user.id)
+          .maybeSingle<{ role: Role; cohort: string | null }>()
         currentRole = profileRow?.role ?? null
-        yearProgress = (yp ?? []) as YearProgressRow[]
-        labProgress = (lp ?? []) as LabProgressRow[]
+        userCohort = isCohort(profileRow?.cohort) ? profileRow!.cohort : null
       }
 
       if (cancelled) return
 
-      const allYears = yearsData ?? []
-      setYears(allYears)
-      setLabs(labsData ?? [])
-      setRole(currentRole)
-      setCompleted(
-        new Set(
-          labProgress.filter((p) => p.completed_at != null).map((p) => p.lab_id),
-        ),
+      const isFellowRole = currentRole === 'fellow'
+
+      // Filter phases by cohort access for fellows; everyone else sees all.
+      const visiblePhases = (phaseRows ?? []).filter((p) =>
+        !isFellowRole
+          ? true
+          : canFellowSeePhase(p.cohorts as string[] | null, userCohort),
       )
+      const visiblePhaseIds = new Set(visiblePhases.map((p) => p.id))
 
-      // Admins / facilitators get everything unlocked. Fellows unlock the
-      // first year automatically, and each subsequent year only once the
-      // preceding one is marked complete (or they already have a
-      // non-locked row for it).
-      const unlocked = new Set<string>()
-      if (currentRole === 'admin' || currentRole === 'facilitator') {
-        allYears.forEach((y) => unlocked.add(y.id))
-      } else {
-        const progressByYear = new Map(yearProgress.map((p) => [p.year_id, p.status]))
-        let previousComplete = true
-        for (const y of allYears) {
-          const status = progressByYear.get(y.id)
-          const isUnlocked =
-            previousComplete || status === 'in_progress' || status === 'complete'
-          if (isUnlocked) unlocked.add(y.id)
-          previousComplete = status === 'complete'
-        }
+      // Tally per-phase content count using the full Phase -> Module
+      // -> Content cascade. We delegate the visibility rule to the
+      // shared helper so it stays in sync with server-side filtering.
+      const phaseCohortById = new Map<string, string[] | null>()
+      for (const p of phaseRows ?? []) {
+        phaseCohortById.set(p.id, (p.cohorts as string[] | null) ?? null)
       }
-      setUnlockedYears(unlocked)
+      const moduleCohortById = new Map<string, string[] | null>()
+      for (const m of (moduleRows ?? []) as ModuleRow[]) {
+        moduleCohortById.set(m.id, m.cohorts)
+      }
 
+      const tally = new Map<string, number>()
+      for (const item of (contentRows ?? []) as ContentRow[]) {
+        if (!visiblePhaseIds.has(item.year_id)) continue
+        if (!item.category) continue
+        if (!item.module_id) continue
+        if (isFellowRole) {
+          const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
+          const moduleCohorts = moduleCohortById.get(item.module_id) ?? null
+          if (
+            !canFellowSeeContent(
+              item.cohorts,
+              phaseCohorts,
+              userCohort,
+              moduleCohorts,
+            )
+          ) {
+            continue
+          }
+        }
+        tally.set(item.year_id, (tally.get(item.year_id) ?? 0) + 1)
+      }
+
+      setPhases(visiblePhases)
+      setCounts(tally)
+      setRole(currentRole)
       setLoading(false)
     }
 
@@ -186,10 +160,6 @@ export function Sidebar({
       cancelled = true
     }
   }, [])
-
-  const toggleYear = (yearId: string) => {
-    setExpandedYear(expandedYear === yearId ? null : yearId)
-  }
 
   const isAdmin = role === 'admin'
 
@@ -204,7 +174,7 @@ export function Sidebar({
       <div className="space-y-2 p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-text">
-            Program curriculum
+            Curriculum
           </h3>
           {isAdmin && (
             <span
@@ -219,86 +189,62 @@ export function Sidebar({
 
         {loading && (
           <div className="space-y-2" aria-hidden="true">
-            <div className="h-8 animate-pulse rounded bg-bg-muted" />
-            <div className="h-8 animate-pulse rounded bg-bg-muted" />
-            <div className="h-8 animate-pulse rounded bg-bg-muted" />
+            <div className="h-9 animate-pulse rounded bg-bg-muted" />
+            <div className="h-9 animate-pulse rounded bg-bg-muted" />
+            <div className="h-9 animate-pulse rounded bg-bg-muted" />
+          </div>
+        )}
+
+        {!loading && phases.length === 0 && (
+          <div className="rounded-md border border-dashed border-border p-4 text-center">
+            <Layers
+              className="mx-auto mb-2 h-5 w-5 text-text-muted"
+              aria-hidden="true"
+            />
+            <p className="text-xs text-text-muted">
+              {isAdmin
+                ? 'No phases yet. Create one in Manage curriculum.'
+                : "No curriculum has been assigned to your cohort yet."}
+            </p>
           </div>
         )}
 
         {!loading &&
-          years.map((year) => {
-            const yearLabs = labs.filter((l) => l.year_id === year.id)
-            const isExpanded = expandedYear === year.id
-            const isUnlocked = unlockedYears.has(year.id)
-            const isLocked = !isUnlocked
-            const displayTitle = stripYearPrefix(year.title) || year.title
-
+          phases.map((phase, idx) => {
+            const isCurrent = currentYearId === phase.id
+            const count = counts.get(phase.id) ?? 0
             return (
-              <div key={year.id} className="mb-3">
-                <button
-                  type="button"
-                  onClick={() => !isLocked && toggleYear(year.id)}
-                  disabled={isLocked}
-                  aria-expanded={isExpanded}
-                  className={cn(
-                    'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-semibold transition-colors',
-                    isExpanded && !isLocked
-                      ? 'bg-bg-muted text-primary'
-                      : 'text-text hover:bg-border',
-                    isLocked && 'cursor-not-allowed opacity-60',
-                  )}
-                >
-                  <span className="truncate pr-2 text-left">{displayTitle}</span>
-                  {isLocked ? (
-                    <Lock className="h-4 w-4 text-text-muted" aria-hidden="true" />
-                  ) : isExpanded ? (
-                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  )}
-                </button>
-
-                {isExpanded && !isLocked && (
-                  <div className="ml-2 mt-1 space-y-0.5 border-l border-border pl-2">
-                    {yearLabs.map((lab) => {
-                      const isCurrent = currentLabId === lab.id
-                      const status: LabStatus = completed.has(lab.id)
-                        ? 'complete'
-                        : isCurrent
-                        ? 'in_progress'
-                        : 'not_started'
-
-                      return (
-                        <Link
-                          key={lab.id}
-                          href={`/labs/${lab.id}`}
-                          onClick={onClose}
-                          aria-current={isCurrent ? 'page' : undefined}
-                          className={cn(
-                            'flex items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors',
-                            isCurrent
-                              ? 'border-l-2 border-primary bg-white font-medium text-text'
-                              : 'text-text hover:bg-border/30',
-                          )}
-                        >
-                          <CompletionDot status={status} />
-                          <span className="truncate leading-relaxed">{lab.title}</span>
-                        </Link>
-                      )
-                    })}
-                    {yearLabs.length === 0 && (
-                      <p className="px-2 py-1 text-xs text-text-muted">
-                        No labs published yet.
-                      </p>
-                    )}
-                  </div>
+              <Link
+                key={phase.id}
+                // Phases no longer have a dedicated page - the dashboard's
+                // collapsible curriculum tree owns browsing. Hash-link to
+                // the right phase block; the tree opens it on hashchange.
+                href={`/dashboard#phase-${phase.id}`}
+                onClick={onClose}
+                aria-current={isCurrent ? 'page' : undefined}
+                className={cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                  isCurrent
+                    ? 'border-l-2 border-primary bg-white pl-2.5 font-medium text-primary'
+                    : 'text-text hover:bg-border/40',
                 )}
-              </div>
+              >
+                <span
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary"
+                  aria-hidden="true"
+                >
+                  {idx + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{phase.title}</span>
+                <span className="shrink-0 text-[11px] text-text-muted">
+                  {count}
+                </span>
+              </Link>
             )
           })}
 
         {!loading && isAdmin && (
-          <div className="pt-2">
+          <div className="pt-3">
             <Link
               href="/admin/curriculum"
               className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-accent hover:bg-accent/5 hover:text-accent"
