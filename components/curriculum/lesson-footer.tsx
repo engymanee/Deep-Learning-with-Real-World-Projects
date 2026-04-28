@@ -90,12 +90,14 @@ export function LessonFooter({
     })
   }
 
-  // Terminal state: completed and nothing to continue to.
+  // Terminal state: already completed AND nothing to continue to.
+  // Render a quiet, non-interactive pill in muted tones - no green
+  // anywhere in the system.
   if (optimistic && !nextHref) {
     return (
       <div className="flex flex-col gap-3 border-t border-border pt-6">
         <div className="flex justify-end">
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1.5 text-sm font-medium text-success">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1.5 text-sm font-medium text-muted-foreground">
             <Check className="h-4 w-4" aria-hidden="true" />
             Completed
           </span>
@@ -105,7 +107,7 @@ export function LessonFooter({
   }
 
   const label = optimistic
-    ? 'Continue'
+    ? 'Mark as complete and continue'
     : nextHref
       ? 'Mark as complete and continue'
       : 'Mark as complete'
@@ -125,8 +127,13 @@ export function LessonFooter({
       )}
 
       <div className="flex justify-end">
+        {/* Soft (secondary) variant so the CTA reads as inviting in
+            both states and stays clickable after the item is already
+            complete - clicking it then just navigates to the next
+            item without a redundant server toggle. */}
         <Button
           type="button"
+          variant="secondary"
           onClick={handleClick}
           disabled={pending || blocked}
           className="inline-flex items-center gap-1.5"

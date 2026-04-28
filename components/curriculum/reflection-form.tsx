@@ -96,7 +96,7 @@ export function ReflectionForm({
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
               Reflection submitted
             </span>
@@ -130,9 +130,11 @@ export function ReflectionForm({
           {/* Counter + helper text. Switches to a quiet success
               tone once the fellow has cleared the bar. */}
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            {/* Counter switches from muted to foreground (no green
+                anywhere) once the word minimum is cleared. */}
             <span
               className={
-                meetsMinimum ? 'text-success' : 'text-muted-foreground'
+                meetsMinimum ? 'text-foreground' : 'text-muted-foreground'
               }
               aria-live="polite"
             >
