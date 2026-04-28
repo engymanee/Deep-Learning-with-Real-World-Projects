@@ -44,8 +44,12 @@ function LoginForm() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.push(next.startsWith('/') ? next : '/dashboard')
-      router.refresh()
+      // `router.replace` (instead of `push`) keeps /auth/login out of
+      // browser history. We intentionally skip a follow-up
+      // `router.refresh()` because the navigation itself triggers a
+      // fresh server render of the destination - calling refresh on top
+      // double-renders and adds noticeable click-to-content latency.
+      router.replace(next.startsWith('/') ? next : '/dashboard')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to sign in')
     } finally {
