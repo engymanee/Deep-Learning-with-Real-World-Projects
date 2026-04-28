@@ -5,8 +5,6 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 import { COHORTS } from '@/lib/cohorts'
 import {
-  CONTENT_CATEGORY_VALUES,
-  RESOURCE_TYPE_VALUES,
   isContentCategory,
   isResourceType,
   type ContentCategory,
@@ -364,6 +362,3 @@ export async function reorderContent(
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
 }
-
-// Re-export so callers don't need a separate import.
-export { CONTENT_CATEGORY_VALUES, RESOURCE_TYPE_VALUES }
