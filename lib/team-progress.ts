@@ -3,15 +3,16 @@ import { requireUser } from '@/lib/auth-server'
 import { loadFullCurriculum } from '@/lib/curriculum-tree'
 
 /**
- * Per-phase progress for the current user + each of their cohort
- * teammates. Powers the dashboard's "your progress / your team's
- * progress" meters.
+ * Per-phase progress for the current user + each of their school
+ * team teammates. Powers the dashboard's "your progress / your
+ * team's progress" meters.
  *
- * "Teammate" === another fellow in the same cohort (the legacy
- * `profiles.cohort` text field, which is the same field that drives
- * content visibility). RLS policy 027 lets cohort peers read each
- * other's completion rows so this loader runs as the signed-in user
- * - no service-role escape hatch needed.
+ * "Teammate" === another fellow on at least one of the current
+ * user's school leadership teams (`public.cohort_members`).
+ * Migration 049 ("School team peers read completions") lets two
+ * fellows read each other's completion rows iff they share at
+ * least one cohort_members row, so this loader runs entirely as
+ * the signed-in user - no service-role escape hatch needed.
  */
 
 export interface TeammateProgress {
@@ -82,28 +83,54 @@ export async function loadTeamProgress(): Promise<TeamProgressData> {
     itemCountByPhase.set(phase.id, count)
   }
 
-  // No cohort = no teammates. Still return per-phase progress for
-  // the current user so the meters render.
-  const cohort = user.cohort ?? null
+  // 1) Look up every school leadership team the current user
+  //    belongs to. No memberships -> no teammates, but we still
+  //    return per-phase progress so the user's own meters render.
+  const { data: myTeamRows } = await supabase
+    .from('cohort_members')
+    .select('cohort_id')
+    .eq('profile_id', user.id)
+    .returns<Array<{ cohort_id: string }>>()
 
+  const myTeamIds = (myTeamRows ?? []).map((r) => r.cohort_id)
+
+  // 2) Find every other fellow who shares at least one of those
+  //    teams. We dedupe across teams so a fellow on two of the
+  //    user's teams only appears once.
   let teammates: Array<{
     id: string
     full_name: string | null
     avatar_url: string | null
   }> = []
-  if (cohort) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .eq('cohort', cohort)
-      .eq('role', 'fellow')
-      .is('deactivated_at', null)
-      .neq('id', user.id)
-      .order('full_name', { ascending: true })
-      .returns<
-        Array<{ id: string; full_name: string | null; avatar_url: string | null }>
-      >()
-    teammates = data ?? []
+  if (myTeamIds.length > 0) {
+    const { data: peerRows } = await supabase
+      .from('cohort_members')
+      .select('profile_id')
+      .in('cohort_id', myTeamIds)
+      .neq('profile_id', user.id)
+      .returns<Array<{ profile_id: string }>>()
+
+    const peerIds = Array.from(
+      new Set((peerRows ?? []).map((r) => r.profile_id)),
+    )
+
+    if (peerIds.length > 0) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', peerIds)
+        .eq('role', 'fellow')
+        .is('deactivated_at', null)
+        .order('full_name', { ascending: true })
+        .returns<
+          Array<{
+            id: string
+            full_name: string | null
+            avatar_url: string | null
+          }>
+        >()
+      teammates = data ?? []
+    }
   }
 
   // Pull every completion row visible under RLS for { me + teammates },
