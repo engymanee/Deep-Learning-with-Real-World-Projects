@@ -4,7 +4,11 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ImagePlus, Plus, Upload, X } from 'lucide-react'
-import { addLibraryResource } from '@/app/resources/actions'
+import {
+  addLibraryResource,
+  updateLibraryResource,
+} from '@/app/resources/actions'
+import type { LibraryResource } from '@/components/library/library-view'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -58,42 +62,103 @@ const MAX_COVER_BYTES = 5 * 1024 * 1024
 const COVER_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
 
 /**
- * Admin / facilitator-only entry point for publishing a new Library
- * resource. Lives next to the Library header so curation happens in
- * place - no context switch to /admin.
+ * Admin / facilitator-only entry point for creating OR editing a
+ * Library resource.
  *
- * Visibility model mirrors the spec:
- *  - "Further Reading" -> isUniversal=true, lands on the universal
- *    tab and is visible to everyone.
- *  - "Cohort-gated"    -> isUniversal=false, plus an A/B/C multi-
- *    select. Cumulative access (a fellow in B sees A + B) is applied
- *    by the page based on the selected cohorts.
+ * Two operating modes - both share the same form so the editor and
+ * the publisher feel identical:
+ *
+ *   1. Add mode (default):  no `initial`, internal trigger button
+ *      labelled "Add resource". Calls `addLibraryResource`.
+ *   2. Edit mode:           pass `initial` (a LibraryResource).
+ *      Caller usually drives `open`/`onOpenChange` themselves and
+ *      sets `hideTrigger` so the dialog doesn't render its own
+ *      button. Calls `updateLibraryResource(initial.id, ...)`.
+ *
+ * Visibility model:
+ *  - "Recommended Reading" -> isUniversal=true (everyone).
+ *  - "Cohort-gated"        -> isUniversal=false + A/B/C multi-select.
  */
-export function AddResourceDialog() {
+export interface ResourceDialogProps {
+  /**
+   * Existing row to edit. When provided the form pre-fills, the
+   * dialog title flips to "Edit resource", and Save calls update
+   * instead of insert.
+   */
+  initial?: LibraryResource
+  /**
+   * Controlled open state. Pass alongside `onOpenChange` when the
+   * caller drives the dialog (e.g. from a row's edit button).
+   */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /**
+   * Suppress the built-in "Add resource" trigger so the caller can
+   * supply its own. Required when running in controlled mode.
+   */
+  hideTrigger?: boolean
+}
+
+export function AddResourceDialog({
+  initial,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+}: ResourceDialogProps = {}) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const isEdit = !!initial
+  const [internalOpen, setInternalOpen] = useState(false)
+  // Controlled / uncontrolled adapter. When the caller passes
+  // `open`, we treat them as the source of truth and forward writes
+  // through `onOpenChange`; otherwise we fall back to internal state
+  // so the standalone "Add resource" trigger keeps working unchanged.
+  const open = controlledOpen ?? internalOpen
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next)
+    else setInternalOpen(next)
+  }
   const [pending, startTransition] = useTransition()
 
   // One state object per field, plus a tags array we manage manually
   // because shadcn doesn't ship a tag input. Keeping each piece
-  // separate lets us validate inline without a form library.
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [url, setUrl] = useState('')
-  const [resourceType, setResourceType] = useState<ResourceType>('document')
-  const [visibility, setVisibility] = useState<Visibility>('cohort')
+  // separate lets us validate inline without a form library. In
+  // edit mode we seed everything from `initial` so the dialog opens
+  // already showing the saved values.
+  const [title, setTitle] = useState(initial?.title ?? '')
+  const [description, setDescription] = useState(initial?.description ?? '')
+  const [url, setUrl] = useState(initial?.url ?? '')
+  const [resourceType, setResourceType] = useState<ResourceType>(
+    (initial?.resourceType as ResourceType) ?? 'document',
+  )
+  const [visibility, setVisibility] = useState<Visibility>(
+    initial?.isUniversal ? 'universal' : 'cohort',
+  )
   // Default to the earliest cohort so the form has a valid state on
-  // open without forcing a click. Most newly-published material is
-  // released for the current cohort first anyway.
-  const [cohorts, setCohorts] = useState<Cohort[]>([COHORTS[0]])
-  const [tags, setTags] = useState<string[]>([])
+  // open without forcing a click. In edit mode, fall back to A so
+  // we never show the picker empty if the row had no cohorts.
+  const [cohorts, setCohorts] = useState<Cohort[]>(() => {
+    if (initial && !initial.isUniversal) {
+      const valid = (initial.cohorts ?? []).filter((c): c is Cohort =>
+        (COHORTS as readonly string[]).includes(c),
+      )
+      return valid.length > 0 ? valid : [COHORTS[0]]
+    }
+    return [COHORTS[0]]
+  })
+  const [tags, setTags] = useState<string[]>(initial?.tags ?? [])
   const [tagDraft, setTagDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
-  // Cover image: keep the actual File for upload + a transient
-  // object URL for the preview. The object URL has to be revoked on
-  // unmount / replacement so we don't leak memory.
+  // Cover image state has three values it needs to model:
+  //   - existing remote URL on the row (`existingCoverUrl`),
+  //   - new file the admin just picked (`coverFile`),
+  //   - explicit "remove the existing cover" intent (`coverCleared`).
+  // The submit logic combines these into the right server payload.
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [existingCoverUrl, setExistingCoverUrl] = useState<string | null>(
+    initial?.coverUrl ?? null,
+  )
+  const [coverCleared, setCoverCleared] = useState(false)
   const coverInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -107,16 +172,35 @@ export function AddResourceDialog() {
   }, [coverFile])
 
   function reset() {
-    setTitle('')
-    setDescription('')
-    setUrl('')
-    setResourceType('document')
-    setVisibility('cohort')
-    setCohorts([COHORTS[0]])
-    setTags([])
+    // In edit mode, "reset" means "back to whatever was on the row
+    // when the dialog opened" - not "blank". In add mode it's a
+    // true blank slate.
+    if (initial) {
+      setTitle(initial.title)
+      setDescription(initial.description ?? '')
+      setUrl(initial.url)
+      setResourceType(initial.resourceType as ResourceType)
+      setVisibility(initial.isUniversal ? 'universal' : 'cohort')
+      const valid = (initial.cohorts ?? []).filter((c): c is Cohort =>
+        (COHORTS as readonly string[]).includes(c),
+      )
+      setCohorts(valid.length > 0 ? valid : [COHORTS[0]])
+      setTags(initial.tags ?? [])
+      setExistingCoverUrl(initial.coverUrl ?? null)
+    } else {
+      setTitle('')
+      setDescription('')
+      setUrl('')
+      setResourceType('document')
+      setVisibility('cohort')
+      setCohorts([COHORTS[0]])
+      setTags([])
+      setExistingCoverUrl(null)
+    }
     setTagDraft('')
     setError(null)
     setCoverFile(null)
+    setCoverCleared(false)
     if (coverInputRef.current) coverInputRef.current.value = ''
   }
 
@@ -140,11 +224,22 @@ export function AddResourceDialog() {
     }
     setError(null)
     setCoverFile(file)
+    // Picking a new file implicitly takes us out of "cleared" state
+    // - the new file IS the cover now.
+    setCoverCleared(false)
   }
 
   function clearCover() {
     setCoverFile(null)
     if (coverInputRef.current) coverInputRef.current.value = ''
+    // In edit mode, the user clearing the picker should also drop
+    // the saved cover URL on submit. We don't mutate the row until
+    // they hit Save, but we mark intent and visually drop the
+    // preview so the UI matches what'll happen.
+    if (existingCoverUrl) {
+      setExistingCoverUrl(null)
+      setCoverCleared(true)
+    }
   }
 
   function commitTagDraft() {
@@ -208,7 +303,7 @@ export function AddResourceDialog() {
         : tags
 
     startTransition(async () => {
-      const result = await addLibraryResource({
+      const payload = {
         title: title.trim(),
         description: description.trim() || null,
         url: url.trim(),
@@ -217,12 +312,24 @@ export function AddResourceDialog() {
         isUniversal: visibility === 'universal',
         cohorts: visibility === 'cohort' ? cohorts : [],
         coverFile: coverFile ?? null,
-      })
+      }
+      const result = isEdit
+        ? await updateLibraryResource(initial!.id, {
+            ...payload,
+            // Only forward the explicit "drop the cover" intent
+            // when there's no replacement file - server-side, a
+            // new upload already supersedes the old one.
+            removeCover: coverCleared && !coverFile,
+          })
+        : await addLibraryResource(payload)
       if (!result.ok) {
         setError(result.message)
         return
       }
-      reset()
+      // Add mode: blank the form so the next click is a fresh
+      // canvas. Edit mode: leave state alone - the dialog is
+      // closing and the parent owns "open".
+      if (!isEdit) reset()
       setOpen(false)
       router.refresh()
     })
@@ -236,20 +343,22 @@ export function AddResourceDialog() {
         setOpen(next)
       }}
     >
-      <DialogTrigger asChild>
-        <Button className="inline-flex items-center gap-1.5">
-          <Plus className="h-4 w-4" />
-          Add resource
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button className="inline-flex items-center gap-1.5">
+            <Plus className="h-4 w-4" />
+            Add resource
+          </Button>
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add to library</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit resource' : 'Add to library'}</DialogTitle>
           <DialogDescription>
-            Publish a curated resource. Choose Recommended Reading for
-            materials everyone should see, or Cohort-gated to stage releases
-            by cohort.
+            {isEdit
+              ? 'Update this resource. Changes apply immediately for everyone with access.'
+              : 'Publish a curated resource. Choose Recommended Reading for materials everyone should see, or Cohort-gated to stage releases by cohort.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -331,12 +440,22 @@ export function AddResourceDialog() {
               onChange={handleCoverPick}
               className="sr-only"
             />
-            {coverPreview ? (
+            {coverPreview || existingCoverUrl ? (
               <div className="flex items-start gap-3">
                 <div className="relative h-24 w-40 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+                  {/*
+                    Preview source priority: a freshly-picked file
+                    (object URL) wins over the saved row image. This
+                    is what gives the editor "see your change before
+                    you save" feedback.
+                  */}
                   <Image
-                    src={coverPreview}
-                    alt="Selected cover preview"
+                    src={(coverPreview ?? existingCoverUrl) as string}
+                    alt={
+                      coverPreview
+                        ? 'Selected cover preview'
+                        : 'Current cover image'
+                    }
                     fill
                     sizes="160px"
                     className="object-cover"
@@ -345,7 +464,11 @@ export function AddResourceDialog() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <p className="text-xs text-muted-foreground">
-                    {coverFile?.name}
+                    {coverFile
+                      ? coverFile.name
+                      : existingCoverUrl
+                        ? 'Current cover'
+                        : ''}
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
@@ -525,7 +648,13 @@ export function AddResourceDialog() {
               Cancel
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Publishing...' : 'Publish'}
+              {pending
+                ? isEdit
+                  ? 'Saving...'
+                  : 'Publishing...'
+                : isEdit
+                  ? 'Save changes'
+                  : 'Publish'}
             </Button>
           </DialogFooter>
         </form>

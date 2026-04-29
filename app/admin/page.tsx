@@ -412,10 +412,16 @@ export default async function AdminHomePage() {
             description="Author phases, items, and content blocks. Assign each to one or more cohorts."
           />
           <ActionCard
-            href="/admin/community"
+            href="/admin/library"
             icon={<Library className="h-5 w-5" />}
-            title="Library & community"
-            description="Curate resources, events, and posts. Gate by cohort as needed."
+            title="Library"
+            description="Add, edit, and remove curated resources. Gate by cohort or publish as Recommended Reading."
+          />
+          <ActionCard
+            href="/admin/community"
+            icon={<MessagesSquare className="h-5 w-5" />}
+            title="Community"
+            description="Moderate posts and events surfaced in the fellow community feed."
           />
           <ActionCard
             href="/admin/announcements"

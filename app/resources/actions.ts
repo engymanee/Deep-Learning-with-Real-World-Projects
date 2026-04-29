@@ -225,6 +225,298 @@ export async function addLibraryResource(
     }
 
     revalidatePath('/resources')
+    revalidatePath('/admin/library')
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Internal helper: derive the storage object path that belongs to a
+ * cover-image public URL so we can clean it up on replace / delete.
+ *
+ * Public URLs from Supabase Storage end in
+ * `.../object/public/resource-covers/<userId>/<filename>` -
+ * everything after `/resource-covers/` is the bucket-relative key.
+ * Returns null when the URL doesn't look like one of ours so callers
+ * never accidentally delete an unrelated object.
+ */
+function coverPathFromUrl(url: string | null): string | null {
+  if (!url) return null
+  const marker = '/resource-covers/'
+  const i = url.indexOf(marker)
+  if (i === -1) return null
+  const path = url.slice(i + marker.length).split('?')[0]
+  return path.length > 0 ? path : null
+}
+
+/**
+ * Edit an existing Library resource. Admin / facilitator only.
+ *
+ * Mirrors `addLibraryResource` for validation + visibility rules and
+ * adds a small cover-image state machine so the editor can:
+ *   - keep the existing cover (no file picked, removeCover=false),
+ *   - replace it with a new upload (file picked) - the previous blob
+ *     is deleted on success,
+ *   - clear it back to no cover (removeCover=true) - the previous
+ *     blob is deleted, `cover_url` becomes NULL.
+ *
+ * The DB row is loaded once up front so we know the prior cover path
+ * (for cleanup) and so the action stays a single round trip on the
+ * happy path even when the cover hasn't changed.
+ */
+export async function updateLibraryResource(
+  id: string,
+  input: {
+    title: string
+    description?: string | null
+    url: string
+    resourceType: string
+    tags?: string[]
+    isUniversal?: boolean
+    cohorts?: string[]
+    coverFile?: File | null
+    /** If true, drop the existing cover image (overrides coverFile). */
+    removeCover?: boolean
+  },
+): Promise<LibraryActionResult> {
+  try {
+    const user = await requireUser()
+    if (user.role !== 'admin' && user.role !== 'facilitator') {
+      return { ok: false, message: 'You do not have permission to edit resources.' }
+    }
+    if (!id || typeof id !== 'string') {
+      return { ok: false, message: 'Resource id is required.' }
+    }
+
+    const title = (input.title ?? '').trim()
+    const description = (input.description ?? '').trim() || null
+    const url = (input.url ?? '').trim()
+    const resourceType = (input.resourceType ?? '').trim()
+
+    if (!title) return { ok: false, message: 'Title is required.' }
+    if (title.length > MAX_TITLE_LEN) {
+      return { ok: false, message: `Title must be ${MAX_TITLE_LEN} characters or fewer.` }
+    }
+    if (description && description.length > MAX_DESC_LEN) {
+      return { ok: false, message: `Description must be ${MAX_DESC_LEN} characters or fewer.` }
+    }
+    if (!url) return { ok: false, message: 'URL is required.' }
+    try {
+      new URL(url)
+    } catch {
+      return { ok: false, message: 'URL must be a valid web address.' }
+    }
+    if (!VALID_TYPES.has(resourceType)) {
+      return { ok: false, message: 'Resource type is invalid.' }
+    }
+
+    const seen = new Set<string>()
+    const tags: string[] = []
+    for (const raw of input.tags ?? []) {
+      const t = (raw ?? '').trim()
+      if (!t) continue
+      if (t.length > MAX_TAG_LEN) {
+        return { ok: false, message: `Tag "${t.slice(0, 16)}..." is too long.` }
+      }
+      const key = t.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      tags.push(t)
+      if (tags.length >= MAX_TAGS) break
+    }
+
+    const isUniversal = input.isUniversal === true
+    let cohorts: string[]
+    if (isUniversal) {
+      cohorts = ['A', 'B', 'C']
+    } else {
+      const seenC = new Set<string>()
+      const cleaned: string[] = []
+      for (const raw of input.cohorts ?? []) {
+        const label = (raw ?? '').trim().toUpperCase()
+        if (!VALID_COHORTS.has(label)) continue
+        if (seenC.has(label)) continue
+        seenC.add(label)
+        cleaned.push(label)
+      }
+      if (cleaned.length === 0) {
+        return {
+          ok: false,
+          message: 'Select at least one cohort or mark this as Recommended Reading.',
+        }
+      }
+      cohorts = cleaned
+    }
+
+    const supabase = await createClient()
+
+    // Load the prior row so we know the existing cover path. We
+    // also use this read as an existence check - bail with a clean
+    // message if the row was already deleted in a parallel session.
+    const { data: prior, error: priorErr } = await supabase
+      .from('community_resources')
+      .select('id, cover_url')
+      .eq('id', id)
+      .maybeSingle<{ id: string; cover_url: string | null }>()
+    if (priorErr) return { ok: false, message: priorErr.message }
+    if (!prior) {
+      return { ok: false, message: 'This resource no longer exists.' }
+    }
+
+    // Cover-image state machine. Three paths:
+    //   1. New file uploaded -> upload, set cover_url to the new
+    //      public URL, schedule the prior blob for cleanup.
+    //   2. removeCover -> set cover_url to NULL, schedule prior
+    //      blob for cleanup.
+    //   3. Otherwise -> leave cover_url untouched.
+    let nextCoverUrl: string | null | undefined
+    let priorCoverPathToDelete: string | null = null
+
+    const cover = input.coverFile
+    if (cover && typeof cover === 'object' && cover.size > 0) {
+      if (!COVER_MIME_TYPES.has(cover.type)) {
+        return {
+          ok: false,
+          message: 'Cover image must be a PNG, JPEG, WebP, or GIF.',
+        }
+      }
+      if (cover.size > MAX_COVER_BYTES) {
+        return {
+          ok: false,
+          message: 'Cover image must be 5 MB or smaller.',
+        }
+      }
+      const ext =
+        cover.type === 'image/png'
+          ? 'png'
+          : cover.type === 'image/webp'
+            ? 'webp'
+            : cover.type === 'image/gif'
+              ? 'gif'
+              : 'jpg'
+      const path = `${user.id}/${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}.${ext}`
+      const upload = await supabase.storage
+        .from('resource-covers')
+        .upload(path, cover, {
+          contentType: cover.type,
+          cacheControl: '3600',
+          upsert: false,
+        })
+      if (upload.error) {
+        return {
+          ok: false,
+          message: `Cover upload failed: ${upload.error.message}`,
+        }
+      }
+      const { data: publicData } = supabase.storage
+        .from('resource-covers')
+        .getPublicUrl(upload.data.path)
+      nextCoverUrl = publicData.publicUrl
+      priorCoverPathToDelete = coverPathFromUrl(prior.cover_url)
+    } else if (input.removeCover === true) {
+      nextCoverUrl = null
+      priorCoverPathToDelete = coverPathFromUrl(prior.cover_url)
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      title,
+      description,
+      url,
+      resource_type: resourceType,
+      tags,
+      cohorts,
+      is_universal: isUniversal,
+    }
+    if (nextCoverUrl !== undefined) {
+      updatePayload.cover_url = nextCoverUrl
+    }
+
+    const { error } = await supabase
+      .from('community_resources')
+      .update(updatePayload)
+      .eq('id', id)
+
+    if (error) {
+      // Clean up the just-uploaded blob if the update failed - we
+      // never want orphan blobs left in the bucket.
+      if (nextCoverUrl) {
+        const newPath = coverPathFromUrl(nextCoverUrl)
+        if (newPath) {
+          await supabase.storage.from('resource-covers').remove([newPath])
+        }
+      }
+      return { ok: false, message: error.message }
+    }
+
+    // Best-effort cleanup of the prior cover. We don't surface a
+    // cleanup failure to the user - the row is already updated and
+    // a leftover blob is recoverable.
+    if (priorCoverPathToDelete) {
+      await supabase.storage.from('resource-covers').remove([priorCoverPathToDelete])
+    }
+
+    revalidatePath('/resources')
+    revalidatePath('/admin/library')
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Permanently delete a Library resource. Admin / facilitator only.
+ *
+ * Cleans up the cover blob in storage too so we don't leak files
+ * into `resource-covers`. Storage cleanup is best-effort - the row
+ * deletion is the source of truth and a leftover blob is recoverable.
+ */
+export async function deleteLibraryResource(
+  id: string,
+): Promise<LibraryActionResult> {
+  try {
+    const user = await requireUser()
+    if (user.role !== 'admin' && user.role !== 'facilitator') {
+      return { ok: false, message: 'You do not have permission to delete resources.' }
+    }
+    if (!id || typeof id !== 'string') {
+      return { ok: false, message: 'Resource id is required.' }
+    }
+
+    const supabase = await createClient()
+
+    // Read the cover URL up front so we can drop the blob after the
+    // row delete succeeds. We don't bail when this read fails - the
+    // delete is the important part.
+    const { data: prior } = await supabase
+      .from('community_resources')
+      .select('cover_url')
+      .eq('id', id)
+      .maybeSingle<{ cover_url: string | null }>()
+
+    const { error } = await supabase
+      .from('community_resources')
+      .delete()
+      .eq('id', id)
+
+    if (error) return { ok: false, message: error.message }
+
+    const path = coverPathFromUrl(prior?.cover_url ?? null)
+    if (path) {
+      await supabase.storage.from('resource-covers').remove([path])
+    }
+
+    revalidatePath('/resources')
+    revalidatePath('/admin/library')
     return { ok: true }
   } catch (e) {
     return {
