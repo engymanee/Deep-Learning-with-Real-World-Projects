@@ -584,21 +584,21 @@ function GridCard({
       rel="noreferrer"
       className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
     >
-      {/* Hero: cover image or icon fallback. The cover fills the
-          entire hero edge-to-edge with object-cover so there is no
-          letterbox/padding "border" between image and card. This
-          can lightly crop landscape og:images, but the title +
-          author byline below carry the resource identity, and the
-          dense grid reads cleanest when every tile is fully
-          inked. The 4:5 portrait ratio keeps four-up working on
-          desktop without dominating viewport height. */}
+      {/* Hero: cover image or icon fallback. We use object-contain
+          inside a generously-padded muted frame so the entire cover
+          (book jacket, landscape thumbnail, square logo, whatever)
+          is shown in full without cropping. The padding creates a
+          deliberate matte "border" around the artwork - the framed
+          look the curator preferred over edge-to-edge bleed. The
+          fixed 4:5 portrait wrapper keeps every tile aligned no
+          matter the source image's aspect. */}
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
         {resource.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={resource.coverUrl}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="absolute inset-0 h-full w-full object-contain p-4 transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"
           />
         ) : (
