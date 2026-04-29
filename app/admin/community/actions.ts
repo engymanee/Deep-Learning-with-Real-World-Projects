@@ -88,11 +88,24 @@ export async function deleteEvent(formData: FormData): Promise<ActionResult> {
 // ---------------------------------------------------------------------------
 // POSTS (blog / podcast)
 // ---------------------------------------------------------------------------
+// The four section kinds users can post into from the admin console.
+// Mirrors the public Community sidebar: announcement (What's New?),
+// reflection (Fellow Reflections), win (Wins & Progress), question
+// (Ask the Community). The DB CHECK constraint also accepts legacy
+// `post` and `story` for backwards compatibility, but new admin
+// creations always pick one of the four canonical kinds.
+const ADMIN_POST_KINDS = new Set([
+  'announcement',
+  'reflection',
+  'win',
+  'question',
+])
+
 export async function createPost(formData: FormData): Promise<ActionResult> {
   try {
     const me = await requireAdmin()
-    const kindRaw = String(formData.get('kind') ?? 'post')
-    const kind = kindRaw === 'podcast' ? 'podcast' : 'post'
+    const kindRaw = String(formData.get('kind') ?? 'announcement')
+    const kind = ADMIN_POST_KINDS.has(kindRaw) ? kindRaw : 'announcement'
     const title = String(formData.get('title') ?? '').trim()
     const excerpt = String(formData.get('excerpt') ?? '').trim() || null
     const body = String(formData.get('body') ?? '').trim() || null

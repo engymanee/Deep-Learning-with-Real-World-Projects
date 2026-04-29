@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
-import { TopBar } from '@/components/top-bar'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { initialsFor } from '@/lib/types/profile'
@@ -90,19 +89,20 @@ export default async function StoryPage({
         ? 'Video'
         : 'Story'
 
+  // The /community layout already renders the TopBar, sidebar, and
+  // outer container. This page is just the article content; the
+  // sidebar stays accessible for quick nav back to other sections.
   return (
-    <div className="min-h-screen bg-background">
-      <TopBar />
-      <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:py-10">
-        <Link
-          href="/community"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back to Community
-        </Link>
+    <div className="mx-auto w-full max-w-3xl">
+      <Link
+        href="/community"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Back to Community
+      </Link>
 
-        <article className="mt-6 flex flex-col gap-6">
+      <article className="mt-6 flex flex-col gap-6">
           {data.cover_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -169,13 +169,12 @@ export default async function StoryPage({
             </a>
           )}
 
-          {data.body && (
-            <div className="whitespace-pre-wrap text-pretty text-base leading-relaxed text-foreground">
-              {data.body}
-            </div>
-          )}
-        </article>
-      </main>
+        {data.body && (
+          <div className="whitespace-pre-wrap text-pretty text-base leading-relaxed text-foreground">
+            {data.body}
+          </div>
+        )}
+      </article>
     </div>
   )
 }
