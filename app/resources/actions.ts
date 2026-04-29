@@ -224,7 +224,9 @@ export async function addLibraryResource(
       // surface a derivation error to the admin because they have
       // already filled in the form correctly; auto-cover is a
       // courtesy, not a requirement.
+      console.log('[v0] addLibraryResource: deriving cover', { url })
       coverUrl = await deriveCoverFromUrl(url)
+      console.log('[v0] addLibraryResource: derived', { url, coverUrl })
     }
 
     const { error } = await supabase.from('community_resources').insert({
@@ -472,7 +474,9 @@ export async function updateLibraryResource(
       // last derivation already failed we'll just get null again,
       // which is harmless; if the URL has been fixed up since the
       // first save, this is where the auto-cover finally lands.
+      console.log('[v0] updateLibraryResource: deriving cover', { id, url })
       const derived = await deriveCoverFromUrl(url)
+      console.log('[v0] updateLibraryResource: derived', { id, url, derived })
       if (derived) nextCoverUrl = derived
     }
 

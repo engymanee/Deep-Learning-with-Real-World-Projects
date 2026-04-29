@@ -3,7 +3,7 @@
  *
  * When an admin doesn't upload a cover image, this module tries to
  * pull a sensible one straight off the resource URL so the card
- * doesn't fall back to a plain icon. Two strategies, in order:
+ * doesn't fall back to a plain icon. Strategies, in order:
  *
  *   1. **YouTube / youtu.be / shorts** - the canonical thumbnail
  *      URL on `img.youtube.com` is deterministic from the video id,
@@ -11,11 +11,16 @@
  *      used because it's guaranteed to exist for every public
  *      video; `maxresdefault.jpg` is sometimes a 404 placeholder.
  *
- *   2. **Generic web pages** - GET the URL, read up to 256 KB of
+ *   2. **Direct image URLs** - if the URL itself points at an
+ *      image (extension or content-type), we just use it. Lets an
+ *      admin paste a Cloudinary/CDN image URL as the resource.
+ *
+ *   3. **Generic web pages** - GET the URL, read up to 256 KB of
  *      HTML (everything we need lives in <head>), and pull the
- *      first `og:image` / `og:image:secure_url` / `twitter:image`
- *      / `twitter:image:src` value we can find. Relative URLs are
- *      resolved against the page URL.
+ *      first usable image meta tag we can find. We try, in order:
+ *      og:image, og:image:secure_url, twitter:image,
+ *      twitter:image:src, itemprop=image, link rel=image_src.
+ *      Relative URLs are resolved against the page URL.
  *
  * Anything that times out, 404s, returns non-HTML content, or has
  * no usable meta tag returns null - the caller persists NULL on
@@ -23,21 +28,32 @@
  * the feature opportunistic: it never blocks a save and never
  * surfaces a derivation error to the admin.
  *
+ * Diagnostic logs are written with the `[v0]` prefix so the dev
+ * server / Vercel function logs can be filtered down to just this
+ * module when something isn't deriving as expected.
+ *
  * NOTE: pure PDF URLs (e.g. arxiv.org/pdf/1234.5678.pdf with no
  * HTML wrapper) currently fall through to null because rendering
  * the first page server-side requires a heavy native canvas
- * dependency that isn't a great fit for a serverless function. The
- * common arXiv-style /abs/ landing pages, Google Drive previews,
+ * dependency that isn't a great fit for a serverless function.
+ * Common arXiv-style /abs/ landing pages, Google Drive previews,
  * Notion shares, etc. all expose `og:image` and are handled.
  */
 
-const FETCH_TIMEOUT_MS = 5_000
-const MAX_HTML_BYTES = 256 * 1024
-// Pretend to be a regular browser. Some sites (Cloudflare, Medium)
-// return a stub page or 403 to obvious bot user agents, which would
-// give us nothing to parse.
+const FETCH_TIMEOUT_MS = 8_000
+const MAX_HTML_BYTES = 512 * 1024
+// Pose as a current desktop Chrome. A bot-flavoured UA gets soft
+// blocked / cloaked by Cloudflare, Medium, X, and a long tail of
+// other hosts, which would silently leave us with no og:image to
+// extract. The Accept-Language header keeps locale-routing CDNs
+// from sending us a redirect chain.
 const USER_AGENT =
-  'Mozilla/5.0 (compatible; LibraryCoverBot/1.0; +https://hbi.fellowship)'
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+
+// File extensions that should be treated as a direct image. Used
+// both for the URL-shape shortcut and for screening relative og:image
+// resolutions.
+const IMAGE_EXTENSIONS = /\.(?:jpe?g|png|webp|gif|avif|svg)(?:\?|#|$)/i
 
 /**
  * Derive a cover image URL from a resource URL. Returns null when
@@ -49,9 +65,24 @@ export async function deriveCoverFromUrl(url: string): Promise<string | null> {
 
   // Tier 1: YouTube. Pure URL math - no network call.
   const yt = youtubeThumbnail(url)
-  if (yt) return yt
+  if (yt) {
+    console.log('[v0] derive-cover: youtube hit', { url, yt })
+    return yt
+  }
 
-  // Tier 2: og:image / twitter:image from the HTML head.
+  // Tier 2: URL itself ends in an image extension. The `new URL`
+  // guard rejects malformed input before we hand it back.
+  if (IMAGE_EXTENSIONS.test(url)) {
+    try {
+      const direct = new URL(url).toString()
+      console.log('[v0] derive-cover: direct image url', { url, direct })
+      return direct
+    } catch {
+      /* fall through to og:image */
+    }
+  }
+
+  // Tier 3: og:image / twitter:image / image_src from the HTML head.
   return await fetchOgImage(url)
 }
 
@@ -74,8 +105,6 @@ function youtubeThumbnail(url: string): string | null {
   let id: string | null = null
 
   if (host === 'youtu.be') {
-    // Path is `/<id>` for short links. Strip any trailing path
-    // segments (e.g. start time fragments).
     id = parsed.pathname.split('/').filter(Boolean)[0] ?? null
   } else if (host === 'youtube.com' || host === 'm.youtube.com') {
     if (parsed.pathname === '/watch') {
@@ -95,15 +124,11 @@ function youtubeThumbnail(url: string): string | null {
 }
 
 /**
- * Fetch the URL and pull the first usable open-graph / twitter
- * image meta tag. Capped at MAX_HTML_BYTES because everything we
- * need is in <head>; reading further is wasted bandwidth and
- * memory.
+ * Fetch the URL and pull the first usable image meta tag. Capped
+ * at MAX_HTML_BYTES because everything we need is in <head>;
+ * reading further is wasted bandwidth and memory.
  */
 async function fetchOgImage(url: string): Promise<string | null> {
-  // AbortController gives us a hard ceiling on the request - some
-  // pages stream HTML slowly and we don't want a save to block on
-  // a slow CDN.
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
@@ -114,36 +139,66 @@ async function fetchOgImage(url: string): Promise<string | null> {
       headers: {
         'User-Agent': USER_AGENT,
         Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        // A few CDNs vary their response on this; sending an empty
+        // string keeps us out of any "from another page" rules.
+        Referer: '',
       },
       redirect: 'follow',
-      // No cache: the admin just typed this URL, the latest version
-      // of the page is what we want.
       cache: 'no-store',
     })
-  } catch {
+  } catch (e) {
     clearTimeout(timeoutId)
+    console.log('[v0] derive-cover: fetch failed', {
+      url,
+      error: e instanceof Error ? e.message : String(e),
+    })
     return null
   }
   clearTimeout(timeoutId)
 
-  if (!response.ok || !response.body) return null
+  if (!response.ok || !response.body) {
+    console.log('[v0] derive-cover: bad response', {
+      url,
+      status: response.status,
+      hasBody: !!response.body,
+    })
+    return null
+  }
 
-  // Skip non-HTML content (binary downloads, PDFs without a landing
-  // page, etc). og tags only live in HTML.
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.toLowerCase().includes('text/html')) {
-    // Drain the body so the connection can be reused.
+  const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
+
+  // If the URL itself returned an image, just use the (possibly
+  // redirected) final URL. Covers cases like a CDN that serves
+  // images without an extension.
+  if (contentType.startsWith('image/')) {
     try {
       await response.body.cancel()
     } catch {
       /* ignore */
     }
+    console.log('[v0] derive-cover: response is an image', {
+      url,
+      finalUrl: response.url,
+      contentType,
+    })
+    return response.url || url
+  }
+
+  // Anything other than HTML doesn't carry og tags. Drain and bail.
+  if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
+    try {
+      await response.body.cancel()
+    } catch {
+      /* ignore */
+    }
+    console.log('[v0] derive-cover: non-html content', { url, contentType })
     return null
   }
 
-  // Stream the body and stop as soon as we either have </head> or
-  // hit the byte cap. This keeps memory bounded for huge pages.
+  // Stream the body and stop as soon as we either have </head>
+  // (case-insensitive) or hit the byte cap. Bounded memory.
   const reader = response.body.getReader()
   const decoder = new TextDecoder('utf-8', { fatal: false })
   let html = ''
@@ -155,13 +210,17 @@ async function fetchOgImage(url: string): Promise<string | null> {
       if (done) break
       received += value.byteLength
       html += decoder.decode(value, { stream: true })
-      if (html.includes('</head>')) break
+      if (/<\/head>/i.test(html)) break
     }
-  } catch {
+    // Final flush so any trailing multi-byte chars are decoded.
+    html += decoder.decode()
+  } catch (e) {
+    console.log('[v0] derive-cover: stream read failed', {
+      url,
+      error: e instanceof Error ? e.message : String(e),
+    })
     return null
   } finally {
-    // Best-effort cancel; the underlying connection is closed
-    // automatically once we drop the reader.
     try {
       await reader.cancel()
     } catch {
@@ -169,36 +228,55 @@ async function fetchOgImage(url: string): Promise<string | null> {
     }
   }
 
-  return extractMetaImage(html, url)
+  const result = extractMetaImage(html, response.url || url)
+  console.log('[v0] derive-cover: extract result', {
+    url,
+    bytesRead: received,
+    found: result,
+  })
+  return result
 }
 
 /**
- * Pull the first `og:image` / `twitter:image` URL out of an HTML
- * blob and resolve it against the page URL. Tolerant of attribute
- * order (`property` before `content` and vice versa), single or
- * double quotes, and the `:secure_url` / `:src` variants.
+ * Pull the first usable image URL out of an HTML blob. Tolerant of
+ * attribute order (`property` before `content` and vice versa),
+ * single or double quotes, extra whitespace, and the secure / src
+ * variants. Returns an absolute https? URL, or null.
  *
  * Exported for unit testing - callers should use deriveCoverFromUrl.
  */
 export function extractMetaImage(html: string, baseUrl: string): string | null {
   // Limit the search window to <head> when possible; some pages
   // include `og:image` references inside articles/scripts as
-  // example text, which we don't want to pick up.
+  // example text, which we don't want to pick up. Case-insensitive.
   const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)
   const haystack = headMatch ? headMatch[1] : html
 
   // Each pattern captures the URL in group 1. Order matters: prefer
   // og:image (largest, most reliable), then secure variants, then
-  // twitter:image as a backstop.
+  // twitter:image, then itemprop, then <link rel="image_src">.
   const patterns: RegExp[] = [
+    // og:image (both attribute orders)
     /<meta[^>]+property\s*=\s*["']og:image["'][^>]*?content\s*=\s*["']([^"']+)["']/i,
     /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]*?property\s*=\s*["']og:image["']/i,
+    // og:image:secure_url
     /<meta[^>]+property\s*=\s*["']og:image:secure_url["'][^>]*?content\s*=\s*["']([^"']+)["']/i,
     /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]*?property\s*=\s*["']og:image:secure_url["']/i,
+    // og:image:url (less common but spec-valid)
+    /<meta[^>]+property\s*=\s*["']og:image:url["'][^>]*?content\s*=\s*["']([^"']+)["']/i,
+    /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]*?property\s*=\s*["']og:image:url["']/i,
+    // twitter:image
     /<meta[^>]+name\s*=\s*["']twitter:image["'][^>]*?content\s*=\s*["']([^"']+)["']/i,
     /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]*?name\s*=\s*["']twitter:image["']/i,
+    // twitter:image:src (older Twitter card spec)
     /<meta[^>]+name\s*=\s*["']twitter:image:src["'][^>]*?content\s*=\s*["']([^"']+)["']/i,
     /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]*?name\s*=\s*["']twitter:image:src["']/i,
+    // schema.org itemprop
+    /<meta[^>]+itemprop\s*=\s*["']image["'][^>]*?content\s*=\s*["']([^"']+)["']/i,
+    /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]*?itemprop\s*=\s*["']image["']/i,
+    // <link rel="image_src">
+    /<link[^>]+rel\s*=\s*["']image_src["'][^>]*?href\s*=\s*["']([^"']+)["']/i,
+    /<link[^>]+href\s*=\s*["']([^"']+)["'][^>]*?rel\s*=\s*["']image_src["']/i,
   ]
 
   for (const pattern of patterns) {
@@ -206,11 +284,8 @@ export function extractMetaImage(html: string, baseUrl: string): string | null {
     if (!match || !match[1]) continue
     const candidate = decodeHtmlEntities(match[1].trim())
     if (!candidate) continue
-    // Resolve relative URLs against the page URL. If even that
-    // fails, the meta tag was junk - try the next pattern.
     try {
       const resolved = new URL(candidate, baseUrl).toString()
-      // Reject obviously invalid schemes (data:, javascript:, etc.).
       if (!/^https?:\/\//i.test(resolved)) continue
       return resolved
     } catch {
