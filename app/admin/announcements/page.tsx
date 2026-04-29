@@ -235,22 +235,27 @@ export default async function AdminAnnouncementsPage() {
     .map(({ _sort: _drop, ...rest }) => rest)
 
   return (
-    <div className="space-y-6 p-6 md:p-10">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-serif text-3xl text-primary">Announcements</h1>
-          <p className="text-sm text-text-muted mt-1">
-            Post messages to everyone, a specific cohort, a school team, or
-            individual fellows.
-          </p>
-        </div>
+    <div className="space-y-6">
+      {/*
+        The admin layout's tab strip already shows "Announcements" as the
+        section, so we don't repeat the heading here. We keep a one-line
+        description on the left and the primary action on the right; the
+        flex layout collapses to a column on narrow viewports so the
+        "New announcement" button is always visible (it was getting
+        squeezed off-screen in the previous wrap-based layout).
+      */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-text-muted max-w-xl">
+          Post messages to everyone, a specific cohort, a school team, or
+          individual fellows.
+        </p>
         <AnnouncementDialog
           mode="create"
           schoolTeams={schoolTeams}
           fellows={fellows}
           contentOptions={contentOptions}
           trigger={
-            <Button>
+            <Button size="lg" className="self-start sm:self-auto shrink-0">
               <Plus className="h-4 w-4 mr-2" />
               New announcement
             </Button>
