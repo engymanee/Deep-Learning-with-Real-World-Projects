@@ -402,7 +402,10 @@ function ResultsBody({
   }
   if (view === 'grid') {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Denser grid: 2 columns on phones, 3 on tablets, 4 on
+          desktop. Smaller per-card footprint so curated stacks
+          read as a wall of options rather than three giant tiles. */}
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
         {filtered.map((r) => (
           <GridCard key={r.id} resource={r} showCohort={showCohort} />
         ))}
@@ -581,35 +584,41 @@ function GridCard({
       rel="noreferrer"
       className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
     >
-      {/* Hero: cover image or icon fallback. We use a 3:4 portrait
-          ratio so covers feel book/poster-like instead of widescreen
-          - far more flattering for typical resource thumbnails. The
-          ratio is fixed so the grid stays even regardless of the
-          source image's intrinsic dimensions. */}
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+      {/* Hero: cover image or icon fallback. We use a 4:5 portrait
+          ratio - still book/poster-leaning but shorter than the
+          previous 3:4 so four cards fit comfortably side-by-side
+          without dominating the viewport vertically. We also
+          switched to object-contain so any cover (book jacket,
+          landscape thumbnail, square logo) is shown in full and
+          letterboxed against the muted background, instead of
+          being hard-cropped. The grid stays visually even because
+          the wrapper aspect ratio is fixed. */}
+      <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
         {resource.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={resource.coverUrl}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="absolute inset-0 h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"
           />
         ) : (
           <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/10 via-muted to-muted">
-            <Icon className="h-10 w-10 text-primary/60" aria-hidden="true" />
+            <Icon className="h-8 w-8 text-primary/60" aria-hidden="true" />
           </div>
         )}
         <Badge
           variant="secondary"
-          className="absolute left-3 top-3 bg-card/95 text-[10px] uppercase tracking-wide backdrop-blur"
+          className="absolute left-2 top-2 bg-card/95 text-[10px] uppercase tracking-wide backdrop-blur"
         >
           <Icon className="mr-1 h-3 w-3" aria-hidden="true" />
           {meta.label}
         </Badge>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-5">
+      {/* Compacter padding so 4-up doesn't feel cramped despite
+          smaller cells. */}
+      <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex flex-1 flex-col gap-2">
           <h3 className="line-clamp-2 font-serif text-base leading-snug text-foreground group-hover:text-primary">
             {resource.title}
@@ -633,8 +642,10 @@ function GridCard({
         {showCohort && <CohortBadgeRow resource={resource} />}
 
         {resource.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {resource.tags.slice(0, 4).map((t) => (
+          <div className="flex flex-wrap gap-1">
+            {/* Cap at 3 tags now that cards are narrower - more than
+                that wraps to a third row and breaks the rhythm. */}
+            {resource.tags.slice(0, 3).map((t) => (
               <Badge key={t} variant="secondary" className="text-[10px]">
                 {t}
               </Badge>
@@ -646,7 +657,7 @@ function GridCard({
             card is already a link to the resource, so the explicit
             "Open" CTA was redundant and competed visually with the
             title. Less chrome, more focus on the content. */}
-        <div className="border-t border-border pt-3 text-xs text-muted-foreground">
+        <div className="border-t border-border pt-2 text-[11px] text-muted-foreground">
           <DateLabel iso={resource.createdAt} />
         </div>
       </div>
