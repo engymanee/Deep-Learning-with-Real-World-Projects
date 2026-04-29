@@ -19,10 +19,27 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { createCommunityPost } from '@/app/community/actions'
-import type { CommunitySection } from '@/lib/community/sections'
 
 interface Props {
-  section: CommunitySection
+  /**
+   * Only the primitive section fields the composer actually needs.
+   * Receiving the full CommunitySection object would force the
+   * server-rendered SectionHeader to serialize `section.icon` (a
+   * Lucide React component) into this client boundary, which React
+   * rejects with "Functions cannot be passed directly to Client
+   * Components". Strings + the writable kind are all this dialog
+   * uses, so we accept exactly that.
+   */
+  /** The kind to write into community_posts.kind on submit. */
+  writeKind: string
+  /** One-liner shown as the dialog description. */
+  description: string
+  /** Title-input placeholder. */
+  titlePlaceholder: string
+  /** Body-textarea placeholder. */
+  bodyPlaceholder: string
+  /** Label on both the trigger button and the submit button. */
+  composerCta: string
   /**
    * Whether the current user is allowed to post in this section.
    * Computed server-side from `staffOnly` + role and passed in so
@@ -39,7 +56,14 @@ interface Props {
  * `createCommunityPost` server action which validates kind + role
  * and inserts a published row.
  */
-export function PostComposer({ section, canPost }: Props) {
+export function PostComposer({
+  writeKind,
+  description,
+  titlePlaceholder,
+  bodyPlaceholder,
+  composerCta,
+  canPost,
+}: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
@@ -47,7 +71,7 @@ export function PostComposer({ section, canPost }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  if (!canPost || !section.writeKind) return null
+  if (!canPost) return null
 
   function reset() {
     setTitle('')
@@ -65,7 +89,7 @@ export function PostComposer({ section, canPost }: Props) {
 
     startTransition(async () => {
       const result = await createCommunityPost({
-        kind: section.writeKind!,
+        kind: writeKind,
         title: t,
         body: b,
       })
@@ -91,14 +115,14 @@ export function PostComposer({ section, canPost }: Props) {
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          {section.composerCta}
+          {composerCta}
         </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{section.composerCta}</DialogTitle>
-          <DialogDescription>{section.description}</DialogDescription>
+          <DialogTitle>{composerCta}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -108,7 +132,7 @@ export function PostComposer({ section, canPost }: Props) {
               id="composer-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={section.composerTitlePlaceholder}
+              placeholder={titlePlaceholder}
               maxLength={200}
               autoFocus
               disabled={pending}
@@ -121,7 +145,7 @@ export function PostComposer({ section, canPost }: Props) {
               id="composer-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder={section.composerBodyPlaceholder}
+              placeholder={bodyPlaceholder}
               rows={7}
               maxLength={10_000}
               disabled={pending}
@@ -148,7 +172,7 @@ export function PostComposer({ section, canPost }: Props) {
             </DialogClose>
             <Button type="submit" disabled={pending}>
               {pending && <Spinner className="h-3.5 w-3.5" />}
-              {section.composerCta}
+              {composerCta}
             </Button>
           </DialogFooter>
         </form>

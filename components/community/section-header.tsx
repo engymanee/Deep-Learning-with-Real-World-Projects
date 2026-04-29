@@ -34,7 +34,20 @@ export function SectionHeader({ section, count, canPost }: Props) {
 
       {section.writeKind && (
         <div className="shrink-0">
-          <PostComposer section={section} canPost={canPost} />
+          {/*
+            Pass primitive fields only - PostComposer is a Client
+            Component, and serializing the full section object would
+            try to ship `section.icon` (a Lucide React component
+            function) across the boundary, which React refuses.
+          */}
+          <PostComposer
+            writeKind={section.writeKind}
+            description={section.description}
+            titlePlaceholder={section.composerTitlePlaceholder}
+            bodyPlaceholder={section.composerBodyPlaceholder}
+            composerCta={section.composerCta}
+            canPost={canPost}
+          />
         </div>
       )}
     </header>
