@@ -37,7 +37,7 @@ export default async function LibraryPage() {
   const { data: rows } = await supabase
     .from('community_resources')
     .select(
-      'id, title, description, url, resource_type, tags, cohorts, is_universal, created_at, cover_url',
+      'id, title, author, description, url, resource_type, tags, cohorts, is_universal, created_at, cover_url',
     )
     .order('created_at', { ascending: false })
 
@@ -66,6 +66,10 @@ export default async function LibraryPage() {
     return {
       id: r.id,
       title: r.title,
+      // `author` may be NULL on legacy rows created before migration
+      // 043; the view treats null as "no attribution" and just hides
+      // the byline rather than rendering "by null".
+      author: (r as { author?: string | null }).author ?? null,
       description: r.description,
       url: r.url,
       resourceType: VALID_TYPES.has(r.resource_type)

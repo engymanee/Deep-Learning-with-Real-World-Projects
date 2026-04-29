@@ -18,6 +18,8 @@ const VALID_TYPES = new Set<AdminLibraryRow['resourceType']>([
 interface RawResourceRow {
   id: string
   title: string
+  /** Nullable for legacy rows created before migration 043. */
+  author: string | null
   description: string | null
   url: string
   resource_type: string
@@ -43,7 +45,7 @@ export default async function AdminLibraryPage() {
   const { data: rows } = await supabase
     .from('community_resources')
     .select(
-      'id, title, description, url, resource_type, tags, cohorts, is_universal, cover_url, created_at',
+      'id, title, author, description, url, resource_type, tags, cohorts, is_universal, cover_url, created_at',
     )
     .order('created_at', { ascending: false })
     .returns<RawResourceRow[]>()
@@ -55,6 +57,7 @@ export default async function AdminLibraryPage() {
   const resources: AdminLibraryRow[] = (rows ?? []).map((r) => ({
     id: r.id,
     title: r.title,
+    author: r.author ?? null,
     description: r.description,
     url: r.url,
     resourceType: VALID_TYPES.has(r.resource_type as AdminLibraryRow['resourceType'])

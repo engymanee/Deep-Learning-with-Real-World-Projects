@@ -125,6 +125,10 @@ export function AddResourceDialog({
   // edit mode we seed everything from `initial` so the dialog opens
   // already showing the saved values.
   const [title, setTitle] = useState(initial?.title ?? '')
+  // Author attribution. Required at submit time - the server enforces
+  // it as well, but mirroring the rule client-side avoids a round
+  // trip just to surface the error.
+  const [author, setAuthor] = useState(initial?.author ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [url, setUrl] = useState(initial?.url ?? '')
   const [resourceType, setResourceType] = useState<ResourceType>(
@@ -177,6 +181,7 @@ export function AddResourceDialog({
     // true blank slate.
     if (initial) {
       setTitle(initial.title)
+      setAuthor(initial.author ?? '')
       setDescription(initial.description ?? '')
       setUrl(initial.url)
       setResourceType(initial.resourceType as ResourceType)
@@ -189,6 +194,7 @@ export function AddResourceDialog({
       setExistingCoverUrl(initial.coverUrl ?? null)
     } else {
       setTitle('')
+      setAuthor('')
       setDescription('')
       setUrl('')
       setResourceType('document')
@@ -289,6 +295,7 @@ export function AddResourceDialog({
     // Mirror the server's required-field rules so the user gets
     // instant feedback instead of a round trip.
     if (!title.trim()) return setError('Title is required.')
+    if (!author.trim()) return setError('Author is required.')
     if (!url.trim()) return setError('URL is required.')
     if (visibility === 'cohort' && cohorts.length === 0) {
       return setError('Pick at least one cohort or switch to Recommended Reading.')
@@ -305,6 +312,7 @@ export function AddResourceDialog({
     startTransition(async () => {
       const payload = {
         title: title.trim(),
+        author: author.trim(),
         description: description.trim() || null,
         url: url.trim(),
         resourceType,
@@ -373,6 +381,26 @@ export function AddResourceDialog({
               maxLength={200}
               placeholder="e.g. Coaching for equitable outcomes"
             />
+          </div>
+
+          {/* Author / attribution. Required - we want every resource
+              card in the Library to surface a byline so fellows know
+              whose work they're about to read or watch. Mirrors the
+              server-side check in addLibraryResource / updateLibraryResource. */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="library-author">Author</Label>
+            <Input
+              id="library-author"
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              required
+              maxLength={200}
+              placeholder="e.g. bell hooks, or Harvard Business Review"
+            />
+            <p className="text-xs text-muted-foreground">
+              Person or organisation credited on the resource. Shown on every
+              card.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">

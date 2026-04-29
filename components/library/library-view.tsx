@@ -44,6 +44,12 @@ import { PWF_PROTOCOLS_LABEL } from '@/lib/library/labels'
 export interface LibraryResource {
   id: string
   title: string
+  /**
+   * Display attribution (book author, video creator, podcast host).
+   * Required for new rows; nullable here only because legacy rows
+   * created before migration 043 may still carry a NULL value.
+   */
+  author: string | null
   description: string | null
   url: string
   resourceType: 'document' | 'video' | 'link' | 'reading'
@@ -608,6 +614,15 @@ function GridCard({
           <h3 className="line-clamp-2 font-serif text-base leading-snug text-foreground group-hover:text-primary">
             {resource.title}
           </h3>
+          {/* Author byline. Sits directly under the title (book-jacket
+              convention) so attribution reads as part of the resource
+              identity, not as metadata. Hidden when the row predates
+              migration 043 and has no author recorded. */}
+          {resource.author && (
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              by {resource.author}
+            </p>
+          )}
           {resource.description && (
             <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
               {resource.description}
@@ -688,6 +703,15 @@ function ListRow({
             </Badge>
             {showCohort && <CohortBadgeRow resource={resource} compact />}
           </div>
+          {/* Compact byline sits between the title row and the
+              description. We tuck it into the same horizontal flow as
+              the description on dense lists so authorship is always
+              one glance away from the title. */}
+          {resource.author && (
+            <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+              by {resource.author}
+            </p>
+          )}
           {resource.description && (
             <p className="mt-1 line-clamp-1 text-sm leading-relaxed text-muted-foreground">
               {resource.description}

@@ -22,6 +22,9 @@ const MAX_TITLE_LEN = 200
 const MAX_DESC_LEN = 1_000
 const MAX_TAGS = 8
 const MAX_TAG_LEN = 32
+/** Author attribution. Generous upper bound so a multi-author byline
+ *  ("Smith, Jones & Wagner") still fits without truncation. */
+const MAX_AUTHOR_LEN = 200
 /** Cover image guard rails. 5 MB is plenty for a card hero. */
 const MAX_COVER_BYTES = 5 * 1024 * 1024
 const COVER_MIME_TYPES = new Set([
@@ -50,6 +53,12 @@ const COVER_MIME_TYPES = new Set([
 export async function addLibraryResource(
   input: {
     title: string
+    /**
+     * Display attribution (book author, video creator, etc.). Required
+     * by the admin form; surfaced on every resource card and list row
+     * so fellows know whose work they're about to read/watch.
+     */
+    author: string
     description?: string | null
     url: string
     resourceType: string
@@ -72,6 +81,7 @@ export async function addLibraryResource(
     }
 
     const title = (input.title ?? '').trim()
+    const author = (input.author ?? '').trim()
     const description = (input.description ?? '').trim() || null
     const url = (input.url ?? '').trim()
     const resourceType = (input.resourceType ?? '').trim()
@@ -79,6 +89,12 @@ export async function addLibraryResource(
     if (!title) return { ok: false, message: 'Title is required.' }
     if (title.length > MAX_TITLE_LEN) {
       return { ok: false, message: `Title must be ${MAX_TITLE_LEN} characters or fewer.` }
+    }
+    // Author is required at the app layer. The DB column is nullable
+    // (legacy rows) but every new/edited row must carry attribution.
+    if (!author) return { ok: false, message: 'Author is required.' }
+    if (author.length > MAX_AUTHOR_LEN) {
+      return { ok: false, message: `Author must be ${MAX_AUTHOR_LEN} characters or fewer.` }
     }
     if (description && description.length > MAX_DESC_LEN) {
       return { ok: false, message: `Description must be ${MAX_DESC_LEN} characters or fewer.` }
@@ -203,6 +219,7 @@ export async function addLibraryResource(
 
     const { error } = await supabase.from('community_resources').insert({
       title,
+      author,
       description,
       url,
       resource_type: resourceType,
@@ -273,6 +290,12 @@ export async function updateLibraryResource(
   id: string,
   input: {
     title: string
+    /**
+     * Display attribution. Required by the admin form (mirrors
+     * `addLibraryResource`); the column is nullable in the DB only
+     * to keep legacy rows valid.
+     */
+    author: string
     description?: string | null
     url: string
     resourceType: string
@@ -294,6 +317,7 @@ export async function updateLibraryResource(
     }
 
     const title = (input.title ?? '').trim()
+    const author = (input.author ?? '').trim()
     const description = (input.description ?? '').trim() || null
     const url = (input.url ?? '').trim()
     const resourceType = (input.resourceType ?? '').trim()
@@ -301,6 +325,10 @@ export async function updateLibraryResource(
     if (!title) return { ok: false, message: 'Title is required.' }
     if (title.length > MAX_TITLE_LEN) {
       return { ok: false, message: `Title must be ${MAX_TITLE_LEN} characters or fewer.` }
+    }
+    if (!author) return { ok: false, message: 'Author is required.' }
+    if (author.length > MAX_AUTHOR_LEN) {
+      return { ok: false, message: `Author must be ${MAX_AUTHOR_LEN} characters or fewer.` }
     }
     if (description && description.length > MAX_DESC_LEN) {
       return { ok: false, message: `Description must be ${MAX_DESC_LEN} characters or fewer.` }
@@ -427,6 +455,7 @@ export async function updateLibraryResource(
 
     const updatePayload: Record<string, unknown> = {
       title,
+      author,
       description,
       url,
       resource_type: resourceType,

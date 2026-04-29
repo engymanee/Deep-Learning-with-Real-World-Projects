@@ -325,6 +325,12 @@ function ResourceRow({ row, onEdit, onDelete }: RowProps) {
             {meta.label}
           </span>
         </div>
+        {/* Author byline. Surfaced even on the dense admin row so
+            curators can verify attribution without opening the edit
+            dialog. Suppressed for legacy rows where author is null. */}
+        {row.author && (
+          <p className="mt-0.5 text-xs text-muted-foreground">by {row.author}</p>
+        )}
         {row.description && (
           <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
             {row.description}
