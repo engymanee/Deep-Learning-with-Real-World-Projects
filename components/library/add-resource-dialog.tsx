@@ -534,7 +534,8 @@ export function AddResourceDialog({
                     Upload a cover image
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    PNG, JPEG, WebP, or GIF. Up to 5 MB.
+                    Optional. We&apos;ll auto-pull one from the link if you
+                    skip this. PNG, JPEG, WebP, or GIF up to 5 MB.
                   </span>
                 </span>
               </button>

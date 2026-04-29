@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
+import { deriveCoverFromUrl } from '@/lib/library/derive-cover'
 
 /**
  * Result envelope used by every Library mutation. Returning a plain
@@ -215,6 +216,15 @@ export async function addLibraryResource(
         .from('resource-covers')
         .getPublicUrl(upload.data.path)
       coverUrl = publicData.publicUrl
+    } else {
+      // No manual upload - try to derive a cover from the resource
+      // URL itself (YouTube thumbnail or og:image). This is purely
+      // opportunistic: a null result just means "no cover", which
+      // the card handles by falling back to a type icon. We never
+      // surface a derivation error to the admin because they have
+      // already filled in the form correctly; auto-cover is a
+      // courtesy, not a requirement.
+      coverUrl = await deriveCoverFromUrl(url)
     }
 
     const { error } = await supabase.from('community_resources').insert({
@@ -396,12 +406,17 @@ export async function updateLibraryResource(
       return { ok: false, message: 'This resource no longer exists.' }
     }
 
-    // Cover-image state machine. Three paths:
+    // Cover-image state machine. Four paths:
     //   1. New file uploaded -> upload, set cover_url to the new
     //      public URL, schedule the prior blob for cleanup.
     //   2. removeCover -> set cover_url to NULL, schedule prior
     //      blob for cleanup.
-    //   3. Otherwise -> leave cover_url untouched.
+    //   3. No upload, no removal, no current cover -> opportunistic
+    //      auto-derivation from the resource URL. Lets edits "fill
+    //      in" a cover for legacy rows or rows whose original
+    //      derivation failed (e.g. URL has since been corrected).
+    //   4. Otherwise -> leave cover_url untouched. Manually picked
+    //      covers are sacred; we never silently overwrite them.
     let nextCoverUrl: string | null | undefined
     let priorCoverPathToDelete: string | null = null
 
@@ -451,6 +466,14 @@ export async function updateLibraryResource(
     } else if (input.removeCover === true) {
       nextCoverUrl = null
       priorCoverPathToDelete = coverPathFromUrl(prior.cover_url)
+    } else if (!prior.cover_url) {
+      // Path 3: row has no cover today. Try to derive one from the
+      // current URL on save. If the URL hasn't changed and the
+      // last derivation already failed we'll just get null again,
+      // which is harmless; if the URL has been fixed up since the
+      // first save, this is where the auto-cover finally lands.
+      const derived = await deriveCoverFromUrl(url)
+      if (derived) nextCoverUrl = derived
     }
 
     const updatePayload: Record<string, unknown> = {
