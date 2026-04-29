@@ -25,6 +25,32 @@ function optionalString(fd: FormData, key: string): string | null {
 }
 
 /**
+ * Resolve and lightly validate the optional curriculum-content pin.
+ * - When the picker is left blank we persist NULL.
+ * - When a lab id is supplied we confirm it actually exists so a
+ *   stale or hand-edited form value can't introduce a dangling FK
+ *   (the column is also a real FK with on-delete-set-null, but the
+ *   explicit existence check yields a friendlier error message than
+ *   a Postgres 23503 surfaced to the user).
+ */
+async function resolveContentId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  raw: string | null,
+): Promise<string | null> {
+  if (!raw) return null
+  const { data, error } = await supabase
+    .from('labs')
+    .select('id')
+    .eq('id', raw)
+    .maybeSingle<{ id: string }>()
+  if (error) throw error
+  if (!data) {
+    throw new Error('That curriculum item could not be found. Please pick another.')
+  }
+  return data.id
+}
+
+/**
  * Map the audience_scope + the two nullable target ids into a strictly
  * valid (scope, year_id, cohort_id) tuple that satisfies the DB check
  * constraint. Rejects invalid combinations early with a clear error.
@@ -61,6 +87,9 @@ export async function createAnnouncement(fd: FormData) {
     optionalString(fd, 'year_id'),
     optionalString(fd, 'cohort_id'),
   )
+  // Optional pin to an existing curriculum item. Validated so stale
+  // form values can't create dangling references.
+  const contentId = await resolveContentId(supabase, optionalString(fd, 'content_id'))
 
   const { error } = await supabase.from('announcements').insert({
     author_id: admin.id,
@@ -70,6 +99,7 @@ export async function createAnnouncement(fd: FormData) {
     title: requiredString(fd, 'title'),
     body: requiredString(fd, 'body'),
     pinned: fd.get('pinned') === 'on',
+    content_id: contentId,
   })
   if (error) throw error
 
@@ -92,6 +122,11 @@ export async function updateAnnouncement(fd: FormData) {
     optionalString(fd, 'year_id'),
     optionalString(fd, 'cohort_id'),
   )
+  // We always write content_id explicitly (null clears any prior pin,
+  // a uuid sets/replaces it). The picker submits an empty string when
+  // the curator chooses "No content"; resolveContentId maps both that
+  // and missing fields to NULL.
+  const contentId = await resolveContentId(supabase, optionalString(fd, 'content_id'))
 
   const { error } = await supabase
     .from('announcements')
@@ -102,6 +137,7 @@ export async function updateAnnouncement(fd: FormData) {
       title: requiredString(fd, 'title'),
       body: requiredString(fd, 'body'),
       pinned: fd.get('pinned') === 'on',
+      content_id: contentId,
     })
     .eq('id', id)
   if (error) throw error

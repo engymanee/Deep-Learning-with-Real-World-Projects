@@ -41,6 +41,17 @@ export interface DashboardAnnouncement {
   pinned: boolean
   publishedAt: string
   author: { name: string; initials: string } | null
+  /**
+   * If the curator pinned the announcement to a curriculum item,
+   * we materialise everything the feed needs to render a one-tap
+   * deep-link without a second round trip.
+   */
+  content: {
+    id: string
+    title: string
+    /** Pre-built URL for the lab page (matches /phases/.../items/...). */
+    href: string
+  } | null
 }
 
 export interface DashboardData {
@@ -218,7 +229,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const { data: announcementRows } = await supabase
     .from('announcements')
     .select(
-      'id, title, body, pinned, published_at, author:profiles!author_id(full_name)',
+      'id, title, body, pinned, published_at, author:profiles!author_id(full_name), content:labs!content_id(id, title, year_id, module_id)',
     )
     .order('pinned', { ascending: false })
     .order('published_at', { ascending: false })
@@ -227,6 +238,13 @@ export async function getDashboardData(): Promise<DashboardData> {
   const announcements: DashboardAnnouncement[] = (announcementRows ?? []).map(
     (row) => {
       const authorRecord = Array.isArray(row.author) ? row.author[0] : row.author
+      // Supabase returns embedded relations as either a single object
+      // or a one-element array depending on the query shape; normalise.
+      const contentRecord = Array.isArray(row.content)
+        ? row.content[0] ?? null
+        : (row.content as
+            | { id: string; title: string; year_id: string; module_id: string }
+            | null) ?? null
       return {
         id: row.id,
         title: row.title,
@@ -237,6 +255,14 @@ export async function getDashboardData(): Promise<DashboardData> {
           ? {
               name: authorRecord.full_name ?? 'Team',
               initials: initialsFor(authorRecord.full_name),
+            }
+          : null,
+        content: contentRecord
+          ? {
+              id: contentRecord.id,
+              title: contentRecord.title,
+              // Mirrors app/(curriculum)/phases/[phaseId]/modules/[moduleId]/items/[itemId]
+              href: `/phases/${contentRecord.year_id}/modules/${contentRecord.module_id}/items/${contentRecord.id}`,
             }
           : null,
       }

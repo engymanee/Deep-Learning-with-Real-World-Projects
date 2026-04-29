@@ -32,6 +32,9 @@ export interface AnnouncementFormInitial {
   title: string
   body: string
   pinned: boolean
+  /** Optional pin to a curriculum item (lab/content). NULL when the
+   *  announcement is purely a free-form note. */
+  content_id: string | null
 }
 
 export interface YearOption {
@@ -44,11 +47,28 @@ export interface CohortOption {
   name: string
 }
 
+/**
+ * One row in the "Pin to content" dropdown. Pre-flattened on the
+ * server so the client just renders a friendly nested label like
+ * "Phase 2 · Module 3 — Reading: Trauma-informed coaching".
+ */
+export interface ContentOption {
+  id: string
+  /** Pretty path the option displays. Already includes year + module. */
+  label: string
+  /** Phase id - used as the in-list section header for grouping. */
+  phaseId: string
+  phaseTitle: string
+}
+
 interface Props {
   mode: 'create' | 'edit'
   initial?: Partial<AnnouncementFormInitial>
   years: YearOption[]
   cohorts: CohortOption[]
+  /** All curriculum items the curator can pin. Empty list disables
+   *  the picker but still renders it so the affordance is visible. */
+  contentOptions: ContentOption[]
   trigger: React.ReactNode
 }
 
@@ -60,13 +80,22 @@ const DEFAULTS: AnnouncementFormInitial = {
   title: '',
   body: '',
   pinned: false,
+  content_id: null,
 }
+
+/**
+ * Sentinel used by the shadcn Select for the "no pinned content"
+ * option. shadcn forbids an empty string as a SelectItem value, so
+ * we bridge between this token and an actual NULL on submit.
+ */
+const NO_CONTENT = '__none__'
 
 export function AnnouncementDialog({
   mode,
   initial,
   years,
   cohorts,
+  contentOptions,
   trigger,
 }: Props) {
   const [open, setOpen] = useState(false)
@@ -79,9 +108,13 @@ export function AnnouncementDialog({
   )
   const [yearId, setYearId] = useState<string | null>(merged.year_id)
   const [cohortId, setCohortId] = useState<string | null>(merged.cohort_id)
+  // contentId carries either a real lab id or null. We fold null into
+  // the NO_CONTENT sentinel only when we hand the value to <Select>.
+  const [contentId, setContentId] = useState<string | null>(merged.content_id)
 
   const titleId = useId()
   const bodyId = useId()
+  const contentSelectId = useId()
 
   const handleSubmit = (fd: FormData) => {
     setError(null)
@@ -110,6 +143,7 @@ export function AnnouncementDialog({
           setScope(merged.audience_scope)
           setYearId(merged.year_id)
           setCohortId(merged.cohort_id)
+          setContentId(merged.content_id)
           setError(null)
         }
       }}
@@ -219,6 +253,54 @@ export function AnnouncementDialog({
               rows={6}
               required
             />
+          </div>
+
+          {/*
+            Pin to existing curriculum content. Optional - leaving it
+            on "No pinned content" keeps the announcement free-form.
+            When set, the dashboard feed renders an inline link straight
+            to the lab page so fellows can jump to it from the feed.
+
+            The hidden <input> mirrors the React state so the form
+            submits even though the shadcn Select isn't a native
+            form-control. We translate the NO_CONTENT sentinel into an
+            empty string, which the action treats as null.
+          */}
+          <div className="space-y-2">
+            <Label htmlFor={contentSelectId}>Pin to a curriculum item</Label>
+            <Select
+              value={contentId ?? NO_CONTENT}
+              onValueChange={(v) => setContentId(v === NO_CONTENT ? null : v)}
+              disabled={contentOptions.length === 0}
+            >
+              <SelectTrigger id={contentSelectId}>
+                <SelectValue
+                  placeholder={
+                    contentOptions.length === 0
+                      ? 'No curriculum items yet'
+                      : 'No pinned content'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={NO_CONTENT}>No pinned content</SelectItem>
+                {contentOptions.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <input
+              type="hidden"
+              name="content_id"
+              value={contentId ?? ''}
+              readOnly
+            />
+            <p className="text-xs text-text-muted">
+              Optional. Adds a one-tap link to the lab below the message on
+              learners&apos; dashboards.
+            </p>
           </div>
 
           <div className="flex items-center gap-2">

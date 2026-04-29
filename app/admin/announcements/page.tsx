@@ -1,10 +1,23 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Empty, EmptyHeader, EmptyTitle, EmptyMedia } from '@/components/ui/empty'
-import { Pin, Plus, Pencil, Trash2, Megaphone } from 'lucide-react'
-import { AnnouncementDialog, type YearOption, type CohortOption } from './announcement-dialog'
+import {
+  Pin,
+  Plus,
+  Pencil,
+  Trash2,
+  Megaphone,
+  BookOpen,
+} from 'lucide-react'
+import {
+  AnnouncementDialog,
+  type YearOption,
+  type CohortOption,
+  type ContentOption,
+} from './announcement-dialog'
 import {
   deleteAnnouncement,
   togglePinAnnouncement,
@@ -20,10 +33,27 @@ interface AnnouncementRow {
   audience_scope: 'global' | 'year' | 'cohort'
   year_id: string | null
   cohort_id: string | null
+  content_id: string | null
   published_at: string
   year: { id: string; title: string } | null
   cohort: { id: string; name: string } | null
   author: { full_name: string | null } | null
+  /** Joined lab summary so the row can render a deep-link to the
+   *  pinned curriculum item without a second round trip. */
+  content: {
+    id: string
+    title: string
+    year_id: string
+    module_id: string
+  } | null
+}
+
+/**
+ * Build the public learner URL for a curriculum item. Mirrors the
+ * route at app/(curriculum)/phases/[phaseId]/modules/[moduleId]/items/[itemId].
+ */
+function contentHref(c: { year_id: string; module_id: string; id: string }) {
+  return `/phases/${c.year_id}/modules/${c.module_id}/items/${c.id}`
 }
 
 function audienceLabel(row: AnnouncementRow): string {
@@ -45,18 +75,34 @@ export default async function AdminAnnouncementsPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const [{ data: announcementRows }, { data: years }, { data: cohorts }] =
-    await Promise.all([
-      supabase
-        .from('announcements')
-        .select(
-          'id, title, body, pinned, audience_scope, year_id, cohort_id, published_at, year:years(id, title), cohort:cohorts(id, name), author:profiles!author_id(full_name)',
-        )
-        .order('pinned', { ascending: false })
-        .order('published_at', { ascending: false }),
-      supabase.from('years').select('id, title').order('order_index'),
-      supabase.from('cohorts').select('id, name').order('name'),
-    ])
+  // We fetch labs (curriculum items) alongside everything else so the
+  // pin-to-content picker has data and so we can render a friendly
+  // deep-link ("Reading: X") on rows that already have a pin.
+  const [
+    { data: announcementRows },
+    { data: years },
+    { data: cohorts },
+    { data: labRows },
+    { data: moduleRows },
+  ] = await Promise.all([
+    supabase
+      .from('announcements')
+      .select(
+        'id, title, body, pinned, audience_scope, year_id, cohort_id, content_id, published_at, year:years(id, title), cohort:cohorts(id, name), author:profiles!author_id(full_name), content:labs!content_id(id, title, year_id, module_id)',
+      )
+      .order('pinned', { ascending: false })
+      .order('published_at', { ascending: false }),
+    supabase.from('years').select('id, title, order_index').order('order_index'),
+    supabase.from('cohorts').select('id, name').order('name'),
+    supabase
+      .from('labs')
+      .select('id, title, year_id, module_id, order_index')
+      .order('order_index', { ascending: true }),
+    supabase
+      .from('modules')
+      .select('id, title, phase_id, order_index')
+      .order('order_index', { ascending: true }),
+  ])
 
   const rows: AnnouncementRow[] = (announcementRows ?? []).map((r) => ({
     id: r.id,
@@ -66,13 +112,67 @@ export default async function AdminAnnouncementsPage() {
     audience_scope: r.audience_scope,
     year_id: r.year_id,
     cohort_id: r.cohort_id,
+    content_id: r.content_id,
     published_at: r.published_at,
     year: Array.isArray(r.year) ? r.year[0] ?? null : r.year ?? null,
     cohort: Array.isArray(r.cohort) ? r.cohort[0] ?? null : r.cohort ?? null,
     author: Array.isArray(r.author) ? r.author[0] ?? null : r.author ?? null,
+    content: Array.isArray(r.content)
+      ? r.content[0] ?? null
+      : (r.content as AnnouncementRow['content']) ?? null,
   }))
 
-  const yearOptions: YearOption[] = years ?? []
+  // Build the curator-facing labels for the content picker. We
+  // pre-flatten "Year > Module > Item" into a single string so the
+  // dialog can stay a plain Select. Items missing a phase/module
+  // still show with a graceful fallback rather than disappearing.
+  const yearById = new Map<string, { title: string; order_index: number }>()
+  for (const y of years ?? []) {
+    yearById.set(y.id, { title: y.title, order_index: y.order_index ?? 0 })
+  }
+  const moduleById = new Map<
+    string,
+    { title: string; phase_id: string; order_index: number }
+  >()
+  for (const m of moduleRows ?? []) {
+    moduleById.set(m.id, {
+      title: m.title,
+      phase_id: m.phase_id,
+      order_index: m.order_index ?? 0,
+    })
+  }
+  const contentOptions: ContentOption[] = (labRows ?? [])
+    .map((lab) => {
+      const mod = lab.module_id ? moduleById.get(lab.module_id) : null
+      const yr = yearById.get(lab.year_id)
+      const yearLabel = yr?.title ?? 'Phase'
+      const modLabel = mod?.title ?? 'Module'
+      return {
+        id: lab.id,
+        label: `${yearLabel} \u00b7 ${modLabel} \u2014 ${lab.title}`,
+        phaseId: lab.year_id,
+        phaseTitle: yearLabel,
+        // Sort key: phase order, module order, lab order. Hidden,
+        // not part of the public ContentOption shape.
+        _sort: [
+          yr?.order_index ?? 0,
+          mod?.order_index ?? 0,
+          lab.order_index ?? 0,
+        ] as [number, number, number],
+      }
+    })
+    .sort((a, b) => {
+      for (let i = 0; i < 3; i++) {
+        if (a._sort[i] !== b._sort[i]) return a._sort[i] - b._sort[i]
+      }
+      return a.label.localeCompare(b.label)
+    })
+    .map(({ _sort: _drop, ...rest }) => rest)
+
+  const yearOptions: YearOption[] = (years ?? []).map((y) => ({
+    id: y.id,
+    title: y.title,
+  }))
   const cohortOptions: CohortOption[] = cohorts ?? []
 
   return (
@@ -89,6 +189,7 @@ export default async function AdminAnnouncementsPage() {
           mode="create"
           years={yearOptions}
           cohorts={cohortOptions}
+          contentOptions={contentOptions}
           trigger={
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -130,6 +231,20 @@ export default async function AdminAnnouncementsPage() {
                   <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">
                     {row.body}
                   </p>
+                  {/*
+                    Surface the pinned curriculum item directly on the
+                    admin row so curators can verify (and click into)
+                    the linked content without opening the edit dialog.
+                  */}
+                  {row.content && (
+                    <Link
+                      href={contentHref(row.content)}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                    >
+                      <BookOpen className="h-3.5 w-3.5" aria-hidden />
+                      Reminder for: {row.content.title}
+                    </Link>
+                  )}
                   <p className="text-xs text-text-muted">
                     {row.author?.full_name ?? 'Unknown author'} ·{' '}
                     {formatDate(row.published_at)}
@@ -157,6 +272,7 @@ export default async function AdminAnnouncementsPage() {
                     mode="edit"
                     years={yearOptions}
                     cohorts={cohortOptions}
+                    contentOptions={contentOptions}
                     initial={{
                       id: row.id,
                       audience_scope: row.audience_scope,
@@ -165,6 +281,7 @@ export default async function AdminAnnouncementsPage() {
                       title: row.title,
                       body: row.body,
                       pinned: row.pinned,
+                      content_id: row.content_id,
                     }}
                     trigger={
                       <Button variant="ghost" size="sm" aria-label="Edit">

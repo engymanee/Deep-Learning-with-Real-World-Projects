@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { ChevronDown, ChevronUp, Pin } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronUp, Pin } from 'lucide-react'
 import type { DashboardAnnouncement } from '@/lib/dashboard-data'
 
 function useNow(intervalMs = 60_000): number | null {
@@ -104,6 +105,22 @@ export function AnnouncementsFeed({
                   <p className="text-sm text-text leading-relaxed ml-11">
                     {ann.body}
                   </p>
+                  {/*
+                    When the curator pinned the announcement to a
+                    curriculum item, render a focused "Open the lab"
+                    affordance directly below the message. Stays in
+                    the avatar's visual gutter so it threads with the
+                    body copy. No-op when there's no pinned content.
+                  */}
+                  {ann.content && (
+                    <Link
+                      href={ann.content.href}
+                      className="ml-11 inline-flex items-center gap-1.5 rounded-md border border-border bg-bg-muted/60 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-bg-muted"
+                    >
+                      <BookOpen className="h-3.5 w-3.5" aria-hidden />
+                      Open: {ann.content.title}
+                    </Link>
+                  )}
                 </div>
               ))
             )}
