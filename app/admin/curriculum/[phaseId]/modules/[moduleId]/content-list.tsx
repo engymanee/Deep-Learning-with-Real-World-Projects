@@ -225,6 +225,7 @@ function ContentRowItem({
                 duration_minutes: item.duration_minutes,
                 reflection_enabled: item.reflection_enabled,
                 reflection_prompt: item.reflection_prompt,
+                scheduled_at: item.scheduled_at,
                 cohorts: item.cohorts,
               }}
               onSaved={() => setEditOpen(false)}

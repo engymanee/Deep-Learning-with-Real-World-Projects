@@ -20,6 +20,14 @@ interface Props {
   /** Next item href, or null when this is the last item. */
   nextHref: string | null
   /**
+   * When true, the manual "Mark as completed" button is suppressed
+   * - completion is driven by external state (e.g. a scheduled live
+   * session that auto-completes once it has ended). The "Continue
+   * to next item" / "Completed" affordances still render once the
+   * lesson is complete; this only hides the manual incomplete CTA.
+   */
+  autoComplete?: boolean
+  /**
    * Optional helper sentence shown next to the Mark-as-completed
    * CTA while the item is still incomplete. Used by live-session
    * items to reassure fellows that they should mark complete after
@@ -53,6 +61,7 @@ export function LessonFooter({
   needsLinkClick,
   needsReflection,
   nextHref,
+  autoComplete = false,
   incompleteHint,
 }: Props) {
   const router = useRouter()
@@ -130,9 +139,11 @@ export function LessonFooter({
 
   // Whether the page passed in a per-item helper hint to show
   // beside the Mark CTA. Only relevant while the lesson is still
-  // incomplete and not gated by reflection/link clicks.
+  // incomplete and not gated by reflection/link clicks. When the
+  // item auto-completes externally we also skip the hint - the
+  // status block above the footer is the source of truth.
   const showIncompleteHint =
-    !optimistic && !blocked && !!incompleteHint
+    !optimistic && !blocked && !autoComplete && !!incompleteHint
 
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-6">
@@ -188,6 +199,11 @@ export function LessonFooter({
           // Reflection (or link) gate is active. Don't even render
           // the Mark as completed button - completion isn't a
           // visual option yet. The hint above explains why.
+          null
+        ) : autoComplete ? (
+          // Completion is owned by an external mechanism (e.g. the
+          // scheduled live-session block above auto-marks the item
+          // complete once the session ends). No manual CTA needed.
           null
         ) : (
           // All gates cleared: single primary CTA.

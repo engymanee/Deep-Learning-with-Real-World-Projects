@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { LessonFooter } from '@/components/curriculum/lesson-footer'
 import { LinkOpenButton } from '@/components/curriculum/link-open-button'
+import { LiveSessionStatus } from '@/components/curriculum/live-session-status'
 import { ReflectionForm } from '@/components/curriculum/reflection-form'
 import {
   VideoEmbed,
@@ -47,6 +48,11 @@ interface ContentRow {
   duration_minutes: number | null
   reflection_enabled: boolean
   reflection_prompt: string | null
+  /**
+   * UTC ISO start time for live-session items. NULL for any other
+   * resource type or for live items the admin hasn't scheduled.
+   */
+  scheduled_at: string | null
 }
 
 function formatDuration(mins: number | null): string | null {
@@ -88,7 +94,7 @@ export default async function ContentItemPage({
     supabase
       .from('labs')
       .select(
-        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes, reflection_enabled, reflection_prompt',
+        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes, reflection_enabled, reflection_prompt, scheduled_at',
       )
       .eq('id', itemId)
       .eq('module_id', moduleId)
@@ -147,7 +153,7 @@ export default async function ContentItemPage({
     loadFullCurriculum(),
   ])
 
-  const isCompleted = !!completion
+  let isCompleted = !!completion
   const linkClicked = !!linkClick
   const reflectionResponse = reflection?.response ?? null
   const resource = item.resource_type ? getResourceType(item.resource_type) : null
@@ -160,6 +166,35 @@ export default async function ContentItemPage({
   // always be present here in practice - but we don't bypass the
   // gate just because the prompt happens to be missing.
   const reflectionRequired = item.reflection_enabled === true
+
+  // Live-session schedule + auto-completion. When the admin set a
+  // start time we replace the Join button with a smart status block
+  // that runs the countdown client-side. Once the session has ended
+  // (start + duration < now) we mark this item complete on the
+  // user's behalf - no manual click needed - and the rest of the
+  // page renders the standard "completed" state. The upsert is
+  // idempotent so a repeated visit after the session ended is a
+  // no-op. We only auto-complete when the reflection gate isn't
+  // active, since a reflection is a fellow-authored artefact we
+  // shouldn't synthesise on their behalf.
+  const scheduledAt = item.scheduled_at
+  const liveSessionScheduled = isLiveSession && !!scheduledAt
+  if (liveSessionScheduled && !isCompleted && !reflectionRequired) {
+    const startMs = new Date(scheduledAt!).getTime()
+    if (Number.isFinite(startMs)) {
+      const durationMs = (item.duration_minutes ?? 60) * 60 * 1000
+      const endMs = startMs + durationMs
+      if (Date.now() >= endMs) {
+        const { error: completeErr } = await supabase
+          .from('user_content_completions')
+          .upsert(
+            { profile_id: user.id, content_id: item.id },
+            { onConflict: 'profile_id,content_id' },
+          )
+        if (!completeErr) isCompleted = true
+      }
+    }
+  }
 
   const { next } = findAdjacentItems(curriculum, item.id)
 
@@ -210,15 +245,27 @@ export default async function ContentItemPage({
         </div>
       )}
 
-      {/* External resource. For video items with a recognizable
-          provider URL (YouTube / Vimeo / Loom / direct media file)
-          we render an inline 16:9 preview so fellows can play it
-          right in the lesson - reaching the embed counts as the
-          "open" for the completion gate. Anything else falls back to
-          a single CTA whose label is the article title (the click
-          target reads as the thing the fellow is opening). */}
+      {/* External resource. Three branches:
+          - Scheduled live sessions: smart status block with a live
+            countdown + adaptive Join button + auto-complete handoff.
+          - Embeddable videos: inline 16:9 player; reaching the
+            embed counts as the "open" for the completion gate.
+          - Everything else: single CTA whose label is the article
+            title so the click target reads as the thing the fellow
+            is opening. Live sessions without a scheduled_at fall
+            through to this branch and use the legacy Join button. */}
       {hasUrl &&
-        (item.resource_type === 'video' && isEmbeddableVideo(item.url!) ? (
+        (liveSessionScheduled ? (
+          <LiveSessionStatus
+            contentId={item.id}
+            url={item.url!}
+            scheduledAt={scheduledAt!}
+            durationMinutes={item.duration_minutes}
+            isCompleted={isCompleted}
+            serverNow={Date.now()}
+          />
+        ) : item.resource_type === 'video' &&
+          isEmbeddableVideo(item.url!) ? (
           <VideoEmbed
             contentId={item.id}
             url={item.url!}
@@ -254,18 +301,27 @@ export default async function ContentItemPage({
         />
       )}
 
-      {/* Footer pairs Mark-as-complete with Continue. The
-          incomplete-CTA hint is used to reassure live-session
-          fellows that they can mark complete without opening the
-          in-app link. */}
+      {/* Footer pairs Mark-as-complete with Continue.
+          - Scheduled live sessions hide the manual "Mark as
+            completed" button entirely (autoComplete=true) because
+            completion is driven by the schedule: the page upserts a
+            completion row once the session has ended. The "Continue
+            to next item" CTA still appears once the lesson is
+            complete.
+          - Unscheduled live sessions keep the legacy hint reminding
+            fellows they can mark complete after attending.
+          - Reflection-gated live sessions also keep the manual
+            button; we don't want to synthesise a reflection for
+            them. */}
       <LessonFooter
         contentId={item.id}
         isCompleted={isCompleted}
         needsLinkClick={needsLinkClick}
         needsReflection={needsReflection}
         nextHref={next?.href ?? null}
+        autoComplete={liveSessionScheduled && !reflectionRequired}
         incompleteHint={
-          isLiveSession && !needsReflection
+          isLiveSession && !liveSessionScheduled && !needsReflection
             ? 'Mark this complete once you have attended the live session.'
             : null
         }

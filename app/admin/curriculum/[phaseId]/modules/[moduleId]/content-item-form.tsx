@@ -40,11 +40,43 @@ export interface ContentItemDraft {
   reflection_enabled: boolean
   reflection_prompt: string | null
   /**
+   * Wall-clock start time for live-session items, ISO 8601 (UTC).
+   * NULL for non-live items, or live items the admin has not yet
+   * scheduled. Combined with `duration_minutes` to compute the
+   * end of the session for the live-session status block.
+   */
+  scheduled_at: string | null
+  /**
    * `null`  -> inherit from the module
    * `[]`    -> locked (no fellows)
    * `[...]` -> override with this exact list
    */
   cohorts: string[] | null
+}
+
+/**
+ * Convert an ISO 8601 timestamp into the local-time string the
+ * `datetime-local` HTML input expects (`YYYY-MM-DDTHH:MM`). Returns
+ * an empty string when no value is set so the input renders blank.
+ *
+ * The browser's `<input type="datetime-local">` shows and accepts
+ * naive local time only - no timezone suffix - so we have to peel
+ * the timezone off the stored ISO value and re-render in whichever
+ * tz the admin's browser is currently in. This means an admin in
+ * one timezone will see the same wall-clock value an admin in a
+ * different timezone scheduled it as, only converted; that's the
+ * conventional behaviour for browser datetime pickers and matches
+ * how Google Calendar / Zoom present session times.
+ */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  )
 }
 
 interface Props {
@@ -89,12 +121,20 @@ export function ContentItemForm({
   const [reflectionEnabled, setReflectionEnabled] = useState<boolean>(
     initial?.reflection_enabled ?? false,
   )
+  // Local-time string for the live-session datetime picker. Stored
+  // separately from the ISO value because <input type="datetime-local">
+  // shows and submits naive local time. We convert to UTC ISO at
+  // submit time below.
+  const [scheduledLocal, setScheduledLocal] = useState<string>(() =>
+    isoToLocalInput(initial?.scheduled_at ?? null),
+  )
   // Default new items to "inherit"; for edits, use whatever the row stored.
   const [inherit, setInherit] = useState<boolean>(
     initial ? initial.cohorts === null : true,
   )
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const scheduledAtId = useId()
 
   function onSubmit(formData: FormData) {
     setError(null)
@@ -105,6 +145,27 @@ export function ContentItemForm({
     if (reflectionEnabled) formData.set('reflection_enabled', 'on')
     if (inherit) formData.set('cohorts_inherit', 'on')
     if (isEdit) formData.set('id', initial!.id!)
+
+    // Live sessions: convert the naive local datetime the admin
+    // typed into a UTC ISO string the server can persist. We do
+    // the conversion here (client-side) because only the browser
+    // knows the admin's local timezone. An empty string clears
+    // any existing schedule. Non-live resource types submit no
+    // schedule at all; the server interprets that as NULL.
+    if (resourceType === 'live_session') {
+      if (scheduledLocal.trim().length > 0) {
+        const parsed = new Date(scheduledLocal)
+        if (!Number.isNaN(parsed.getTime())) {
+          formData.set('scheduled_at', parsed.toISOString())
+        } else {
+          formData.set('scheduled_at', '')
+        }
+      } else {
+        formData.set('scheduled_at', '')
+      }
+    } else {
+      formData.set('scheduled_at', '')
+    }
 
     startTransition(async () => {
       const res = isEdit
@@ -245,6 +306,33 @@ export function ContentItemForm({
           </p>
         </div>
       </div>
+
+      {/* Live-session schedule. Only relevant when the resource type
+          is a live session - we hide it everywhere else so the form
+          stays focused. The duration field above doubles as the
+          session length, so we don't ask for "end time" separately. */}
+      {resourceType === 'live_session' && (
+        <div className="space-y-2 rounded-md border border-border bg-muted/30 p-4">
+          <Label htmlFor={scheduledAtId}>Session date &amp; time</Label>
+          <Input
+            id={scheduledAtId}
+            type="datetime-local"
+            // Step in 5-minute increments - finer granularity is
+            // rarely useful for a session start time.
+            step={300}
+            value={scheduledLocal}
+            onChange={(e) => setScheduledLocal(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            When the session starts in your local timezone. Fellows
+            will see a live countdown to this time, the join button
+            unlocks shortly before the session begins, and the item
+            auto-completes once the session has ended (start time +
+            duration). Leave blank to keep the legacy &ldquo;Join
+            now&rdquo; behaviour with no countdown.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor={bodyId}>Body (optional)</Label>
