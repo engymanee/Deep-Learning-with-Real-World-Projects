@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bell, Settings, LogOut, User as UserIcon, Shield } from 'lucide-react'
+import { Settings, LogOut, User as UserIcon, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -53,7 +53,7 @@ export function TopBar() {
           Dashboard
         </Link>
         <Link
-          href="/team-roster"
+          href="/team"
           className="text-sm font-medium text-white/80 hover:text-white transition-colors"
         >
           My Team
@@ -81,18 +81,11 @@ export function TopBar() {
         )}
       </nav>
 
-      {/* Right: Notifications + User Menu */}
+      {/* Right: User Menu. The notification bell was removed - it
+          had a "you have a message" warning dot but no underlying
+          notifications system, which made it look broken. We can
+          add it back when the data layer is wired up. */}
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative text-white hover:bg-primary-light"
-          aria-label="Notifications"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-2 right-2 h-2 w-2 bg-warning rounded-full" />
-        </Button>
-
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

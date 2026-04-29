@@ -87,7 +87,14 @@ export function ReflectionForm({
       return
     }
     startTransition(async () => {
-      const res = await submitReflection(contentId, value)
+      // Pass markComplete so the server tries to mark the item
+      // complete in the same call - eliminates the old "Submit
+      // reflection" + "Mark as completed" two-step. If a separate
+      // gate is still pending the server will silently skip
+      // completion; the lesson footer takes over from there.
+      const res = await submitReflection(contentId, value, {
+        markComplete: true,
+      })
       if (!res.ok) {
         setError(res.message)
         return
@@ -190,7 +197,11 @@ export function ReflectionForm({
               </Button>
             )}
             <Button type="submit" disabled={pending || !meetsMinimum}>
-              {pending ? 'Saving...' : savedResponse ? 'Save changes' : 'Submit reflection'}
+              {pending
+                ? 'Saving...'
+                : savedResponse
+                  ? 'Save changes'
+                  : 'Submit & mark complete'}
             </Button>
           </div>
         </form>

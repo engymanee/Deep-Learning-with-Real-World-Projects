@@ -41,6 +41,12 @@ export type ContentRow = {
    */
   reflection_enabled: boolean
   reflection_prompt: string | null
+  /**
+   * UTC ISO start time for live-session items; NULL for any other
+   * resource type or for live items that haven't been scheduled.
+   * Edited via the datetime-local input on `ContentItemForm`.
+   */
+  scheduled_at: string | null
   order_index: number
 }
 
@@ -68,7 +74,7 @@ export default async function AdminModuleDetailPage({
     supabase
       .from('labs')
       .select(
-        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes, reflection_enabled, reflection_prompt, order_index',
+        'id, module_id, title, description, body, url, category, resource_type, cohorts, duration_minutes, reflection_enabled, reflection_prompt, scheduled_at, order_index',
       )
       .eq('module_id', moduleId)
       .order('order_index', { ascending: true })

@@ -327,6 +327,13 @@ interface ContentInputs {
   durationMinutes: number | null
   reflectionEnabled: boolean
   reflectionPrompt: string | null
+  /**
+   * Wall-clock start time for live-session items, ISO 8601 (UTC).
+   * NULL when the resource isn't a live session, or when the admin
+   * hasn't scheduled it yet. Always NULL for non-live resource
+   * types - the form clears it automatically when the type changes.
+   */
+  scheduledAt: string | null
   cohorts: string[] | null
 }
 
@@ -381,6 +388,24 @@ function readContentInputs(formData: FormData): ContentInputs | string {
   }
   const reflectionPrompt = reflectionEnabled ? reflectionPromptRaw : null
 
+  // Live-session schedule. The form converts the admin's local
+  // datetime to a UTC ISO string client-side and submits it here.
+  // We only persist it when the row is actually a live session; for
+  // any other resource type we force NULL so a leftover schedule
+  // can't survive a type change. Empty/blank means "not scheduled
+  // yet" and the fellow UI falls back to the legacy Join button.
+  let scheduledAt: string | null = null
+  if (resourceType === 'live_session') {
+    const raw = nullable(formData.get('scheduled_at'))
+    if (raw !== null) {
+      const d = new Date(raw)
+      if (Number.isNaN(d.getTime())) {
+        return 'Session date & time is not a valid datetime'
+      }
+      scheduledAt = d.toISOString()
+    }
+  }
+
   return {
     phaseId,
     moduleId,
@@ -393,6 +418,7 @@ function readContentInputs(formData: FormData): ContentInputs | string {
     durationMinutes,
     reflectionEnabled,
     reflectionPrompt,
+    scheduledAt,
     cohorts,
   }
 }
@@ -431,6 +457,7 @@ export async function createContent(formData: FormData): Promise<ActionResult> {
       duration_minutes: parsed.durationMinutes,
       reflection_enabled: parsed.reflectionEnabled,
       reflection_prompt: parsed.reflectionPrompt,
+      scheduled_at: parsed.scheduledAt,
       cohorts: parsed.cohorts,
       order_index: nextIndex,
     })
@@ -493,6 +520,7 @@ export async function updateContent(formData: FormData): Promise<ActionResult> {
         duration_minutes: parsed.durationMinutes,
         reflection_enabled: parsed.reflectionEnabled,
         reflection_prompt: parsed.reflectionPrompt,
+        scheduled_at: parsed.scheduledAt,
         cohorts: parsed.cohorts,
         ...(nextOrderIndex !== undefined
           ? { order_index: nextOrderIndex }

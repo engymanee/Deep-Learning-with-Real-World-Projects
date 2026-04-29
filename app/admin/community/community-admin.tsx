@@ -7,7 +7,6 @@ import {
   BookMarked,
   Plus,
   Trash2,
-  Mic,
   Eye,
   EyeOff,
   ExternalLink,
@@ -292,9 +291,33 @@ function PostsSection({ posts }: { posts: PostRow[] }) {
   )
 }
 
+/**
+ * Display label for a post kind in the admin list. Falls back to the
+ * raw kind for legacy values (`post`, `story`, `podcast`) so old rows
+ * still read sensibly.
+ */
+function postKindLabel(kind: string): string {
+  switch (kind) {
+    case 'announcement':
+      return "What's New?"
+    case 'reflection':
+      return 'Reflection'
+    case 'win':
+      return 'Win'
+    case 'question':
+      return 'Question'
+    case 'podcast':
+      return 'Podcast'
+    case 'story':
+      return 'Story'
+    default:
+      return 'Post'
+  }
+}
+
 function PostCard({ post }: { post: PostRow }) {
   const [pending, startTransition] = useTransition()
-  const isPodcast = post.kind === 'podcast'
+  const kindLabel = postKindLabel(post.kind)
   const published = Boolean(post.published_at)
 
   function onToggle() {
@@ -312,8 +335,8 @@ function PostCard({ post }: { post: PostRow }) {
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="gap-1">
-              {isPodcast ? <Mic className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
-              {isPodcast ? 'Podcast' : 'Post'}
+              <FileText className="h-3 w-3" />
+              {kindLabel}
             </Badge>
             <Badge
               variant={published ? 'default' : 'outline'}
@@ -357,11 +380,36 @@ function PostCard({ post }: { post: PostRow }) {
   )
 }
 
+type AdminPostKind = 'announcement' | 'reflection' | 'win' | 'question'
+
+const ADMIN_KIND_OPTIONS: ReadonlyArray<{
+  value: AdminPostKind
+  label: string
+  description: string
+}> = [
+  {
+    value: 'announcement',
+    label: "What's New?",
+    description: 'Program updates and announcements.',
+  },
+  {
+    value: 'reflection',
+    label: 'Reflection',
+    description: 'Stories and insights from practice.',
+  },
+  { value: 'win', label: 'Win', description: 'Celebrate progress.' },
+  {
+    value: 'question',
+    label: 'Question',
+    description: 'Open it up to the community.',
+  },
+]
+
 function AddPostDialog() {
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
-  const [kind, setKind] = useState<'post' | 'podcast'>('post')
+  const [kind, setKind] = useState<AdminPostKind>('announcement')
 
   function onSubmit(fd: FormData) {
     setErr(null)
@@ -386,30 +434,28 @@ function AddPostDialog() {
           <DialogHeader>
             <DialogTitle>New post</DialogTitle>
             <DialogDescription>
-              Save as a draft or publish immediately.
+              Pick which Community section this post belongs to. Save as a
+              draft or publish immediately.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={kind === 'post' ? 'default' : 'outline'}
-              onClick={() => setKind('post')}
-            >
-              <FileText className="h-4 w-4" />
-              Post
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={kind === 'podcast' ? 'default' : 'outline'}
-              onClick={() => setKind('podcast')}
-            >
-              <Mic className="h-4 w-4" />
-              Podcast
-            </Button>
+          <div className="flex flex-wrap gap-2">
+            {ADMIN_KIND_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                type="button"
+                size="sm"
+                variant={kind === opt.value ? 'default' : 'outline'}
+                onClick={() => setKind(opt.value)}
+              >
+                <FileText className="h-4 w-4" />
+                {opt.label}
+              </Button>
+            ))}
           </div>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            {ADMIN_KIND_OPTIONS.find((o) => o.value === kind)?.description}
+          </p>
 
           <FormRow label="Title" htmlFor="post-title">
             <Input id="post-title" name="title" required />
@@ -426,17 +472,6 @@ function AddPostDialog() {
           <FormRow label="Cover image URL (optional)" htmlFor="post-cover">
             <Input id="post-cover" name="cover_url" type="url" placeholder="https://" />
           </FormRow>
-
-          {kind === 'podcast' && (
-            <FormRow label="Audio URL" htmlFor="post-media">
-              <Input
-                id="post-media"
-                name="media_url"
-                type="url"
-                placeholder="https://example.com/episode.mp3"
-              />
-            </FormRow>
-          )}
 
           <label className="flex items-center gap-2 text-sm">
             <input

@@ -19,12 +19,28 @@ interface Props {
   needsReflection: boolean
   /** Next item href, or null when this is the last item. */
   nextHref: string | null
+  /**
+   * When true, the manual "Mark complete" button is suppressed
+   * - completion is driven by external state (e.g. a scheduled live
+   * session that auto-completes once it has ended). The "Continue
+   * to next item" / "Completed" affordances still render once the
+   * lesson is complete; this only hides the manual incomplete CTA.
+   */
+  autoComplete?: boolean
+  /**
+   * Optional helper sentence shown next to the Mark-as-completed
+   * CTA while the item is still incomplete. Used by live-session
+   * items to reassure fellows that they should mark complete after
+   * attending - even if they joined via Calendar instead of the
+   * in-app link.
+   */
+  incompleteHint?: string | null
 }
 
 /**
  * Coursera-style two-state lesson CTA.
  *
- *  Not yet completed:  primary [ Mark as completed ] button.
+ *  Not yet completed:  primary [ Mark complete ] button.
  *                      Disabled with an inline hint until the link
  *                      has been opened (when present) and a
  *                      reflection meeting the minimum word count has
@@ -45,6 +61,8 @@ export function LessonFooter({
   needsLinkClick,
   needsReflection,
   nextHref,
+  autoComplete = false,
+  incompleteHint,
 }: Props) {
   const router = useRouter()
   const [optimistic, setOptimistic] = useState(isCompleted)
@@ -109,21 +127,35 @@ export function LessonFooter({
       type="button"
       onClick={handleReopen}
       disabled={pending}
-      title="Mark as not completed"
-      aria-label="Mark as not completed"
+      title="Mark incomplete"
+      aria-label="Mark incomplete"
       className="group inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
     >
       <Check className="h-4 w-4" aria-hidden="true" />
       <span className="group-hover:hidden">Completed</span>
-      <span className="hidden group-hover:inline">Mark as not completed</span>
+      <span className="hidden group-hover:inline">Mark incomplete</span>
     </button>
   )
+
+  // Whether the page passed in a per-item helper hint to show
+  // beside the Mark CTA. Only relevant while the lesson is still
+  // incomplete and not gated by reflection/link clicks. When the
+  // item auto-completes externally we also skip the hint - the
+  // status block above the footer is the source of truth.
+  const showIncompleteHint =
+    !optimistic && !blocked && !autoComplete && !!incompleteHint
 
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-6">
       {!optimistic && blocked && blockMessage && (
         <p className="text-sm text-muted-foreground" role="status">
           {blockMessage}
+        </p>
+      )}
+
+      {showIncompleteHint && (
+        <p className="text-sm text-muted-foreground" role="status">
+          {incompleteHint}
         </p>
       )}
 
@@ -135,11 +167,13 @@ export function LessonFooter({
 
       <div className="flex flex-wrap items-center justify-end gap-3">
         {optimistic ? (
-          // Completed state: navigation button + neutral indicator.
-          // On the last lesson there's no nextHref so we drop the
-          // button and show only the indicator.
+          // Completed state. When there IS a next item we render
+          // the primary nav CTA. When this is the final item in the
+          // module we still want a way out, so a quiet "Back to
+          // dashboard" link replaces the dead-end - alongside the
+          // neutral Completed indicator either way.
           <>
-            {nextHref && (
+            {nextHref ? (
               <Button
                 type="button"
                 onClick={handleContinue}
@@ -148,13 +182,28 @@ export function LessonFooter({
                 Go to next item
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/dashboard')}
+                className="inline-flex items-center gap-1.5"
+              >
+                Back to dashboard
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Button>
             )}
             {completedBadge}
           </>
         ) : blocked ? (
           // Reflection (or link) gate is active. Don't even render
-          // the Mark as completed button - completion isn't a
-          // visual option yet. The hint above explains why.
+          // the Mark complete button - completion isn't a visual
+          // option yet. The hint above explains why.
+          null
+        ) : autoComplete ? (
+          // Completion is owned by an external mechanism (e.g. the
+          // scheduled live-session block above auto-marks the item
+          // complete once the session ends). No manual CTA needed.
           null
         ) : (
           // All gates cleared: single primary CTA.
@@ -163,7 +212,7 @@ export function LessonFooter({
             onClick={handleMarkComplete}
             disabled={pending}
           >
-            {pending ? 'Marking...' : 'Mark as completed'}
+            {pending ? 'Marking...' : 'Mark complete'}
           </Button>
         )}
       </div>

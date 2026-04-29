@@ -7,12 +7,17 @@ import {
   canFellowSeeContent,
   canFellowSeeModule,
   canFellowSeePhase,
+  type ResourceType,
 } from '@/lib/curriculum'
 import {
   MIN_REFLECTION_WORDS,
   countWords,
   reflectionMeetsMinimum,
 } from '@/lib/reflections'
+import {
+  hasSessionLinkClick,
+  recordSessionLinkClick,
+} from '@/lib/session-link-clicks'
 
 // ----------------------------------------------------------------------------
 // Visibility helper
@@ -23,6 +28,7 @@ interface ItemWithCascade {
   year_id: string
   module_id: string | null
   url: string | null
+  resource_type: ResourceType | null
   reflection_enabled: boolean
   cohorts: string[] | null
   modules: { cohorts: string[] | null } | null
@@ -48,7 +54,7 @@ async function loadVisibleItem(
   const { data: item, error } = await supabase
     .from('labs')
     .select(
-      'id, year_id, module_id, url, reflection_enabled, cohorts, modules:module_id (cohorts), years:year_id (cohorts)',
+      'id, year_id, module_id, url, resource_type, reflection_enabled, cohorts, modules:module_id (cohorts), years:year_id (cohorts)',
     )
     .eq('id', contentId)
     .maybeSingle<ItemWithCascade>()
@@ -107,15 +113,18 @@ export async function toggleContentCompletion(
     const { item } = visible
 
     if (nextCompleted) {
-      // Gate 1: link click (if there's a link to click).
-      if (item.url) {
-        const { data: clickRow } = await supabase
-          .from('user_content_link_clicks')
-          .select('content_id')
-          .eq('profile_id', user.id)
-          .eq('content_id', contentId)
-          .maybeSingle<{ content_id: string }>()
-        if (!clickRow) {
+      // Gate 1: link click. Live sessions are exempt - the fellow
+      // may have joined via Google Calendar or the email invite, so
+      // forcing them to also click the in-app link before marking
+      // the session attended is needlessly clunky. The reflection
+      // gate (gate 2) still applies if the admin enabled one.
+      const linkGated = !!item.url && item.resource_type !== 'live_session'
+      if (linkGated) {
+        // Session-scoped: the gate clears only after the fellow
+        // opens the link in *this* login session. A persisted DB
+        // click from a previous login no longer counts.
+        const clicked = await hasSessionLinkClick(contentId)
+        if (!clicked) {
           return {
             ok: false,
             message: 'Open the linked resource before marking complete.',
@@ -205,6 +214,14 @@ export async function recordLinkClick(
       return { ok: true }
     }
 
+    // 1) Authoritative gate: append to the per-login session
+    //    cookie. This is what `toggleContentCompletion` and the
+    //    page reader consult.
+    await recordSessionLinkClick(contentId)
+
+    // 2) Audit/analytics: keep the legacy DB row so admins can
+    //    still see who has *ever* opened a resource. This is best
+    //    effort - failure here doesn't block the gate clearing.
     const { error } = await supabase
       .from('user_content_link_clicks')
       .upsert(
@@ -230,7 +247,7 @@ export async function recordLinkClick(
 // ----------------------------------------------------------------------------
 
 export type ReflectionResult =
-  | { ok: true }
+  | { ok: true; completed?: boolean }
   | { ok: false; message: string }
 
 const MAX_REFLECTION_LENGTH = 5000
@@ -238,10 +255,19 @@ const MAX_REFLECTION_LENGTH = 5000
 /**
  * Save (or update) the current user's reflection for a content item.
  * Only valid when the item has `reflection_enabled = true`.
+ *
+ * When `opts.markComplete` is true, the action also tries to mark
+ * the item completed in the same round-trip - so the fellow only
+ * needs ONE click ("Submit reflection") instead of two ("Submit"
+ * then "Mark complete"). If a separate gate is still pending
+ * (e.g. the link hasn't been opened yet on a non-live-session
+ * item), the reflection is still saved but completion is silently
+ * skipped; the page footer falls back to the standalone Mark CTA.
  */
 export async function submitReflection(
   contentId: string,
   response: string,
+  opts?: { markComplete?: boolean },
 ): Promise<ReflectionResult> {
   try {
     const user = await requireUser()
@@ -288,10 +314,41 @@ export async function submitReflection(
       )
     if (error) return { ok: false, message: error.message }
 
+    // One-step "submit & complete" flow: only when the caller asks
+    // for it AND the link gate is either absent or already cleared.
+    // We mirror the live-session exemption here so the rules stay
+    // consistent across actions.
+    let completed = false
+    if (opts?.markComplete) {
+      const linkGated = !!item.url && item.resource_type !== 'live_session'
+      let linkOk = !linkGated
+      if (linkGated) {
+        // Same session-scoped check as `toggleContentCompletion`:
+        // we trust the per-login cookie, not the DB audit row.
+        linkOk = await hasSessionLinkClick(contentId)
+      }
+      if (linkOk) {
+        const { error: completeErr } = await supabase
+          .from('user_content_completions')
+          .upsert(
+            { profile_id: user.id, content_id: contentId },
+            { onConflict: 'profile_id,content_id' },
+          )
+        if (!completeErr) {
+          completed = true
+          revalidatePath('/dashboard')
+        }
+        // Failures here are intentionally swallowed - the
+        // reflection itself saved successfully, so we don't want
+        // to surface a confusing error. The footer will still
+        // render the standalone Mark CTA next refresh.
+      }
+    }
+
     revalidatePath(
       `/phases/${item.year_id}/modules/${item.module_id}/items/${contentId}`,
     )
-    return { ok: true }
+    return { ok: true, completed }
   } catch (e) {
     return {
       ok: false,

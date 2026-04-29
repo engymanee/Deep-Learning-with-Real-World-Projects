@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CompletionRadio } from './completion-radio'
 import type { CurriculumItem, CurriculumPhase } from '@/lib/curriculum-tree'
@@ -184,6 +184,39 @@ export function CurriculumTree({ phases }: Props) {
   return (
     <nav aria-label="Curriculum" className="flex flex-col gap-3">
       {phases.map((phase) => {
+        // Locked phases render as a flat, non-interactive stub:
+        // no children loaded, no toggle, just a clear "you don't
+        // have access yet" affordance. Fellows still see the phase
+        // exists so they know the rest of the program is coming.
+        if (phase.isLocked) {
+          return (
+            <section
+              key={phase.id}
+              id={`phase-${phase.id}`}
+              aria-label={`${phase.title} (locked)`}
+              className="rounded-lg border border-dashed border-border bg-muted/30"
+            >
+              <div className="flex w-full items-center justify-between gap-3 px-5 py-4">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-serif text-xl leading-tight text-muted-foreground">
+                    {phase.title}
+                  </h3>
+                </div>
+                {/* Icon-only lock affordance. The label "Locked"
+                    is exposed to screen readers via aria-label /
+                    title - sighted users just see the icon. */}
+                <span
+                  className="inline-flex shrink-0 items-center justify-center rounded-md bg-muted p-1.5 text-muted-foreground"
+                  title="Locked"
+                  aria-label="Locked"
+                >
+                  <Lock className="h-4 w-4" aria-hidden="true" />
+                </span>
+              </div>
+            </section>
+          )
+        }
+
         const phaseOpen = openIds.has(phase.id)
         return (
           <section

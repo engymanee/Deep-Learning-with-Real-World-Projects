@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Building2,
   BookOpen,
+  Library,
   Megaphone,
   MessagesSquare,
 } from 'lucide-react'
@@ -49,6 +50,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             href="/admin/curriculum"
             icon={<BookOpen className="h-4 w-4" />}
             label="Curriculum"
+          />
+          <AdminTab
+            href="/admin/library"
+            icon={<Library className="h-4 w-4" />}
+            label="Library"
           />
           <AdminTab
             href="/admin/community"
