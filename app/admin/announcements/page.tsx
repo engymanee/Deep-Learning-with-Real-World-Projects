@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/empty'
 import {
   Pin,
-  Plus,
   Pencil,
   Trash2,
   Megaphone,
@@ -25,6 +24,7 @@ import {
   type ContentOption,
   type AudienceScope,
 } from './announcement-dialog'
+import { NewAnnouncementButton } from './new-announcement-button'
 import {
   deleteAnnouncement,
   togglePinAnnouncement,
@@ -251,17 +251,11 @@ export default async function AdminAnnouncementsPage() {
             individual fellows.
           </p>
         </div>
-        <AnnouncementDialog
-          mode="create"
+        <NewAnnouncementButton
           schoolTeams={schoolTeams}
           fellows={fellows}
           contentOptions={contentOptions}
-          trigger={
-            <Button size="lg" className="shrink-0">
-              <Plus className="h-4 w-4 mr-2" />
-              New announcement
-            </Button>
-          }
+          variant="header"
         />
       </div>
 
@@ -278,17 +272,11 @@ export default async function AdminAnnouncementsPage() {
             <EmptyTitle>No announcements yet</EmptyTitle>
           </EmptyHeader>
           <div className="mt-4 flex justify-center">
-            <AnnouncementDialog
-              mode="create"
+            <NewAnnouncementButton
               schoolTeams={schoolTeams}
               fellows={fellows}
               contentOptions={contentOptions}
-              trigger={
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create your first announcement
-                </Button>
-              }
+              variant="empty"
             />
           </div>
         </Empty>

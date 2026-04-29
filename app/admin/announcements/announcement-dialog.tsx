@@ -74,7 +74,17 @@ interface Props {
   schoolTeams: SchoolTeamOption[]
   fellows: FellowOption[]
   contentOptions: ContentOption[]
-  trigger: React.ReactNode
+  /**
+   * Optional inline trigger (button, menu item, etc.). When omitted,
+   * the dialog is fully controlled by the parent via `open` /
+   * `onOpenChange` and renders no trigger of its own. We use this
+   * "no-trigger" mode from `<NewAnnouncementButton>`, so the button
+   * stays decoupled from the dialog's internals.
+   */
+  trigger?: React.ReactNode
+  /** Externally-controlled open state. Pair with `onOpenChange`. */
+  open?: boolean
+  onOpenChange?: (next: boolean) => void
 }
 
 const DEFAULTS: AnnouncementFormInitial = {
@@ -103,8 +113,18 @@ export function AnnouncementDialog({
   fellows,
   contentOptions,
   trigger,
+  open: controlledOpen,
+  onOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(false)
+  // Support both uncontrolled (legacy callsites that pass a `trigger`)
+  // and fully-controlled (new `<NewAnnouncementButton>` pattern) modes.
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next)
+    onOpenChange?.(next)
+  }
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -205,7 +225,7 @@ export function AnnouncementDialog({
         }
       }}
     >
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
