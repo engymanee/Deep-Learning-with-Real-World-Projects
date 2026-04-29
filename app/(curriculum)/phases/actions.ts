@@ -14,6 +14,10 @@ import {
   countWords,
   reflectionMeetsMinimum,
 } from '@/lib/reflections'
+import {
+  hasSessionLinkClick,
+  recordSessionLinkClick,
+} from '@/lib/session-link-clicks'
 
 // ----------------------------------------------------------------------------
 // Visibility helper
@@ -116,13 +120,11 @@ export async function toggleContentCompletion(
       // gate (gate 2) still applies if the admin enabled one.
       const linkGated = !!item.url && item.resource_type !== 'live_session'
       if (linkGated) {
-        const { data: clickRow } = await supabase
-          .from('user_content_link_clicks')
-          .select('content_id')
-          .eq('profile_id', user.id)
-          .eq('content_id', contentId)
-          .maybeSingle<{ content_id: string }>()
-        if (!clickRow) {
+        // Session-scoped: the gate clears only after the fellow
+        // opens the link in *this* login session. A persisted DB
+        // click from a previous login no longer counts.
+        const clicked = await hasSessionLinkClick(contentId)
+        if (!clicked) {
           return {
             ok: false,
             message: 'Open the linked resource before marking complete.',
@@ -212,6 +214,14 @@ export async function recordLinkClick(
       return { ok: true }
     }
 
+    // 1) Authoritative gate: append to the per-login session
+    //    cookie. This is what `toggleContentCompletion` and the
+    //    page reader consult.
+    await recordSessionLinkClick(contentId)
+
+    // 2) Audit/analytics: keep the legacy DB row so admins can
+    //    still see who has *ever* opened a resource. This is best
+    //    effort - failure here doesn't block the gate clearing.
     const { error } = await supabase
       .from('user_content_link_clicks')
       .upsert(
@@ -249,7 +259,7 @@ const MAX_REFLECTION_LENGTH = 5000
  * When `opts.markComplete` is true, the action also tries to mark
  * the item completed in the same round-trip - so the fellow only
  * needs ONE click ("Submit reflection") instead of two ("Submit"
- * then "Mark as completed"). If a separate gate is still pending
+ * then "Mark complete"). If a separate gate is still pending
  * (e.g. the link hasn't been opened yet on a non-live-session
  * item), the reflection is still saved but completion is silently
  * skipped; the page footer falls back to the standalone Mark CTA.
@@ -313,13 +323,9 @@ export async function submitReflection(
       const linkGated = !!item.url && item.resource_type !== 'live_session'
       let linkOk = !linkGated
       if (linkGated) {
-        const { data: clickRow } = await supabase
-          .from('user_content_link_clicks')
-          .select('content_id')
-          .eq('profile_id', user.id)
-          .eq('content_id', contentId)
-          .maybeSingle<{ content_id: string }>()
-        linkOk = !!clickRow
+        // Same session-scoped check as `toggleContentCompletion`:
+        // we trust the per-login cookie, not the DB audit row.
+        linkOk = await hasSessionLinkClick(contentId)
       }
       if (linkOk) {
         const { error: completeErr } = await supabase

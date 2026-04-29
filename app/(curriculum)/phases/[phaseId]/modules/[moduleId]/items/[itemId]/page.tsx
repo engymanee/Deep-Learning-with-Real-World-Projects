@@ -23,6 +23,7 @@ import {
   loadFullCurriculum,
 } from '@/lib/curriculum-tree'
 import { reflectionMeetsMinimum } from '@/lib/reflections'
+import { hasSessionLinkClick } from '@/lib/session-link-clicks'
 
 export const dynamic = 'force-dynamic'
 
@@ -123,11 +124,15 @@ export default async function ContentItemPage({
   }
 
   // Look up per-user state for the gates and the completion radio.
-  // All three are scoped to the current user via RLS, so we just
-  // ask for the rows that exist.
+  // Completion + reflection are persisted in Postgres (scoped to the
+  // user via RLS). The link-click gate, however, is intentionally
+  // *session-scoped*: it lives in a per-login cookie ledger
+  // (`hasSessionLinkClick`) so logging out and back in re-engages
+  // the gate. The legacy `user_content_link_clicks` table is still
+  // written for audit, but is no longer consulted for the gate.
   const [
     { data: completion },
-    { data: linkClick },
+    linkClicked,
     { data: reflection },
     curriculum,
   ] = await Promise.all([
@@ -137,12 +142,7 @@ export default async function ContentItemPage({
       .eq('profile_id', user.id)
       .eq('content_id', item.id)
       .maybeSingle<{ content_id: string }>(),
-    supabase
-      .from('user_content_link_clicks')
-      .select('content_id')
-      .eq('profile_id', user.id)
-      .eq('content_id', item.id)
-      .maybeSingle<{ content_id: string }>(),
+    hasSessionLinkClick(item.id),
     supabase
       .from('user_content_reflections')
       .select('response')
@@ -155,7 +155,6 @@ export default async function ContentItemPage({
   ])
 
   let isCompleted = !!completion
-  const linkClicked = !!linkClick
   const reflectionResponse = reflection?.response ?? null
   const resource = item.resource_type ? getResourceType(item.resource_type) : null
   const duration = formatDuration(item.duration_minutes)
@@ -302,9 +301,9 @@ export default async function ContentItemPage({
         />
       )}
 
-      {/* Footer pairs Mark-as-complete with Continue.
-          - Scheduled live sessions hide the manual "Mark as
-            completed" button entirely (autoComplete=true) because
+      {/* Footer pairs Mark-complete with Continue.
+          - Scheduled live sessions hide the manual "Mark complete"
+            button entirely (autoComplete=true) because
             completion is driven by the schedule: the page upserts a
             completion row once the session has ended. The "Continue
             to next item" CTA still appears once the lesson is

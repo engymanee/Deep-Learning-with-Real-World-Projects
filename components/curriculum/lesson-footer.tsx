@@ -20,7 +20,7 @@ interface Props {
   /** Next item href, or null when this is the last item. */
   nextHref: string | null
   /**
-   * When true, the manual "Mark as completed" button is suppressed
+   * When true, the manual "Mark complete" button is suppressed
    * - completion is driven by external state (e.g. a scheduled live
    * session that auto-completes once it has ended). The "Continue
    * to next item" / "Completed" affordances still render once the
@@ -40,7 +40,7 @@ interface Props {
 /**
  * Coursera-style two-state lesson CTA.
  *
- *  Not yet completed:  primary [ Mark as completed ] button.
+ *  Not yet completed:  primary [ Mark complete ] button.
  *                      Disabled with an inline hint until the link
  *                      has been opened (when present) and a
  *                      reflection meeting the minimum word count has
@@ -127,13 +127,13 @@ export function LessonFooter({
       type="button"
       onClick={handleReopen}
       disabled={pending}
-      title="Mark as not completed"
-      aria-label="Mark as not completed"
+      title="Mark incomplete"
+      aria-label="Mark incomplete"
       className="group inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
     >
       <Check className="h-4 w-4" aria-hidden="true" />
       <span className="group-hover:hidden">Completed</span>
-      <span className="hidden group-hover:inline">Mark as not completed</span>
+      <span className="hidden group-hover:inline">Mark incomplete</span>
     </button>
   )
 
@@ -197,8 +197,8 @@ export function LessonFooter({
           </>
         ) : blocked ? (
           // Reflection (or link) gate is active. Don't even render
-          // the Mark as completed button - completion isn't a
-          // visual option yet. The hint above explains why.
+          // the Mark complete button - completion isn't a visual
+          // option yet. The hint above explains why.
           null
         ) : autoComplete ? (
           // Completion is owned by an external mechanism (e.g. the
@@ -212,7 +212,7 @@ export function LessonFooter({
             onClick={handleMarkComplete}
             disabled={pending}
           >
-            {pending ? 'Marking...' : 'Mark as completed'}
+            {pending ? 'Marking...' : 'Mark complete'}
           </Button>
         )}
       </div>
