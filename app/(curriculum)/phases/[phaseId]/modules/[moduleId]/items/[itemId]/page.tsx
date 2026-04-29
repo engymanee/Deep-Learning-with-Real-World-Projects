@@ -3,10 +3,11 @@ import { LessonFooter } from '@/components/curriculum/lesson-footer'
 import { LinkOpenButton } from '@/components/curriculum/link-open-button'
 import { LiveSessionStatus } from '@/components/curriculum/live-session-status'
 import { ReflectionForm } from '@/components/curriculum/reflection-form'
-import {
-  VideoEmbed,
-  isEmbeddableVideo,
-} from '@/components/curriculum/video-embed'
+import { VideoEmbed } from '@/components/curriculum/video-embed'
+// Detector is server-safe (pure URL parsing) and lives in a
+// non-client module so this server component can call it without
+// crossing the RSC client boundary.
+import { isEmbeddableVideo } from '@/lib/video-embed'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
