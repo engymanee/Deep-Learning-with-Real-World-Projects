@@ -62,7 +62,7 @@ export const COMMUNITY_SECTIONS: CommunitySection[] = [
     slug: 'bios',
     label: 'Fellows Bios',
     description:
-      "Meet every fellow and facilitator across the program - search, filter, and open a full profile.",
+      'Meet every fellow and faculty member across the program - search, filter by team, and open a full profile.',
     icon: Users,
     postKinds: null,
     writeKind: null,

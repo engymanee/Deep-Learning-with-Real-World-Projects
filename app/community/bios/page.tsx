@@ -34,6 +34,9 @@ export default async function CommunityBiosPage() {
   const section = getSectionBySlug('bios')!
   const supabase = await createClient()
 
+  // Include admin alongside facilitator so the directory surfaces
+  // every faculty member (program staff = facilitator + admin) plus
+  // every fellow. Fellows in turn see the entire fellowship cohort.
   const { data } = await supabase
     .from('profiles')
     .select(
@@ -42,7 +45,7 @@ export default async function CommunityBiosPage() {
       schools:school_id (name)
       `,
     )
-    .in('role', ['fellow', 'facilitator'])
+    .in('role', ['fellow', 'facilitator', 'admin'])
     .is('deactivated_at', null)
     .order('full_name', { ascending: true })
     .limit(500)
@@ -70,7 +73,7 @@ export default async function CommunityBiosPage() {
 
       {profiles.length === 0 ? (
         <p className="rounded-md border border-dashed border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
-          No fellows or facilitators are listed yet.
+          No fellows or faculty are listed yet.
         </p>
       ) : (
         <BiosDirectory
