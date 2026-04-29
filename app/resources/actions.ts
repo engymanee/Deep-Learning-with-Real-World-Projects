@@ -22,6 +22,14 @@ const MAX_TITLE_LEN = 200
 const MAX_DESC_LEN = 1_000
 const MAX_TAGS = 8
 const MAX_TAG_LEN = 32
+/** Cover image guard rails. 5 MB is plenty for a card hero. */
+const MAX_COVER_BYTES = 5 * 1024 * 1024
+const COVER_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+])
 
 /**
  * Add a resource to the shared Library. Admin / facilitator only.
@@ -48,6 +56,13 @@ export async function addLibraryResource(
     tags?: string[]
     isUniversal?: boolean
     cohorts?: string[]
+    /**
+     * Optional cover image. Sent from the client as a File via
+     * FormData. Validated for type + size, then uploaded to the
+     * `resource-covers` bucket and the public URL is persisted on
+     * the new row's `cover_url` column.
+     */
+    coverFile?: File | null
   },
 ): Promise<LibraryActionResult> {
   try {
@@ -129,6 +144,63 @@ export async function addLibraryResource(
     }
 
     const supabase = await createClient()
+
+    // Optional cover image. Validate, upload to the `resource-covers`
+    // bucket, then persist the resulting public URL alongside the
+    // row. We upload BEFORE insert so a failed upload surfaces a
+    // user-visible error instead of leaving an orphan row pointing
+    // at nothing.
+    let coverUrl: string | null = null
+    const cover = input.coverFile
+    if (cover && typeof cover === 'object' && cover.size > 0) {
+      if (!COVER_MIME_TYPES.has(cover.type)) {
+        return {
+          ok: false,
+          message: 'Cover image must be a PNG, JPEG, WebP, or GIF.',
+        }
+      }
+      if (cover.size > MAX_COVER_BYTES) {
+        return {
+          ok: false,
+          message: 'Cover image must be 5 MB or smaller.',
+        }
+      }
+      // Filename: <userId>/<timestamp>-<random>.<ext>. Folder is the
+      // uploader's auth uid so the storage RLS policy (which scopes
+      // writes to the caller's own folder) is satisfied. The
+      // timestamp + random suffix stops two simultaneous uploads
+      // from clobbering each other.
+      const ext =
+        cover.type === 'image/png'
+          ? 'png'
+          : cover.type === 'image/webp'
+            ? 'webp'
+            : cover.type === 'image/gif'
+              ? 'gif'
+              : 'jpg'
+      const path = `${user.id}/${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}.${ext}`
+
+      const upload = await supabase.storage
+        .from('resource-covers')
+        .upload(path, cover, {
+          contentType: cover.type,
+          cacheControl: '3600',
+          upsert: false,
+        })
+      if (upload.error) {
+        return {
+          ok: false,
+          message: `Cover upload failed: ${upload.error.message}`,
+        }
+      }
+      const { data: publicData } = supabase.storage
+        .from('resource-covers')
+        .getPublicUrl(upload.data.path)
+      coverUrl = publicData.publicUrl
+    }
+
     const { error } = await supabase.from('community_resources').insert({
       title,
       description,
@@ -137,8 +209,20 @@ export async function addLibraryResource(
       tags,
       cohorts,
       is_universal: isUniversal,
+      cover_url: coverUrl,
     })
-    if (error) return { ok: false, message: error.message }
+    if (error) {
+      // Best-effort cleanup: if we uploaded a cover but the row
+      // insert failed, drop the orphan blob so the bucket doesn't
+      // accumulate dead images.
+      if (coverUrl) {
+        const path = coverUrl.split('/resource-covers/')[1]
+        if (path) {
+          await supabase.storage.from('resource-covers').remove([path])
+        }
+      }
+      return { ok: false, message: error.message }
+    }
 
     revalidatePath('/resources')
     return { ok: true }

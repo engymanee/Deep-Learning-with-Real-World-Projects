@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Plus, X } from 'lucide-react'
+import { ImagePlus, Plus, Upload, X } from 'lucide-react'
 import { addLibraryResource } from '@/app/resources/actions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -52,6 +53,9 @@ type ResourceType = (typeof TYPE_OPTIONS)[number]['value']
 type Visibility = 'cohort' | 'universal'
 
 const MAX_TAGS = 8
+/** Mirror server validation so users get instant feedback. */
+const MAX_COVER_BYTES = 5 * 1024 * 1024
+const COVER_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
 
 /**
  * Admin / facilitator-only entry point for publishing a new Library
@@ -85,6 +89,22 @@ export function AddResourceDialog() {
   const [tags, setTags] = useState<string[]>([])
   const [tagDraft, setTagDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // Cover image: keep the actual File for upload + a transient
+  // object URL for the preview. The object URL has to be revoked on
+  // unmount / replacement so we don't leak memory.
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const coverInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreview(null)
+      return
+    }
+    const objectUrl = URL.createObjectURL(coverFile)
+    setCoverPreview(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [coverFile])
 
   function reset() {
     setTitle('')
@@ -96,6 +116,35 @@ export function AddResourceDialog() {
     setTags([])
     setTagDraft('')
     setError(null)
+    setCoverFile(null)
+    if (coverInputRef.current) coverInputRef.current.value = ''
+  }
+
+  function handleCoverPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setCoverFile(null)
+      return
+    }
+    // Mirror server-side validation so the user doesn't wait for a
+    // round trip just to learn their image is too big.
+    if (!file.type.startsWith('image/')) {
+      setError('Cover image must be a PNG, JPEG, WebP, or GIF.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > MAX_COVER_BYTES) {
+      setError('Cover image must be 5 MB or smaller.')
+      e.target.value = ''
+      return
+    }
+    setError(null)
+    setCoverFile(file)
+  }
+
+  function clearCover() {
+    setCoverFile(null)
+    if (coverInputRef.current) coverInputRef.current.value = ''
   }
 
   function commitTagDraft() {
@@ -167,6 +216,7 @@ export function AddResourceDialog() {
         tags: finalTags,
         isUniversal: visibility === 'universal',
         cohorts: visibility === 'cohort' ? cohorts : [],
+        coverFile: coverFile ?? null,
       })
       if (!result.ok) {
         setError(result.message)
@@ -264,6 +314,80 @@ export function AddResourceDialog() {
           <p className="-mt-2 text-xs text-muted-foreground">
             File uploads (PDF, MP4) are coming soon. Paste a link for now.
           </p>
+
+          {/* Cover image. Optional - if omitted, the card on the
+              Library page falls back to a type-icon panel. */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="library-cover">
+              Cover image{' '}
+              <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <input
+              ref={coverInputRef}
+              id="library-cover"
+              type="file"
+              accept={COVER_ACCEPT}
+              onChange={handleCoverPick}
+              className="sr-only"
+            />
+            {coverPreview ? (
+              <div className="flex items-start gap-3">
+                <div className="relative h-24 w-40 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+                  <Image
+                    src={coverPreview}
+                    alt="Selected cover preview"
+                    fill
+                    sizes="160px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {coverFile?.name}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => coverInputRef.current?.click()}
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Replace
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearCover}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                className="flex items-center gap-3 rounded-md border border-dashed border-border bg-muted/40 p-4 text-left transition-colors hover:border-primary/60 hover:bg-muted"
+              >
+                <span className="grid h-10 w-10 place-items-center rounded-md bg-background text-muted-foreground">
+                  <ImagePlus className="h-5 w-5" />
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-foreground">
+                    Upload a cover image
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    PNG, JPEG, WebP, or GIF. Up to 5 MB.
+                  </span>
+                </span>
+              </button>
+            )}
+          </div>
 
           {/* Visibility radio + (conditional) cohort multi-select.
               The cohort row collapses when "Further reading" is

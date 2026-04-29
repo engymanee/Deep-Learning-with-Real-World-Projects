@@ -37,7 +37,7 @@ export default async function LibraryPage() {
   const { data: rows } = await supabase
     .from('community_resources')
     .select(
-      'id, title, description, url, resource_type, tags, cohorts, is_universal, created_at',
+      'id, title, description, url, resource_type, tags, cohorts, is_universal, created_at, cover_url',
     )
     .order('created_at', { ascending: false })
 
@@ -75,6 +75,7 @@ export default async function LibraryPage() {
       cohorts: Array.isArray(r.cohorts) ? (r.cohorts as string[]) : [],
       isUniversal: r.is_universal === true,
       createdAt: r.created_at,
+      coverUrl: r.cover_url ?? null,
     }
   }
 
@@ -82,6 +83,10 @@ export default async function LibraryPage() {
   const furtherReading: LibraryResource[] = universalRows.map(toResource)
 
   const canManage = user.role === 'admin' || user.role === 'facilitator'
+  // Cohort labels are program-internal staging metadata. Surface
+  // them on cards / list rows for admins only - facilitators and
+  // fellows shouldn't see them.
+  const showCohort = user.role === 'admin'
 
   return (
     <div className="min-h-screen bg-background">
@@ -91,6 +96,7 @@ export default async function LibraryPage() {
           myResources={myResources}
           furtherReading={furtherReading}
           canManage={canManage}
+          showCohort={showCohort}
         />
       </main>
     </div>

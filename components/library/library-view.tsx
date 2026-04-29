@@ -55,6 +55,8 @@ export interface LibraryResource {
   isUniversal: boolean
   /** ISO timestamp; null when the underlying row is missing one. */
   createdAt: string | null
+  /** Public URL of the cover image. Null falls back to a type-icon panel. */
+  coverUrl: string | null
 }
 
 export interface LibraryViewProps {
@@ -64,6 +66,13 @@ export interface LibraryViewProps {
   furtherReading: LibraryResource[]
   /** Whether to render the admin-only "Add resource" affordance. */
   canManage: boolean
+  /**
+   * Whether to render the per-card "Cohort A / B / C" badges. Admin-
+   * only - cohort labels are program-internal staging metadata, not
+   * something fellows should see surfaced on every resource. The
+   * server passes this in based on `user.role === 'admin'`.
+   */
+  showCohort?: boolean
 }
 
 type TypeFilter = 'all' | 'document' | 'video' | 'link' | 'reading'
@@ -101,6 +110,7 @@ export function LibraryView({
   myResources,
   furtherReading,
   canManage,
+  showCohort = false,
 }: LibraryViewProps) {
   const [tab, setTab] = useState<TabId>('mine')
   const [view, setView] = useState<'grid' | 'list'>('grid')
@@ -320,6 +330,7 @@ export function LibraryView({
             query={query}
             typeFilter={typeFilter}
             tagFilter={tagFilter}
+            showCohort={showCohort}
           />
         </TabsContent>
         <TabsContent value="further" className="mt-0">
@@ -331,6 +342,7 @@ export function LibraryView({
             query={query}
             typeFilter={typeFilter}
             tagFilter={tagFilter}
+            showCohort={showCohort}
           />
         </TabsContent>
       </Tabs>
@@ -346,6 +358,7 @@ function ResultsBody({
   query,
   typeFilter,
   tagFilter,
+  showCohort,
 }: {
   tab: TabId
   view: 'grid' | 'list'
@@ -354,6 +367,7 @@ function ResultsBody({
   query: string
   typeFilter: TypeFilter
   tagFilter: string[]
+  showCohort: boolean
 }) {
   if (filtered.length === 0) {
     return (
@@ -370,7 +384,7 @@ function ResultsBody({
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((r) => (
-          <GridCard key={r.id} resource={r} />
+          <GridCard key={r.id} resource={r} showCohort={showCohort} />
         ))}
       </div>
     )
@@ -378,7 +392,7 @@ function ResultsBody({
   return (
     <ul className="flex flex-col gap-2">
       {filtered.map((r) => (
-        <ListRow key={r.id} resource={r} />
+        <ListRow key={r.id} resource={r} showCohort={showCohort} />
       ))}
     </ul>
   )
@@ -527,9 +541,16 @@ function TagFilterPopover({
 }
 
 /** Compact card surfaced in grid view - the primary library
- *  affordance. Hover lifts the border + adds a subtle shadow so
- *  card boundaries stay readable on the muted background. */
-function GridCard({ resource }: { resource: LibraryResource }) {
+ *  affordance. The cover image is the visual anchor; when missing,
+ *  we render an icon-tinted panel so the layout stays uniform across
+ *  the grid (no "some cards have an image, some are blank text"). */
+function GridCard({
+  resource,
+  showCohort,
+}: {
+  resource: LibraryResource
+  showCohort: boolean
+}) {
   const meta = TYPE_META[resource.resourceType]
   const Icon = meta.Icon
 
@@ -538,55 +559,79 @@ function GridCard({ resource }: { resource: LibraryResource }) {
       href={resource.url}
       target="_blank"
       rel="noreferrer"
-      className="group flex h-full flex-col gap-3 rounded-lg border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+      className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
     >
-      <div className="flex items-start justify-between gap-3">
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+      {/* Hero: cover image or icon fallback. Aspect ratio is fixed
+          so the grid stays even regardless of the source image. */}
+      <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
+        {resource.coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={resource.coverUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/10 via-muted to-muted">
+            <Icon className="h-10 w-10 text-primary/60" aria-hidden="true" />
+          </div>
+        )}
+        <Badge
+          variant="secondary"
+          className="absolute left-3 top-3 bg-card/95 text-[10px] uppercase tracking-wide backdrop-blur"
+        >
+          <Icon className="mr-1 h-3 w-3" aria-hidden="true" />
           {meta.label}
         </Badge>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2">
-        <h3 className="line-clamp-2 font-serif text-base leading-snug text-foreground group-hover:text-primary">
-          {resource.title}
-        </h3>
-        {resource.description && (
-          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-            {resource.description}
-          </p>
-        )}
-      </div>
-
-      <CohortBadgeRow resource={resource} />
-
-      {resource.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {resource.tags.slice(0, 4).map((t) => (
-            <Badge key={t} variant="secondary" className="text-[10px]">
-              {t}
-            </Badge>
-          ))}
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <div className="flex flex-1 flex-col gap-2">
+          <h3 className="line-clamp-2 font-serif text-base leading-snug text-foreground group-hover:text-primary">
+            {resource.title}
+          </h3>
+          {resource.description && (
+            <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+              {resource.description}
+            </p>
+          )}
         </div>
-      )}
 
-      <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
-        <DateLabel iso={resource.createdAt} />
-        <span className="inline-flex items-center gap-1 font-medium text-primary">
-          {meta.cta}
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-        </span>
+        {showCohort && <CohortBadgeRow resource={resource} />}
+
+        {resource.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {resource.tags.slice(0, 4).map((t) => (
+              <Badge key={t} variant="secondary" className="text-[10px]">
+                {t}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
+          <DateLabel iso={resource.createdAt} />
+          <span className="inline-flex items-center gap-1 font-medium text-primary">
+            {meta.cta}
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+        </div>
       </div>
     </a>
   )
 }
 
-/** Dense one-per-row layout used by the List view. Keeps the same
- *  affordances the card has, just rearranged horizontally so users
- *  can scan more items per screen. */
-function ListRow({ resource }: { resource: LibraryResource }) {
+/** Dense one-per-row layout used by the List view. Renders a small
+ *  thumbnail using the same cover image so users get a consistent
+ *  visual cue regardless of which view mode they prefer. */
+function ListRow({
+  resource,
+  showCohort,
+}: {
+  resource: LibraryResource
+  showCohort: boolean
+}) {
   const meta = TYPE_META[resource.resourceType]
   const Icon = meta.Icon
 
@@ -598,9 +643,22 @@ function ListRow({ resource }: { resource: LibraryResource }) {
         rel="noreferrer"
         className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40"
       >
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" aria-hidden="true" />
-        </span>
+        {/* 16:9 thumbnail keeps shape parity with the grid cards. */}
+        <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-md bg-muted">
+          {resource.coverUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={resource.coverUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/10 to-muted">
+              <Icon className="h-5 w-5 text-primary/60" aria-hidden="true" />
+            </div>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-2">
             <h3 className="font-serif text-base leading-snug text-foreground group-hover:text-primary">
@@ -609,7 +667,7 @@ function ListRow({ resource }: { resource: LibraryResource }) {
             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
               {meta.label}
             </Badge>
-            <CohortBadgeRow resource={resource} compact />
+            {showCohort && <CohortBadgeRow resource={resource} compact />}
           </div>
           {resource.description && (
             <p className="mt-1 line-clamp-1 text-sm leading-relaxed text-muted-foreground">
