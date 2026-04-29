@@ -237,25 +237,27 @@ export default async function AdminAnnouncementsPage() {
   return (
     <div className="space-y-6">
       {/*
-        The admin layout's tab strip already shows "Announcements" as the
-        section, so we don't repeat the heading here. We keep a one-line
-        description on the left and the primary action on the right; the
-        flex layout collapses to a column on narrow viewports so the
-        "New announcement" button is always visible (it was getting
-        squeezed off-screen in the previous wrap-based layout).
+        Section header. We keep an explicit H2 + description on the left
+        and the primary CTA on the right. Wrapping is allowed via
+        `flex-wrap` so the button stays on screen on narrow viewports
+        instead of being clipped, and `shrink-0` guarantees the button
+        never collapses to zero width when the description is long.
       */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-text-muted max-w-xl">
-          Post messages to everyone, a specific cohort, a school team, or
-          individual fellows.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1 min-w-0">
+          <h2 className="font-serif text-2xl text-foreground">Announcements</h2>
+          <p className="text-sm text-muted-foreground max-w-xl">
+            Post messages to everyone, a specific cohort, a school team, or
+            individual fellows.
+          </p>
+        </div>
         <AnnouncementDialog
           mode="create"
           schoolTeams={schoolTeams}
           fellows={fellows}
           contentOptions={contentOptions}
           trigger={
-            <Button size="lg" className="self-start sm:self-auto shrink-0">
+            <Button size="lg" className="shrink-0">
               <Plus className="h-4 w-4 mr-2" />
               New announcement
             </Button>
@@ -264,6 +266,10 @@ export default async function AdminAnnouncementsPage() {
       </div>
 
       {rows.length === 0 ? (
+        // Redundant CTA inside the empty state so curators have a
+        // second, in-context way to start their first announcement -
+        // important when the page-level button might be off-screen on
+        // small displays or scrolled past.
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -271,6 +277,20 @@ export default async function AdminAnnouncementsPage() {
             </EmptyMedia>
             <EmptyTitle>No announcements yet</EmptyTitle>
           </EmptyHeader>
+          <div className="mt-4 flex justify-center">
+            <AnnouncementDialog
+              mode="create"
+              schoolTeams={schoolTeams}
+              fellows={fellows}
+              contentOptions={contentOptions}
+              trigger={
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create your first announcement
+                </Button>
+              }
+            />
+          </div>
         </Empty>
       ) : (
         <div className="space-y-3">
