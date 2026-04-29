@@ -4,7 +4,22 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 
-export type AnnouncementScope = 'global' | 'year' | 'cohort'
+/**
+ * Audience scopes the curator can pick from. The DB still allows a
+ * legacy `year` value for historical rows, but the picker no longer
+ * offers it - new and edited announcements always land in one of
+ * these four scopes.
+ *
+ * - global       : visible to everyone signed-in
+ * - cohort       : visible to fellows whose profile.cohort is in cohort_codes (A/B/C)
+ * - school_team  : visible to fellows whose cohort_members row matches one of school_team_ids
+ * - users        : visible only to the explicit profiles.id list in user_ids
+ */
+export type AnnouncementScope = 'global' | 'cohort' | 'school_team' | 'users'
+
+const VALID_COHORT_CODES = ['A', 'B', 'C'] as const
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // --------------------------------------------------------------------
 // Helpers
@@ -25,13 +40,25 @@ function optionalString(fd: FormData, key: string): string | null {
 }
 
 /**
- * Resolve and lightly validate the optional curriculum-content pin.
- * - When the picker is left blank we persist NULL.
- * - When a lab id is supplied we confirm it actually exists so a
- *   stale or hand-edited form value can't introduce a dangling FK
- *   (the column is also a real FK with on-delete-set-null, but the
- *   explicit existence check yields a friendlier error message than
- *   a Postgres 23503 surfaced to the user).
+ * Read a multi-valued form field, trim entries, drop empties, and
+ * deduplicate (so accidental double-clicks on a checkbox don't write
+ * `["A","A"]`).
+ */
+function multiString(fd: FormData, key: string): string[] {
+  const seen = new Set<string>()
+  for (const raw of fd.getAll(key)) {
+    if (typeof raw !== 'string') continue
+    const v = raw.trim()
+    if (v === '') continue
+    seen.add(v)
+  }
+  return [...seen]
+}
+
+/**
+ * Validate the optional curriculum-content pin. NULL when omitted; an
+ * explicit existence check on `labs` so a stale or hand-edited form
+ * value yields a friendlier error than the raw FK violation.
  */
 async function resolveContentId(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -51,26 +78,109 @@ async function resolveContentId(
 }
 
 /**
- * Map the audience_scope + the two nullable target ids into a strictly
- * valid (scope, year_id, cohort_id) tuple that satisfies the DB check
- * constraint. Rejects invalid combinations early with a clear error.
+ * Resolve scope + the three array inputs into a strict, fully-typed
+ * payload that satisfies the DB scope_targets check constraint. Each
+ * non-global scope must carry at least one matching target id; we
+ * blank the other arrays so the row is unambiguous.
+ *
+ * Also validates target ids: cohort codes must be one of A/B/C, and
+ * uuid arrays must look like uuids. The DB has its own checks too,
+ * but doing it here yields better error messages.
  */
-function resolveScopeTargets(
+async function resolveAudience(
+  supabase: Awaited<ReturnType<typeof createClient>>,
   scope: AnnouncementScope,
-  yearId: string | null,
-  cohortId: string | null,
-): { year_id: string | null; cohort_id: string | null } {
+  cohortCodes: string[],
+  schoolTeamIds: string[],
+  userIds: string[],
+): Promise<{
+  audience_scope: AnnouncementScope
+  cohort_codes: string[] | null
+  school_team_ids: string[] | null
+  user_ids: string[] | null
+  // legacy columns we keep nulled to avoid stale data
+  year_id: string | null
+  cohort_id: string | null
+}> {
   if (scope === 'global') {
-    return { year_id: null, cohort_id: null }
+    return {
+      audience_scope: 'global',
+      cohort_codes: null,
+      school_team_ids: null,
+      user_ids: null,
+      year_id: null,
+      cohort_id: null,
+    }
   }
-  if (scope === 'year') {
-    if (!yearId) throw new Error('Year is required for year-scoped announcements')
-    return { year_id: yearId, cohort_id: null }
+
+  if (scope === 'cohort') {
+    const cleaned = cohortCodes.filter((c) =>
+      (VALID_COHORT_CODES as readonly string[]).includes(c),
+    )
+    if (cleaned.length === 0) {
+      throw new Error('Pick at least one cohort (A, B, or C).')
+    }
+    return {
+      audience_scope: 'cohort',
+      cohort_codes: cleaned,
+      school_team_ids: null,
+      user_ids: null,
+      year_id: null,
+      cohort_id: null,
+    }
   }
-  if (!cohortId) {
-    throw new Error('Cohort is required for cohort-scoped announcements')
+
+  if (scope === 'school_team') {
+    const cleaned = schoolTeamIds.filter((id) => UUID_RE.test(id))
+    if (cleaned.length === 0) {
+      throw new Error('Pick at least one school team.')
+    }
+    // Sanity check: every id must exist.
+    const { data: existing, error } = await supabase
+      .from('cohorts')
+      .select('id')
+      .in('id', cleaned)
+    if (error) throw error
+    const found = new Set((existing ?? []).map((r) => r.id))
+    const missing = cleaned.filter((id) => !found.has(id))
+    if (missing.length > 0) {
+      throw new Error(
+        `One or more school teams could not be found. Please reselect.`,
+      )
+    }
+    return {
+      audience_scope: 'school_team',
+      cohort_codes: null,
+      school_team_ids: cleaned,
+      user_ids: null,
+      year_id: null,
+      cohort_id: null,
+    }
   }
-  return { year_id: null, cohort_id: cohortId }
+
+  // scope === 'users'
+  const cleaned = userIds.filter((id) => UUID_RE.test(id))
+  if (cleaned.length === 0) {
+    throw new Error('Pick at least one fellow.')
+  }
+  const { data: existingUsers, error: usersErr } = await supabase
+    .from('profiles')
+    .select('id')
+    .in('id', cleaned)
+  if (usersErr) throw usersErr
+  const foundUsers = new Set((existingUsers ?? []).map((r) => r.id))
+  const missingUsers = cleaned.filter((id) => !foundUsers.has(id))
+  if (missingUsers.length > 0) {
+    throw new Error('One or more fellows could not be found. Please reselect.')
+  }
+  return {
+    audience_scope: 'users',
+    cohort_codes: null,
+    school_team_ids: null,
+    user_ids: cleaned,
+    year_id: null,
+    cohort_id: null,
+  }
 }
 
 // --------------------------------------------------------------------
@@ -81,25 +191,26 @@ export async function createAnnouncement(fd: FormData) {
   const admin = await requireAdmin()
   const supabase = await createClient()
 
-  const scope = (requiredString(fd, 'audience_scope') as AnnouncementScope)
-  const targets = resolveScopeTargets(
+  const scope = requiredString(fd, 'audience_scope') as AnnouncementScope
+  const audience = await resolveAudience(
+    supabase,
     scope,
-    optionalString(fd, 'year_id'),
-    optionalString(fd, 'cohort_id'),
+    multiString(fd, 'cohort_codes'),
+    multiString(fd, 'school_team_ids'),
+    multiString(fd, 'user_ids'),
   )
-  // Optional pin to an existing curriculum item. Validated so stale
-  // form values can't create dangling references.
-  const contentId = await resolveContentId(supabase, optionalString(fd, 'content_id'))
+  const contentId = await resolveContentId(
+    supabase,
+    optionalString(fd, 'content_id'),
+  )
 
   const { error } = await supabase.from('announcements').insert({
     author_id: admin.id,
-    audience_scope: scope,
-    year_id: targets.year_id,
-    cohort_id: targets.cohort_id,
     title: requiredString(fd, 'title'),
     body: requiredString(fd, 'body'),
     pinned: fd.get('pinned') === 'on',
     content_id: contentId,
+    ...audience,
   })
   if (error) throw error
 
@@ -116,28 +227,27 @@ export async function updateAnnouncement(fd: FormData) {
   const supabase = await createClient()
 
   const id = requiredString(fd, 'id')
-  const scope = (requiredString(fd, 'audience_scope') as AnnouncementScope)
-  const targets = resolveScopeTargets(
+  const scope = requiredString(fd, 'audience_scope') as AnnouncementScope
+  const audience = await resolveAudience(
+    supabase,
     scope,
-    optionalString(fd, 'year_id'),
-    optionalString(fd, 'cohort_id'),
+    multiString(fd, 'cohort_codes'),
+    multiString(fd, 'school_team_ids'),
+    multiString(fd, 'user_ids'),
   )
-  // We always write content_id explicitly (null clears any prior pin,
-  // a uuid sets/replaces it). The picker submits an empty string when
-  // the curator chooses "No content"; resolveContentId maps both that
-  // and missing fields to NULL.
-  const contentId = await resolveContentId(supabase, optionalString(fd, 'content_id'))
+  const contentId = await resolveContentId(
+    supabase,
+    optionalString(fd, 'content_id'),
+  )
 
   const { error } = await supabase
     .from('announcements')
     .update({
-      audience_scope: scope,
-      year_id: targets.year_id,
-      cohort_id: targets.cohort_id,
       title: requiredString(fd, 'title'),
       body: requiredString(fd, 'body'),
       pinned: fd.get('pinned') === 'on',
       content_id: contentId,
+      ...audience,
     })
     .eq('id', id)
   if (error) throw error
@@ -163,7 +273,7 @@ export async function deleteAnnouncement(fd: FormData) {
 }
 
 // --------------------------------------------------------------------
-// Toggle pin (small convenience action for the list row)
+// Toggle pin
 // --------------------------------------------------------------------
 
 export async function togglePinAnnouncement(fd: FormData) {

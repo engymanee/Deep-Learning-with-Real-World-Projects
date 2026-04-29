@@ -3,7 +3,12 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Empty, EmptyHeader, EmptyTitle, EmptyMedia } from '@/components/ui/empty'
+import {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyMedia,
+} from '@/components/ui/empty'
 import {
   Pin,
   Plus,
@@ -11,12 +16,14 @@ import {
   Trash2,
   Megaphone,
   BookOpen,
+  Users,
 } from 'lucide-react'
 import {
   AnnouncementDialog,
-  type YearOption,
-  type CohortOption,
+  type SchoolTeamOption,
+  type FellowOption,
   type ContentOption,
+  type AudienceScope,
 } from './announcement-dialog'
 import {
   deleteAnnouncement,
@@ -25,21 +32,22 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 interface AnnouncementRow {
   id: string
   title: string
   body: string
   pinned: boolean
-  audience_scope: 'global' | 'year' | 'cohort'
-  year_id: string | null
-  cohort_id: string | null
+  audience_scope: AudienceScope | 'year'
+  cohort_codes: string[] | null
+  school_team_ids: string[] | null
+  user_ids: string[] | null
   content_id: string | null
   published_at: string
-  year: { id: string; title: string } | null
-  cohort: { id: string; name: string } | null
   author: { full_name: string | null } | null
-  /** Joined lab summary so the row can render a deep-link to the
-   *  pinned curriculum item without a second round trip. */
   content: {
     id: string
     title: string
@@ -48,18 +56,52 @@ interface AnnouncementRow {
   } | null
 }
 
-/**
- * Build the public learner URL for a curriculum item. Mirrors the
- * route at app/(curriculum)/phases/[phaseId]/modules/[moduleId]/items/[itemId].
- */
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function contentHref(c: { year_id: string; module_id: string; id: string }) {
   return `/phases/${c.year_id}/modules/${c.module_id}/items/${c.id}`
 }
 
-function audienceLabel(row: AnnouncementRow): string {
-  if (row.audience_scope === 'global') return 'Everyone'
-  if (row.audience_scope === 'year') return row.year?.title ?? 'Year'
-  return row.cohort?.name ?? 'Cohort'
+/**
+ * Pretty audience summary for the list row. Falls back to a generic
+ * label for legacy "year" rows we no longer let curators create.
+ */
+function audienceLabel(
+  row: AnnouncementRow,
+  schoolNameById: Map<string, string>,
+  fellowNameById: Map<string, string>,
+): string {
+  switch (row.audience_scope) {
+    case 'global':
+      return 'Everyone'
+    case 'cohort': {
+      const codes = row.cohort_codes ?? []
+      if (codes.length === 0) return 'Cohort'
+      return `Cohort ${codes.join(', ')}`
+    }
+    case 'school_team': {
+      const ids = row.school_team_ids ?? []
+      if (ids.length === 0) return 'School team'
+      const names = ids
+        .map((id) => schoolNameById.get(id))
+        .filter((n): n is string => !!n)
+      if (names.length <= 2) return names.join(', ') || 'School team'
+      return `${names[0]}, ${names[1]} +${names.length - 2}`
+    }
+    case 'users': {
+      const ids = row.user_ids ?? []
+      if (ids.length === 0) return 'Specific fellow'
+      const names = ids
+        .map((id) => fellowNameById.get(id))
+        .filter((n): n is string => !!n)
+      if (names.length === 1) return names[0] ?? 'Specific fellow'
+      return `${names[0] ?? 'Fellow'} +${names.length - 1}`
+    }
+    default:
+      return 'Custom'
+  }
 }
 
 function formatDate(iso: string): string {
@@ -71,29 +113,35 @@ function formatDate(iso: string): string {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default async function AdminAnnouncementsPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  // We fetch labs (curriculum items) alongside everything else so the
-  // pin-to-content picker has data and so we can render a friendly
-  // deep-link ("Reading: X") on rows that already have a pin.
   const [
     { data: announcementRows },
-    { data: years },
-    { data: cohorts },
+    { data: schoolTeamRows },
+    { data: fellowRows },
+    { data: yearRows },
     { data: labRows },
     { data: moduleRows },
   ] = await Promise.all([
     supabase
       .from('announcements')
       .select(
-        'id, title, body, pinned, audience_scope, year_id, cohort_id, content_id, published_at, year:years(id, title), cohort:cohorts(id, name), author:profiles!author_id(full_name), content:labs!content_id(id, title, year_id, module_id)',
+        'id, title, body, pinned, audience_scope, cohort_codes, school_team_ids, user_ids, content_id, published_at, author:profiles!author_id(full_name), content:labs!content_id(id, title, year_id, module_id)',
       )
       .order('pinned', { ascending: false })
       .order('published_at', { ascending: false }),
-    supabase.from('years').select('id, title, order_index').order('order_index'),
     supabase.from('cohorts').select('id, name').order('name'),
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, cohort, role')
+      .order('full_name'),
+    supabase.from('years').select('id, title, order_index').order('order_index'),
     supabase
       .from('labs')
       .select('id, title, year_id, module_id, order_index')
@@ -104,31 +152,50 @@ export default async function AdminAnnouncementsPage() {
       .order('order_index', { ascending: true }),
   ])
 
+  // School teams: cohorts table holds the school leadership groups.
+  const schoolTeams: SchoolTeamOption[] = (schoolTeamRows ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+  }))
+  const schoolNameById = new Map(schoolTeams.map((s) => [s.id, s.name]))
+
+  // Fellows: keep only learner roles for the picker. Coaches/admins
+  // shouldn't show up as targets for "Specific fellow".
+  const fellows: FellowOption[] = (fellowRows ?? [])
+    .filter((p) => p.role === 'fellow')
+    .map((p) => ({
+      id: p.id,
+      fullName: p.full_name ?? p.email ?? 'Unnamed fellow',
+      email: p.email ?? null,
+      cohort: (p.cohort as string | null) ?? null,
+    }))
+  const fellowNameById = new Map(fellows.map((f) => [f.id, f.fullName]))
+
   const rows: AnnouncementRow[] = (announcementRows ?? []).map((r) => ({
     id: r.id,
     title: r.title,
     body: r.body,
     pinned: r.pinned,
     audience_scope: r.audience_scope,
-    year_id: r.year_id,
-    cohort_id: r.cohort_id,
+    cohort_codes: (r.cohort_codes as string[] | null) ?? null,
+    school_team_ids: (r.school_team_ids as string[] | null) ?? null,
+    user_ids: (r.user_ids as string[] | null) ?? null,
     content_id: r.content_id,
     published_at: r.published_at,
-    year: Array.isArray(r.year) ? r.year[0] ?? null : r.year ?? null,
-    cohort: Array.isArray(r.cohort) ? r.cohort[0] ?? null : r.cohort ?? null,
     author: Array.isArray(r.author) ? r.author[0] ?? null : r.author ?? null,
     content: Array.isArray(r.content)
       ? r.content[0] ?? null
       : (r.content as AnnouncementRow['content']) ?? null,
   }))
 
-  // Build the curator-facing labels for the content picker. We
-  // pre-flatten "Year > Module > Item" into a single string so the
-  // dialog can stay a plain Select. Items missing a phase/module
-  // still show with a graceful fallback rather than disappearing.
+  // Curriculum picker labels. We pre-flatten "Phase > Module > Item"
+  // so the dialog can stay a plain Select.
   const yearById = new Map<string, { title: string; order_index: number }>()
-  for (const y of years ?? []) {
-    yearById.set(y.id, { title: y.title, order_index: y.order_index ?? 0 })
+  for (const y of yearRows ?? []) {
+    yearById.set(y.id, {
+      title: y.title,
+      order_index: y.order_index ?? 0,
+    })
   }
   const moduleById = new Map<
     string,
@@ -152,8 +219,6 @@ export default async function AdminAnnouncementsPage() {
         label: `${yearLabel} \u00b7 ${modLabel} \u2014 ${lab.title}`,
         phaseId: lab.year_id,
         phaseTitle: yearLabel,
-        // Sort key: phase order, module order, lab order. Hidden,
-        // not part of the public ContentOption shape.
         _sort: [
           yr?.order_index ?? 0,
           mod?.order_index ?? 0,
@@ -169,26 +234,20 @@ export default async function AdminAnnouncementsPage() {
     })
     .map(({ _sort: _drop, ...rest }) => rest)
 
-  const yearOptions: YearOption[] = (years ?? []).map((y) => ({
-    id: y.id,
-    title: y.title,
-  }))
-  const cohortOptions: CohortOption[] = cohorts ?? []
-
   return (
     <div className="space-y-6 p-6 md:p-10">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-serif text-3xl text-primary">Announcements</h1>
           <p className="text-sm text-text-muted mt-1">
-            Post messages to every learner, a specific year, or a specific
-            cohort.
+            Post messages to everyone, a specific cohort, a school team, or
+            individual fellows.
           </p>
         </div>
         <AnnouncementDialog
           mode="create"
-          years={yearOptions}
-          cohorts={cohortOptions}
+          schoolTeams={schoolTeams}
+          fellows={fellows}
           contentOptions={contentOptions}
           trigger={
             <Button>
@@ -224,18 +283,14 @@ export default async function AdminAnnouncementsPage() {
                         Pinned
                       </span>
                     )}
-                    <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs text-text-muted">
-                      {audienceLabel(row)}
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-text-muted">
+                      <Users className="h-3 w-3" aria-hidden />
+                      {audienceLabel(row, schoolNameById, fellowNameById)}
                     </span>
                   </div>
                   <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">
                     {row.body}
                   </p>
-                  {/*
-                    Surface the pinned curriculum item directly on the
-                    admin row so curators can verify (and click into)
-                    the linked content without opening the edit dialog.
-                  */}
                   {row.content && (
                     <Link
                       href={contentHref(row.content)}
@@ -270,14 +325,21 @@ export default async function AdminAnnouncementsPage() {
 
                   <AnnouncementDialog
                     mode="edit"
-                    years={yearOptions}
-                    cohorts={cohortOptions}
+                    schoolTeams={schoolTeams}
+                    fellows={fellows}
                     contentOptions={contentOptions}
                     initial={{
                       id: row.id,
-                      audience_scope: row.audience_scope,
-                      year_id: row.year_id,
-                      cohort_id: row.cohort_id,
+                      // Legacy "year" rows fall back to "global" in the
+                      // dialog so the curator never lands on a value the
+                      // picker can't render.
+                      audience_scope:
+                        row.audience_scope === 'year'
+                          ? 'global'
+                          : (row.audience_scope as AudienceScope),
+                      cohort_codes: row.cohort_codes ?? [],
+                      school_team_ids: row.school_team_ids ?? [],
+                      user_ids: row.user_ids ?? [],
                       title: row.title,
                       body: row.body,
                       pinned: row.pinned,

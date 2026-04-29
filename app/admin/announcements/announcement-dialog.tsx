@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useId } from 'react'
+import { useMemo, useState, useTransition, useId } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -21,42 +21,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
+import { Search, X } from 'lucide-react'
 import { createAnnouncement, updateAnnouncement } from './actions'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type AudienceScope = 'global' | 'cohort' | 'school_team' | 'users'
 
 export interface AnnouncementFormInitial {
   id: string | null
-  audience_scope: 'global' | 'year' | 'cohort'
-  year_id: string | null
-  cohort_id: string | null
+  audience_scope: AudienceScope
+  cohort_codes: string[]
+  school_team_ids: string[]
+  user_ids: string[]
   title: string
   body: string
   pinned: boolean
-  /** Optional pin to a curriculum item (lab/content). NULL when the
-   *  announcement is purely a free-form note. */
   content_id: string | null
 }
 
-export interface YearOption {
-  id: string
-  title: string
-}
-
-export interface CohortOption {
+export interface SchoolTeamOption {
   id: string
   name: string
 }
 
-/**
- * One row in the "Pin to content" dropdown. Pre-flattened on the
- * server so the client just renders a friendly nested label like
- * "Phase 2 · Module 3 — Reading: Trauma-informed coaching".
- */
+export interface FellowOption {
+  id: string
+  fullName: string
+  email: string | null
+  /** A/B/C cohort code surfaced as a small chip in search results so a
+   *  curator picking individual fellows can disambiguate quickly. */
+  cohort: string | null
+}
+
 export interface ContentOption {
   id: string
-  /** Pretty path the option displays. Already includes year + module. */
+  /** Pretty path the option displays. Already includes phase + module. */
   label: string
-  /** Phase id - used as the in-list section header for grouping. */
   phaseId: string
   phaseTitle: string
 }
@@ -64,10 +71,8 @@ export interface ContentOption {
 interface Props {
   mode: 'create' | 'edit'
   initial?: Partial<AnnouncementFormInitial>
-  years: YearOption[]
-  cohorts: CohortOption[]
-  /** All curriculum items the curator can pin. Empty list disables
-   *  the picker but still renders it so the affordance is visible. */
+  schoolTeams: SchoolTeamOption[]
+  fellows: FellowOption[]
   contentOptions: ContentOption[]
   trigger: React.ReactNode
 }
@@ -75,26 +80,27 @@ interface Props {
 const DEFAULTS: AnnouncementFormInitial = {
   id: null,
   audience_scope: 'global',
-  year_id: null,
-  cohort_id: null,
+  cohort_codes: [],
+  school_team_ids: [],
+  user_ids: [],
   title: '',
   body: '',
   pinned: false,
   content_id: null,
 }
 
-/**
- * Sentinel used by the shadcn Select for the "no pinned content"
- * option. shadcn forbids an empty string as a SelectItem value, so
- * we bridge between this token and an actual NULL on submit.
- */
+const COHORT_CODES = ['A', 'B', 'C'] as const
 const NO_CONTENT = '__none__'
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function AnnouncementDialog({
   mode,
   initial,
-  years,
-  cohorts,
+  schoolTeams,
+  fellows,
   contentOptions,
   trigger,
 }: Props) {
@@ -103,18 +109,63 @@ export function AnnouncementDialog({
   const [error, setError] = useState<string | null>(null)
 
   const merged: AnnouncementFormInitial = { ...DEFAULTS, ...initial }
-  const [scope, setScope] = useState<AnnouncementFormInitial['audience_scope']>(
-    merged.audience_scope,
+
+  const [scope, setScope] = useState<AudienceScope>(merged.audience_scope)
+  const [cohortCodes, setCohortCodes] = useState<string[]>(merged.cohort_codes)
+  const [schoolTeamIds, setSchoolTeamIds] = useState<string[]>(
+    merged.school_team_ids,
   )
-  const [yearId, setYearId] = useState<string | null>(merged.year_id)
-  const [cohortId, setCohortId] = useState<string | null>(merged.cohort_id)
-  // contentId carries either a real lab id or null. We fold null into
-  // the NO_CONTENT sentinel only when we hand the value to <Select>.
+  const [userIds, setUserIds] = useState<string[]>(merged.user_ids)
   const [contentId, setContentId] = useState<string | null>(merged.content_id)
+
+  // Search inputs are local to each picker - they don't submit.
+  const [schoolQuery, setSchoolQuery] = useState('')
+  const [fellowQuery, setFellowQuery] = useState('')
 
   const titleId = useId()
   const bodyId = useId()
   const contentSelectId = useId()
+  const schoolSearchId = useId()
+  const fellowSearchId = useId()
+
+  // Filtered + sorted lists for the two search-driven pickers.
+  const filteredSchools = useMemo(() => {
+    const q = schoolQuery.trim().toLowerCase()
+    const list = q
+      ? schoolTeams.filter((s) => s.name.toLowerCase().includes(q))
+      : schoolTeams
+    return [...list].sort((a, b) => a.name.localeCompare(b.name))
+  }, [schoolTeams, schoolQuery])
+
+  const filteredFellows = useMemo(() => {
+    const q = fellowQuery.trim().toLowerCase()
+    const list = q
+      ? fellows.filter(
+          (f) =>
+            f.fullName.toLowerCase().includes(q) ||
+            (f.email ?? '').toLowerCase().includes(q),
+        )
+      : fellows
+    return [...list].sort((a, b) => a.fullName.localeCompare(b.fullName))
+  }, [fellows, fellowQuery])
+
+  // Quick lookup maps for chip rendering of currently-selected ids.
+  const schoolById = useMemo(
+    () => new Map(schoolTeams.map((s) => [s.id, s])),
+    [schoolTeams],
+  )
+  const fellowById = useMemo(
+    () => new Map(fellows.map((f) => [f.id, f])),
+    [fellows],
+  )
+
+  const toggle = (
+    list: string[],
+    setList: (next: string[]) => void,
+    value: string,
+  ) => {
+    setList(list.includes(value) ? list.filter((x) => x !== value) : [...list, value])
+  }
 
   const handleSubmit = (fd: FormData) => {
     setError(null)
@@ -133,105 +184,301 @@ export function AnnouncementDialog({
     })
   }
 
+  // ---------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
         if (next) {
-          // Reset local state from props each time the dialog re-opens.
+          // Re-seed local state from props each time the dialog opens.
           setScope(merged.audience_scope)
-          setYearId(merged.year_id)
-          setCohortId(merged.cohort_id)
+          setCohortCodes(merged.cohort_codes)
+          setSchoolTeamIds(merged.school_team_ids)
+          setUserIds(merged.user_ids)
           setContentId(merged.content_id)
+          setSchoolQuery('')
+          setFellowQuery('')
           setError(null)
         }
       }}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {mode === 'create' ? 'New announcement' : 'Edit announcement'}
           </DialogTitle>
           <DialogDescription>
-            Announcements appear on learners&apos; dashboards. Scope decides who
-            sees them.
+            Announcements appear on learners&apos; dashboards. The audience
+            decides who sees them.
           </DialogDescription>
         </DialogHeader>
 
-        <form action={handleSubmit} className="space-y-4">
-          {/* Scope picker */}
+        <form action={handleSubmit} className="space-y-5">
+          {/* ----------------------------------------------------------- */}
+          {/* Audience scope                                              */}
+          {/* ----------------------------------------------------------- */}
           <div className="space-y-2">
             <Label>Audience</Label>
             <Select
               name="audience_scope"
               value={scope}
-              onValueChange={(v) =>
-                setScope(v as AnnouncementFormInitial['audience_scope'])
-              }
+              onValueChange={(v) => setScope(v as AudienceScope)}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="global">Everyone</SelectItem>
-                <SelectItem value="year" disabled={years.length === 0}>
-                  Specific year
+                <SelectItem value="cohort">Specific Cohort</SelectItem>
+                <SelectItem
+                  value="school_team"
+                  disabled={schoolTeams.length === 0}
+                >
+                  Specific School Team
                 </SelectItem>
-                <SelectItem value="cohort" disabled={cohorts.length === 0}>
-                  Specific cohort
+                <SelectItem value="users" disabled={fellows.length === 0}>
+                  Specific Fellow
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Year picker (only when scope=year) */}
-          {scope === 'year' && (
-            <div className="space-y-2">
-              <Label>Year</Label>
-              <Select
-                name="year_id"
-                value={yearId ?? ''}
-                onValueChange={(v) => setYearId(v || null)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((y) => (
-                    <SelectItem key={y.id} value={y.id}>
-                      {y.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Cohort picker (only when scope=cohort) */}
+          {/* ----------------------------------------------------------- */}
+          {/* Specific Cohort: A / B / C multi-select                     */}
+          {/* ----------------------------------------------------------- */}
           {scope === 'cohort' && (
-            <div className="space-y-2">
-              <Label>Cohort</Label>
-              <Select
-                name="cohort_id"
-                value={cohortId ?? ''}
-                onValueChange={(v) => setCohortId(v || null)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a cohort" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cohorts.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <fieldset className="space-y-2 rounded-lg border border-border p-3">
+              <legend className="px-1 text-sm font-medium">
+                Cohorts (pick one or more)
+              </legend>
+              <div className="flex flex-wrap gap-3">
+                {COHORT_CODES.map((code) => {
+                  const checked = cohortCodes.includes(code)
+                  return (
+                    <label
+                      key={code}
+                      className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm cursor-pointer hover:bg-bg-muted"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() =>
+                          toggle(cohortCodes, setCohortCodes, code)
+                        }
+                      />
+                      Cohort {code}
+                    </label>
+                  )
+                })}
+              </div>
+              {/* serialise selected codes as repeated form fields */}
+              {cohortCodes.map((code) => (
+                <input
+                  key={code}
+                  type="hidden"
+                  name="cohort_codes"
+                  value={code}
+                />
+              ))}
+            </fieldset>
           )}
 
+          {/* ----------------------------------------------------------- */}
+          {/* Specific School Team: searchable multi-select               */}
+          {/* ----------------------------------------------------------- */}
+          {scope === 'school_team' && (
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-sm font-medium">
+                School teams (pick one or more)
+              </legend>
+
+              {/* Search */}
+              <div className="relative">
+                <Search
+                  className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
+                  aria-hidden
+                />
+                <Input
+                  id={schoolSearchId}
+                  type="search"
+                  value={schoolQuery}
+                  onChange={(e) => setSchoolQuery(e.target.value)}
+                  placeholder="Search school teams..."
+                  className="pl-8"
+                />
+              </div>
+
+              {/* Selected chips */}
+              {schoolTeamIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {schoolTeamIds.map((id) => {
+                    const s = schoolById.get(id)
+                    if (!s) return null
+                    return (
+                      <Badge
+                        key={id}
+                        variant="secondary"
+                        className="pl-2 pr-1 gap-1"
+                      >
+                        {s.name}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${s.name}`}
+                          className="ml-1 rounded-sm p-0.5 hover:bg-bg-muted"
+                          onClick={() =>
+                            toggle(schoolTeamIds, setSchoolTeamIds, id)
+                          }
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Options list */}
+              <ScrollArea className="h-48 rounded-md border border-border">
+                <ul className="divide-y divide-border">
+                  {filteredSchools.length === 0 ? (
+                    <li className="px-3 py-6 text-center text-sm text-text-muted">
+                      No matches
+                    </li>
+                  ) : (
+                    filteredSchools.map((s) => {
+                      const checked = schoolTeamIds.includes(s.id)
+                      return (
+                        <li key={s.id}>
+                          <label className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-bg-muted">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() =>
+                                toggle(schoolTeamIds, setSchoolTeamIds, s.id)
+                              }
+                            />
+                            <span className="truncate">{s.name}</span>
+                          </label>
+                        </li>
+                      )
+                    })
+                  )}
+                </ul>
+              </ScrollArea>
+
+              {schoolTeamIds.map((id) => (
+                <input
+                  key={id}
+                  type="hidden"
+                  name="school_team_ids"
+                  value={id}
+                />
+              ))}
+            </fieldset>
+          )}
+
+          {/* ----------------------------------------------------------- */}
+          {/* Specific Fellow: search + multi-select                      */}
+          {/* ----------------------------------------------------------- */}
+          {scope === 'users' && (
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-sm font-medium">
+                Fellows (filter by name and pick)
+              </legend>
+
+              <div className="relative">
+                <Search
+                  className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
+                  aria-hidden
+                />
+                <Input
+                  id={fellowSearchId}
+                  type="search"
+                  value={fellowQuery}
+                  onChange={(e) => setFellowQuery(e.target.value)}
+                  placeholder="Search by name or email..."
+                  className="pl-8"
+                />
+              </div>
+
+              {userIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {userIds.map((id) => {
+                    const f = fellowById.get(id)
+                    if (!f) return null
+                    return (
+                      <Badge
+                        key={id}
+                        variant="secondary"
+                        className="pl-2 pr-1 gap-1"
+                      >
+                        {f.fullName}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${f.fullName}`}
+                          className="ml-1 rounded-sm p-0.5 hover:bg-bg-muted"
+                          onClick={() => toggle(userIds, setUserIds, id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+
+              <ScrollArea className="h-56 rounded-md border border-border">
+                <ul className="divide-y divide-border">
+                  {filteredFellows.length === 0 ? (
+                    <li className="px-3 py-6 text-center text-sm text-text-muted">
+                      No matches
+                    </li>
+                  ) : (
+                    filteredFellows.map((f) => {
+                      const checked = userIds.includes(f.id)
+                      return (
+                        <li key={f.id}>
+                          <label className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-bg-muted">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() =>
+                                toggle(userIds, setUserIds, f.id)
+                              }
+                            />
+                            <span className="flex-1 min-w-0">
+                              <span className="block truncate font-medium">
+                                {f.fullName}
+                              </span>
+                              {f.email && (
+                                <span className="block truncate text-xs text-text-muted">
+                                  {f.email}
+                                </span>
+                              )}
+                            </span>
+                            {f.cohort && (
+                              <Badge variant="outline" className="shrink-0">
+                                Cohort {f.cohort}
+                              </Badge>
+                            )}
+                          </label>
+                        </li>
+                      )
+                    })
+                  )}
+                </ul>
+              </ScrollArea>
+
+              {userIds.map((id) => (
+                <input key={id} type="hidden" name="user_ids" value={id} />
+              ))}
+            </fieldset>
+          )}
+
+          {/* ----------------------------------------------------------- */}
+          {/* Title / body                                                */}
+          {/* ----------------------------------------------------------- */}
           <div className="space-y-2">
             <Label htmlFor={titleId}>Title</Label>
             <Input
@@ -255,17 +502,9 @@ export function AnnouncementDialog({
             />
           </div>
 
-          {/*
-            Pin to existing curriculum content. Optional - leaving it
-            on "No pinned content" keeps the announcement free-form.
-            When set, the dashboard feed renders an inline link straight
-            to the lab page so fellows can jump to it from the feed.
-
-            The hidden <input> mirrors the React state so the form
-            submits even though the shadcn Select isn't a native
-            form-control. We translate the NO_CONTENT sentinel into an
-            empty string, which the action treats as null.
-          */}
+          {/* ----------------------------------------------------------- */}
+          {/* Optional curriculum pin                                     */}
+          {/* ----------------------------------------------------------- */}
           <div className="space-y-2">
             <Label htmlFor={contentSelectId}>Pin to a curriculum item</Label>
             <Select
@@ -303,6 +542,9 @@ export function AnnouncementDialog({
             </p>
           </div>
 
+          {/* ----------------------------------------------------------- */}
+          {/* Pin to top                                                  */}
+          {/* ----------------------------------------------------------- */}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
