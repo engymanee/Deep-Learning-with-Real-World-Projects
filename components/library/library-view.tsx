@@ -598,7 +598,7 @@ function GridCard({
           <img
             src={resource.coverUrl}
             alt=""
-            className="absolute inset-0 h-full w-full object-contain p-4 transition-transform duration-300 group-hover:scale-[1.02]"
+            className="absolute inset-0 h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-[1.02]"
             loading="lazy"
           />
         ) : (
