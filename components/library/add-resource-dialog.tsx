@@ -28,7 +28,11 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { COHORTS, type Cohort } from '@/lib/cohorts'
-import { PWF_PROTOCOLS_LABEL } from '@/components/library/library-view'
+// Pulled from a leaf module - importing this from library-view
+// would create a cycle (library-view itself imports this file),
+// which throws a TDZ ReferenceError when Next.js evaluates the
+// dialog module first.
+import { PWF_PROTOCOLS_LABEL } from '@/lib/library/labels'
 import type { ReactNode } from 'react'
 
 // Order + labels match the user-visible filter pills on the Library

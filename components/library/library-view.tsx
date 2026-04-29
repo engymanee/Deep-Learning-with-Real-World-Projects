@@ -32,6 +32,10 @@ import {
 } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { AddResourceDialog } from '@/components/library/add-resource-dialog'
+// Lives in a leaf module so AddResourceDialog can also import it
+// without creating a circular dependency on this file (which would
+// throw a TDZ ReferenceError at module evaluation time).
+import { PWF_PROTOCOLS_LABEL } from '@/lib/library/labels'
 
 /**
  * Shape returned by the server page after cohort gating. The server
@@ -65,27 +69,6 @@ export interface LibraryViewProps {
 type TypeFilter = 'all' | 'document' | 'video' | 'link' | 'reading'
 type SortMode = 'newest' | 'alpha'
 type TabId = 'mine' | 'further'
-
-/**
- * "PWF Protocols" gets a trademark mark next to PWF in superscript.
- * Defined once and reused so the badge, the filter pill, and the
- * admin Add-resource select all render the same node - no risk of
- * one surface dropping the TM.
- *
- * The badge in the cards is rendered uppercase via Tailwind, which
- * is fine for "PWF" but would also uppercase "Protocols". That is
- * intentional - matches the rest of the type badges and reads as a
- * label rather than prose.
- */
-export const PWF_PROTOCOLS_LABEL: ReactNode = (
-  <>
-    PWF
-    <sup className="ml-px text-[0.55em] font-semibold tracking-normal">
-      ™
-    </sup>{' '}
-    Protocols
-  </>
-)
 
 /** Keep label + icon decisions in one place so cards and filters
  *  stay consistent without prop-drilling. Labels are ReactNode so
