@@ -18,32 +18,41 @@ interface RawProfile {
   role: string | null
   cohort: string | null
   bio: string | null
-  schools: { name: string | null } | null
+}
+
+interface RawMembership {
+  profile_id: string
+  cohorts: { name: string | null } | null
 }
 
 /**
  * /community/bios - the searchable directory of fellows + facilitators.
  *
- * Reuses `BiosDirectory`, which renders MemberCards with the
- * uploaded headshot (falling back to initials). Cohort labels are
- * gated behind admin role to keep program-internal staging metadata
- * out of fellow-facing surfaces.
+ * The directory always lists every active fellow, facilitator, and
+ * admin (faculty roles), regardless of which school leadership team
+ * the viewer belongs to. Fellows in turn see the entire fellowship
+ * cohort, with rich filters (name search, school team, role tabs)
+ * to narrow down.
+ *
+ * School-team membership comes from `cohort_members → cohorts(name)`.
+ * `cohorts` here are the school leadership teams (Lincoln, IVA,
+ * Atchison, ...) - NOT the A/B/C admission cohort, which is the
+ * single-letter `profiles.cohort` text column. Some members
+ * (admins, brand-new fellows) belong to no team and surface with no
+ * school chip.
  */
 export default async function CommunityBiosPage() {
   const user = await requireUser()
   const section = getSectionBySlug('bios')!
   const supabase = await createClient()
 
-  // Include admin alongside facilitator so the directory surfaces
-  // every faculty member (program staff = facilitator + admin) plus
-  // every fellow. Fellows in turn see the entire fellowship cohort.
-  const { data } = await supabase
+  // Step 1: pull every active member we want to surface. Single
+  // round-trip, ordered by name so the grid is alphabetised by
+  // default and the team dropdown renders deterministically.
+  const { data: rawProfiles } = await supabase
     .from('profiles')
     .select(
-      `
-      id, full_name, email, title, avatar_url, role, cohort, bio,
-      schools:school_id (name)
-      `,
+      `id, full_name, email, title, avatar_url, role, cohort, bio`,
     )
     .in('role', ['fellow', 'facilitator', 'admin'])
     .is('deactivated_at', null)
@@ -51,17 +60,54 @@ export default async function CommunityBiosPage() {
     .limit(500)
     .returns<RawProfile[]>()
 
-  const profiles: DirectoryProfile[] = (data ?? []).map((p) => ({
-    id: p.id,
-    full_name: p.full_name,
-    email: p.email,
-    title: p.title,
-    avatar_url: p.avatar_url,
-    role: p.role,
-    cohort: p.cohort,
-    bio: p.bio,
-    school_name: p.schools?.name ?? null,
-  }))
+  const profileIds = (rawProfiles ?? []).map((p) => p.id)
+
+  // Step 2: school-team membership for those profiles. We fetch
+  // separately (rather than nesting under profiles) because a
+  // profile can belong to multiple teams - the join would multiply
+  // rows and force us to dedupe anyway. We pick the first team
+  // (alphabetical) as the displayed `school_name`; the whole list
+  // is also exposed via `school_names` for client-side filtering.
+  const membershipByProfile = new Map<string, string[]>()
+  if (profileIds.length > 0) {
+    const { data: memberships } = await supabase
+      .from('cohort_members')
+      .select('profile_id, cohorts:cohort_id ( name )')
+      .in('profile_id', profileIds)
+      .returns<RawMembership[]>()
+
+    for (const m of memberships ?? []) {
+      const name = m.cohorts?.name?.trim()
+      if (!name) continue
+      const list = membershipByProfile.get(m.profile_id) ?? []
+      list.push(name)
+      membershipByProfile.set(m.profile_id, list)
+    }
+    // Sort each profile's team list alphabetically so the "primary"
+    // team (first element) is stable across renders.
+    for (const [id, names] of membershipByProfile) {
+      membershipByProfile.set(id, [...new Set(names)].sort())
+    }
+  }
+
+  const profiles: DirectoryProfile[] = (rawProfiles ?? []).map((p) => {
+    const teams = membershipByProfile.get(p.id) ?? []
+    return {
+      id: p.id,
+      full_name: p.full_name,
+      email: p.email,
+      title: p.title,
+      avatar_url: p.avatar_url,
+      role: p.role,
+      cohort: p.cohort,
+      bio: p.bio,
+      // Primary (alphabetical) team is the displayed chip; null when
+      // the member isn't on any team yet. The full list is mirrored
+      // in `school_names` for the team-filter dropdown.
+      school_name: teams[0] ?? null,
+      school_names: teams,
+    }
+  })
 
   return (
     <div className="flex flex-col">

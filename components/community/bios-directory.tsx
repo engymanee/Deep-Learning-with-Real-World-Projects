@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { DirectoryProfile } from '@/lib/types/profile'
+import { type DirectoryProfile, roleLabelFor } from '@/lib/types/profile'
 
 interface Props {
   profiles: DirectoryProfile[]
@@ -81,9 +81,21 @@ export function BiosDirectory({ profiles, showCohort = false }: Props) {
     return [...set].sort()
   }, [profiles, showCohort])
 
+  // Team dropdown is sourced from the union of every member's
+  // `school_names` (falling back to the legacy single `school_name`
+  // when callers haven't populated the array). This way a member
+  // who's on multiple leadership teams contributes to each option,
+  // and the filter still works for callers that only set
+  // `school_name`.
   const teamOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const p of profiles) if (p.school_name) set.add(p.school_name)
+    for (const p of profiles) {
+      if (p.school_names && p.school_names.length > 0) {
+        for (const name of p.school_names) if (name) set.add(name)
+      } else if (p.school_name) {
+        set.add(p.school_name)
+      }
+    }
     return [...set].sort()
   }, [profiles])
 
@@ -100,9 +112,37 @@ export function BiosDirectory({ profiles, showCohort = false }: Props) {
         return false
       }
       if (cohort !== ALL && p.cohort !== cohort) return false
-      if (team !== ALL && p.school_name !== team) return false
+      if (team !== ALL) {
+        // A member matches the team filter when the selected team
+        // is in their full membership list, OR (legacy fallback)
+        // matches the single `school_name` field.
+        const teams =
+          p.school_names && p.school_names.length > 0
+            ? p.school_names
+            : p.school_name
+              ? [p.school_name]
+              : []
+        if (!teams.includes(team)) return false
+      }
       if (q.length > 0) {
-        const haystack = [p.full_name, p.email, p.title]
+        // School-team names are part of the haystack so typing
+        // "Lincoln" surfaces every member on the Lincoln team.
+        // Role label ("Admin" / "Facilitator" / "Fellow") is too,
+        // so users can search for "admin" and pull the program
+        // staff in one go without touching the role tabs.
+        const teams =
+          p.school_names && p.school_names.length > 0
+            ? p.school_names
+            : p.school_name
+              ? [p.school_name]
+              : []
+        const haystack = [
+          p.full_name,
+          p.email,
+          p.title,
+          roleLabelFor(p.role),
+          ...teams,
+        ]
           .filter(Boolean)
           .join(' ')
           .toLowerCase()
@@ -195,7 +235,7 @@ export function BiosDirectory({ profiles, showCohort = false }: Props) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, email, or role..."
+            placeholder="Search by name, email, school, or role (e.g. admin)..."
             aria-label="Search Fellow Bios"
             className="pl-9"
           />

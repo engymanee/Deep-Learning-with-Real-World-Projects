@@ -15,7 +15,20 @@ export interface DirectoryProfile {
   /** 'fellow' | 'facilitator' | 'admin' from the DB. */
   role: string | null
   cohort: string | null
+  /**
+   * Primary school leadership team name (alphabetical first when a
+   * member is on multiple teams). Used as the chip on the card and
+   * the modal. Nullable for admins / fellows not yet assigned to a
+   * team.
+   */
   school_name: string | null
+  /**
+   * Full list of school team names the member belongs to. Drives
+   * the team-filter dropdown so a member on two teams shows up
+   * under either filter. Optional for backwards compatibility with
+   * call-sites that only populate `school_name`.
+   */
+  school_names?: string[]
 }
 
 /** Display-only role label: hides 'admin' from non-admin contexts. */
