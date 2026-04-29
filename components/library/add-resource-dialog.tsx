@@ -28,13 +28,21 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { COHORTS, type Cohort } from '@/lib/cohorts'
+import { PWF_PROTOCOLS_LABEL } from '@/components/library/library-view'
+import type { ReactNode } from 'react'
 
-const TYPE_OPTIONS = [
-  { value: 'document', label: 'Document' },
-  { value: 'video', label: 'Video' },
-  { value: 'reading', label: 'Reading' },
-  { value: 'link', label: 'Link' },
-] as const
+// Order + labels match the user-visible filter pills on the Library
+// page. The underlying enum values (`document` / `link` / `video` /
+// `reading`) stay the same so the DB / CHECK constraint doesn't move.
+const TYPE_OPTIONS: ReadonlyArray<{
+  value: 'document' | 'link' | 'video' | 'reading'
+  label: ReactNode
+}> = [
+  { value: 'document', label: PWF_PROTOCOLS_LABEL },
+  { value: 'link',     label: 'Field Guides' },
+  { value: 'video',    label: 'Video' },
+  { value: 'reading',  label: 'Readings' },
+]
 
 type ResourceType = (typeof TYPE_OPTIONS)[number]['value']
 type Visibility = 'cohort' | 'universal'

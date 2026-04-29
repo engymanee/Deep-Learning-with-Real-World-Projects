@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   ArrowDownAZ,
   ArrowDownWideNarrow,
@@ -66,23 +66,51 @@ type TypeFilter = 'all' | 'document' | 'video' | 'link' | 'reading'
 type SortMode = 'newest' | 'alpha'
 type TabId = 'mine' | 'further'
 
+/**
+ * "PWF Protocols" gets a trademark mark next to PWF in superscript.
+ * Defined once and reused so the badge, the filter pill, and the
+ * admin Add-resource select all render the same node - no risk of
+ * one surface dropping the TM.
+ *
+ * The badge in the cards is rendered uppercase via Tailwind, which
+ * is fine for "PWF" but would also uppercase "Protocols". That is
+ * intentional - matches the rest of the type badges and reads as a
+ * label rather than prose.
+ */
+export const PWF_PROTOCOLS_LABEL: ReactNode = (
+  <>
+    PWF
+    <sup className="ml-px text-[0.55em] font-semibold tracking-normal">
+      ™
+    </sup>{' '}
+    Protocols
+  </>
+)
+
 /** Keep label + icon decisions in one place so cards and filters
- *  stay consistent without prop-drilling. */
+ *  stay consistent without prop-drilling. Labels are ReactNode so
+ *  "PWF Protocols" can render its TM as a real <sup>. */
 const TYPE_META: Record<
   LibraryResource['resourceType'],
-  { label: string; Icon: typeof FileText; cta: string }
+  { label: ReactNode; Icon: typeof FileText; cta: string }
 > = {
-  document: { label: 'Document', Icon: FileText, cta: 'Download' },
-  video:    { label: 'Video',    Icon: PlayCircle, cta: 'Watch' },
-  reading:  { label: 'Reading',  Icon: BookOpen,   cta: 'Read' },
-  link:     { label: 'Link',     Icon: Link2,      cta: 'Open' },
+  // The legacy enum values stay (`document` / `link` / `video` /
+  // `reading`) so the DB / CHECK constraint don't have to move.
+  // Only the user-visible labels change:
+  //   document -> PWF Protocols, link -> Field Guides.
+  document: { label: PWF_PROTOCOLS_LABEL, Icon: FileText,   cta: 'Open' },
+  link:     { label: 'Field Guides',      Icon: Link2,      cta: 'Open' },
+  video:    { label: 'Video',             Icon: PlayCircle, cta: 'Watch' },
+  reading:  { label: 'Readings',          Icon: BookOpen,   cta: 'Read' },
 }
 
-const TYPE_FILTERS: Array<{ id: TypeFilter; label: string }> = [
+// Filter pill order matches the user's preferred reading order:
+// All, PWF Protocols, Field Guides, Video, Readings.
+const TYPE_FILTERS: Array<{ id: TypeFilter; label: ReactNode }> = [
   { id: 'all',      label: 'All' },
-  { id: 'document', label: 'Documents' },
-  { id: 'video',    label: 'Videos' },
-  { id: 'link',     label: 'Links' },
+  { id: 'document', label: PWF_PROTOCOLS_LABEL },
+  { id: 'link',     label: 'Field Guides' },
+  { id: 'video',    label: 'Video' },
   { id: 'reading',  label: 'Readings' },
 ]
 
