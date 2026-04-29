@@ -201,9 +201,6 @@ export function CurriculumTree({ phases }: Props) {
                   <h3 className="font-serif text-xl leading-tight text-muted-foreground">
                     {phase.title}
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Not yet assigned to your cohort.
-                  </p>
                 </div>
                 {/* Icon-only lock affordance. The label "Locked"
                     is exposed to screen readers via aria-label /
