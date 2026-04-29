@@ -6,7 +6,6 @@ import {
   ArrowDownWideNarrow,
   BookOpen,
   Check,
-  ExternalLink,
   FileText,
   Filter,
   Layers,
@@ -576,9 +575,12 @@ function GridCard({
       rel="noreferrer"
       className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
     >
-      {/* Hero: cover image or icon fallback. Aspect ratio is fixed
-          so the grid stays even regardless of the source image. */}
-      <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
+      {/* Hero: cover image or icon fallback. We use a 3:4 portrait
+          ratio so covers feel book/poster-like instead of widescreen
+          - far more flattering for typical resource thumbnails. The
+          ratio is fixed so the grid stays even regardless of the
+          source image's intrinsic dimensions. */}
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
         {resource.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -625,12 +627,12 @@ function GridCard({
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
+        {/* Footer strip is now just the added-on date. The whole
+            card is already a link to the resource, so the explicit
+            "Open" CTA was redundant and competed visually with the
+            title. Less chrome, more focus on the content. */}
+        <div className="border-t border-border pt-3 text-xs text-muted-foreground">
           <DateLabel iso={resource.createdAt} />
-          <span className="inline-flex items-center gap-1 font-medium text-primary">
-            {meta.cta}
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-          </span>
         </div>
       </div>
     </a>
@@ -658,8 +660,10 @@ function ListRow({
         rel="noreferrer"
         className="group flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40"
       >
-        {/* 16:9 thumbnail keeps shape parity with the grid cards. */}
-        <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-md bg-muted">
+        {/* Portrait thumbnail mirrors the 3:4 hero used by the grid
+            cards so users see the same orientation regardless of
+            view mode. */}
+        <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
           {resource.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -698,15 +702,8 @@ function ListRow({
             ))}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="hidden shrink-0 sm:inline-flex"
-          tabIndex={-1}
-        >
-          {meta.cta}
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
+        {/* No trailing "Open" button - the entire row is a link, so
+            a duplicated CTA would just be visual noise. */}
       </a>
     </li>
   )
