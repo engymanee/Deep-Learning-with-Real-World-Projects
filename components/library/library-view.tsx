@@ -197,8 +197,9 @@ export function LibraryView({
         <div>
           <h1 className="font-serif text-2xl text-foreground">Library</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Curated tools, readings, and recordings. Use the tabs to switch
-            between your cohort resources and recommended reading.
+            Curated books, videos, podcasts, and other resources. Use the
+            tabs to switch between your cohort resources and recommended
+            resources.
           </p>
         </div>
         {canManage && <AddResourceDialog />}
@@ -213,7 +214,7 @@ export function LibraryView({
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="further">
-            Recommended Reading
+            Recommended Resources
             <Badge variant="secondary" className="ml-2 text-[10px]">
               {furtherReading.length}
             </Badge>
@@ -231,8 +232,8 @@ export function LibraryView({
           aria-live="polite"
         >
           {tab === 'mine'
-            ? 'Resources released to your cohort - tools, readings, and recordings tied to the labs you are working through right now.'
-            : 'Curated extended reading from the program team. These materials sit alongside the curriculum and are available to every fellow, regardless of cohort or pace.'}
+            ? 'Resources released to your cohort - books, videos, podcasts, and other materials tied to the labs you are working through right now.'
+            : 'Curated books, videos, podcasts, and other recommendations from the program team. These materials sit alongside the curriculum and are available to every fellow, regardless of cohort or pace.'}
         </p>
 
         {/* Search + filter row. Visible on both tabs since the state
@@ -807,7 +808,7 @@ function EmptyState({
   if (totalForTab === 0) {
     message =
       tab === 'mine'
-        ? 'No cohort resources have been published for you yet. Check back soon, or try Recommended Reading.'
+          ? 'No cohort resources have been published for you yet. Check back soon, or try Recommended Resources.'
         : "There's no recommended reading yet. New resources will show up here when published."
   } else if (isNarrowing) {
     message =

@@ -76,8 +76,9 @@ const COVER_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
  *      button. Calls `updateLibraryResource(initial.id, ...)`.
  *
  * Visibility model:
- *  - "Recommended Reading" -> isUniversal=true (everyone).
- *  - "Cohort-gated"        -> isUniversal=false + A/B/C multi-select.
+ *  - "Recommended Resources" -> isUniversal=true (everyone). Books,
+ *    videos, podcasts, or anything else worth recommending broadly.
+ *  - "Cohort-gated"          -> isUniversal=false + A/B/C multi-select.
  */
 export interface ResourceDialogProps {
   /**
@@ -298,7 +299,7 @@ export function AddResourceDialog({
     if (!author.trim()) return setError('Author is required.')
     if (!url.trim()) return setError('URL is required.')
     if (visibility === 'cohort' && cohorts.length === 0) {
-      return setError('Pick at least one cohort or switch to Recommended Reading.')
+      return setError('Pick at least one cohort or switch to Recommended Resources.')
     }
 
     // Capture any in-flight tag draft so users don't lose it to
@@ -366,7 +367,7 @@ export function AddResourceDialog({
           <DialogDescription>
             {isEdit
               ? 'Update this resource. Changes apply immediately for everyone with access.'
-              : 'Publish a curated resource. Choose Recommended Reading for materials everyone should see, or Cohort-gated to stage releases by cohort.'}
+              : 'Publish a curated resource - a book, video, podcast, or anything else. Choose Recommended Resources for materials everyone should see, or Cohort-gated to stage releases by cohort.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -570,11 +571,12 @@ export function AddResourceDialog({
                 <RadioGroupItem value="universal" id="vis-universal" className="mt-0.5" />
                 <span className="flex flex-col gap-0.5">
                   <span className="text-sm font-medium text-foreground">
-                    Recommended reading
+                    Recommended Resources
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    Visible to everyone, regardless of cohort. Lands on the
-                    Recommended Reading tab.
+                    Visible to everyone, regardless of cohort. Books, videos,
+                    podcasts, or anything else. Lands on the Recommended
+                    Resources tab.
                   </span>
                 </span>
               </label>

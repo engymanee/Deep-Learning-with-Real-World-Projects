@@ -57,7 +57,8 @@ interface Props {
  * Admin-only catalogue view of Library resources.
  *
  * Two grouped lists, each rendered as a compact table-style row:
- *   1. Recommended Reading (`is_universal`)
+ *   1. Recommended Resources (`is_universal`) - books, videos,
+ *      podcasts, and other materials surfaced to everyone.
  *   2. Cohort-gated, ordered by which cohorts they target.
  *
  * Each row exposes inline Edit + Delete affordances. Edit reuses
@@ -145,15 +146,15 @@ export function LibraryAdmin({ resources }: Props) {
       ) : (
         <>
           <ResourceGroup
-            title="Recommended Reading"
-            description="Visible to every fellow regardless of cohort."
+            title="Recommended Resources"
+            description="Books, videos, podcasts, and other recommendations visible to every fellow regardless of cohort."
             rows={universal}
             onEdit={setEditing}
             onDelete={setDeleting}
             emptyMessage={
               query
-                ? 'No matches in Recommended Reading.'
-                : 'Nothing in Recommended Reading yet.'
+                ? 'No matches in Recommended Resources.'
+                : 'Nothing in Recommended Resources yet.'
             }
           />
 

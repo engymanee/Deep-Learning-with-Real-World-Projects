@@ -415,7 +415,7 @@ export default async function AdminHomePage() {
             href="/admin/library"
             icon={<Library className="h-5 w-5" />}
             title="Library"
-            description="Add, edit, and remove curated resources. Gate by cohort or publish as Recommended Reading."
+            description="Add, edit, and remove curated books, videos, podcasts, and other resources. Gate by cohort or publish as Recommended Resources."
           />
           <ActionCard
             href="/admin/community"
