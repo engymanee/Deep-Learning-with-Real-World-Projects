@@ -401,10 +401,10 @@ function ResultsBody({
     )
   }
   if (view === 'grid') {
+    // Denser grid: 2 columns on phones, 3 on tablets, 4 on desktop.
+    // Smaller per-card footprint so curated stacks read as a wall
+    // of options rather than three giant tiles.
     return (
-      {/* Denser grid: 2 columns on phones, 3 on tablets, 4 on
-          desktop. Smaller per-card footprint so curated stacks
-          read as a wall of options rather than three giant tiles. */}
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
         {filtered.map((r) => (
           <GridCard key={r.id} resource={r} showCohort={showCohort} />
