@@ -196,7 +196,7 @@ export function AddResourceDialog() {
     if (!title.trim()) return setError('Title is required.')
     if (!url.trim()) return setError('URL is required.')
     if (visibility === 'cohort' && cohorts.length === 0) {
-      return setError('Pick at least one cohort or switch to Further Reading.')
+      return setError('Pick at least one cohort or switch to Recommended Reading.')
     }
 
     // Capture any in-flight tag draft so users don't lose it to
@@ -247,8 +247,9 @@ export function AddResourceDialog() {
         <DialogHeader>
           <DialogTitle>Add to library</DialogTitle>
           <DialogDescription>
-            Publish a curated resource. Choose Further Reading for materials
-            everyone should see, or Cohort-gated to stage releases by cohort.
+            Publish a curated resource. Choose Recommended Reading for
+            materials everyone should see, or Cohort-gated to stage releases
+            by cohort.
           </DialogDescription>
         </DialogHeader>
 
@@ -417,11 +418,11 @@ export function AddResourceDialog() {
                 <RadioGroupItem value="universal" id="vis-universal" className="mt-0.5" />
                 <span className="flex flex-col gap-0.5">
                   <span className="text-sm font-medium text-foreground">
-                    Further reading
+                    Recommended reading
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Visible to everyone, regardless of cohort. Lands on the
-                    Further Reading tab.
+                    Recommended Reading tab.
                   </span>
                 </span>
               </label>

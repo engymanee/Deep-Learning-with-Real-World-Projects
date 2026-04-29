@@ -137,7 +137,7 @@ export async function addLibraryResource(
       if (cleaned.length === 0) {
         return {
           ok: false,
-          message: 'Select at least one cohort or mark this as Further Reading.',
+          message: 'Select at least one cohort or mark this as Recommended Reading.',
         }
       }
       cohorts = cleaned
