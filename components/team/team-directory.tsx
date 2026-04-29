@@ -10,6 +10,11 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   members: DirectoryProfile[]
+  /**
+   * Whether to expose the cohort filter pills and the cohort chip
+   * on cards / modal. Admin-only; fellows don't see staging labels.
+   */
+  showCohort?: boolean
 }
 
 /**
@@ -23,18 +28,20 @@ interface Props {
  * Cohort filter only renders when the team has mixed cohorts, per
  * spec - it would be noise on a single-cohort team.
  */
-export function TeamDirectory({ members }: Props) {
+export function TeamDirectory({ members, showCohort = false }: Props) {
   const [selected, setSelected] = useState<DirectoryProfile | null>(null)
   const [cohortFilter, setCohortFilter] = useState<string | null>(null)
 
   // Distinct cohorts present in this team. Sorted alphabetically so
   // the filter pills render A, B, C in a stable order regardless of
-  // the underlying member sort.
+  // the underlying member sort. Empty for non-admins so the filter
+  // chrome below collapses entirely.
   const distinctCohorts = useMemo(() => {
+    if (!showCohort) return []
     const set = new Set<string>()
     for (const m of members) if (m.cohort) set.add(m.cohort)
     return [...set].sort()
-  }, [members])
+  }, [members, showCohort])
 
   const showCohortFilter = distinctCohorts.length > 1
   const filtered = useMemo(() => {
@@ -91,6 +98,7 @@ export function TeamDirectory({ members }: Props) {
               key={m.id}
               profile={m}
               variant="compact"
+              showCohort={showCohort}
               onSelect={setSelected}
             />
           ))}
@@ -100,6 +108,7 @@ export function TeamDirectory({ members }: Props) {
       <ProfileModal
         profile={selected}
         onOpenChange={(open) => !open && setSelected(null)}
+        showCohort={showCohort}
       />
     </div>
   )

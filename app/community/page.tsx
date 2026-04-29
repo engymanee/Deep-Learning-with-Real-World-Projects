@@ -230,7 +230,10 @@ export default async function CommunityPage() {
             {profiles.length === 0 ? (
               <EmptyState copy="No fellows or facilitators are listed yet." />
             ) : (
-              <BiosDirectory profiles={profiles} />
+              <BiosDirectory
+                profiles={profiles}
+                showCohort={user.role === 'admin'}
+              />
             )}
           </TabsContent>
         </Tabs>

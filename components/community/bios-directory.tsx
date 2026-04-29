@@ -18,6 +18,12 @@ import type { DirectoryProfile } from '@/lib/types/profile'
 
 interface Props {
   profiles: DirectoryProfile[]
+  /**
+   * Whether to expose the cohort filter and the cohort chip on the
+   * cards / modal. Cohort labels are program-internal staging data,
+   * so the server only sets this true for admins.
+   */
+  showCohort?: boolean
 }
 
 const ALL = '__all__'
@@ -36,18 +42,20 @@ const ALL = '__all__'
  * card variant is used here so each tile teases the bio - the
  * modal is reserved for the full view.
  */
-export function BiosDirectory({ profiles }: Props) {
+export function BiosDirectory({ profiles, showCohort = false }: Props) {
   const [query, setQuery] = useState('')
   const [cohort, setCohort] = useState<string>(ALL)
   const [team, setTeam] = useState<string>(ALL)
   const [selected, setSelected] = useState<DirectoryProfile | null>(null)
   const deferredQuery = useDeferredValue(query)
 
+  // Cohort filter is admin-only (matches the cohort chip rule).
   const cohortOptions = useMemo(() => {
+    if (!showCohort) return []
     const set = new Set<string>()
     for (const p of profiles) if (p.cohort) set.add(p.cohort)
     return [...set].sort()
-  }, [profiles])
+  }, [profiles, showCohort])
 
   const teamOptions = useMemo(() => {
     const set = new Set<string>()
@@ -166,6 +174,7 @@ export function BiosDirectory({ profiles }: Props) {
               key={p.id}
               profile={p}
               variant="detailed"
+              showCohort={showCohort}
               onSelect={setSelected}
             />
           ))}
@@ -175,6 +184,7 @@ export function BiosDirectory({ profiles }: Props) {
       <ProfileModal
         profile={selected}
         onOpenChange={(open) => !open && setSelected(null)}
+        showCohort={showCohort}
       />
     </div>
   )

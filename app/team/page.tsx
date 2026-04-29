@@ -88,7 +88,10 @@ export default async function TeamPage() {
               cohort is fully enrolled.
             </p>
           ) : (
-            <TeamDirectory members={members} />
+            <TeamDirectory
+              members={members}
+              showCohort={user.role === 'admin'}
+            />
           )}
         </section>
       </main>

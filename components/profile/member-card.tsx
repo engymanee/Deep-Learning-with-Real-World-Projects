@@ -20,6 +20,15 @@ interface Props {
    *    card is helpful.
    */
   variant?: 'compact' | 'detailed'
+  /**
+   * Whether to render the "Cohort A/B/C" chip. Cohort labels are
+   * program-internal staging metadata - participants don't think of
+   * themselves by cohort letter, so we only surface it for admins
+   * (passed in by the server based on `user.role === 'admin'`).
+   * Defaults to false so accidental omission errs on the side of
+   * privacy.
+   */
+  showCohort?: boolean
   /** Optional click handler - when provided the card becomes a button. */
   onSelect?: (profile: DirectoryProfile) => void
 }
@@ -36,7 +45,12 @@ interface Props {
  *    title to avoid stacking badges vertically.
  *  - Bio excerpt uses `line-clamp-2` so cards stay equal height.
  */
-export function MemberCard({ profile, variant = 'compact', onSelect }: Props) {
+export function MemberCard({
+  profile,
+  variant = 'compact',
+  showCohort = false,
+  onSelect,
+}: Props) {
   const name = profile.full_name?.trim() || profile.email || 'Unnamed member'
   const initials = initialsFor(profile.full_name, profile.email)
   const interactive = !!onSelect
@@ -49,9 +63,14 @@ export function MemberCard({ profile, variant = 'compact', onSelect }: Props) {
       type={interactive ? 'button' : undefined}
       onClick={interactive ? () => onSelect?.(profile) : undefined}
       className={cn(
-        'group flex w-full items-start gap-3 rounded-md border border-border bg-card p-4 text-left transition-colors',
+        // Subtle shadow / brand-tinted border on hover instead of
+        // the previous accent fill, which painted the card in the
+        // brand rose and turned every label hard to read. The
+        // background stays card-coloured; only the border + a
+        // light shadow signal interactivity.
+        'group flex w-full items-start gap-3 rounded-md border border-border bg-card p-4 text-left transition-all',
         interactive &&
-          'hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'cursor-pointer hover:border-primary/60 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
       )}
       aria-label={interactive ? `Open profile for ${name}` : undefined}
     >
@@ -81,7 +100,8 @@ export function MemberCard({ profile, variant = 'compact', onSelect }: Props) {
           <Badge variant="secondary" className="text-[10px]">
             {roleLabelFor(profile.role)}
           </Badge>
-          {profile.cohort && (
+          {/* Cohort chip is admin-only - see Props.showCohort. */}
+          {showCohort && profile.cohort && (
             <Badge variant="outline" className="text-[10px]">
               Cohort {profile.cohort}
             </Badge>

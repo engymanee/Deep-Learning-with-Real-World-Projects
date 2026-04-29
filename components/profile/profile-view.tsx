@@ -28,7 +28,17 @@ import {
  *  - Bio paragraph (whitespace-pre-wrap so newlines survive)
  *  - Contact email link, only when present
  */
-export function ProfileView({ profile }: { profile: DirectoryProfile }) {
+interface ProfileViewProps {
+  profile: DirectoryProfile
+  /**
+   * Whether to render the "Cohort A/B/C" chip. Mirrors MemberCard
+   * - admin-only by default. Server passes the value derived from
+   * `user.role === 'admin'` so fellows never see staging metadata.
+   */
+  showCohort?: boolean
+}
+
+export function ProfileView({ profile, showCohort = false }: ProfileViewProps) {
   const name = profile.full_name?.trim() || profile.email || 'Unnamed member'
   const initials = initialsFor(profile.full_name, profile.email)
 
@@ -62,7 +72,8 @@ export function ProfileView({ profile }: { profile: DirectoryProfile }) {
             <Badge variant="secondary" className="text-xs">
               {roleLabelFor(profile.role)}
             </Badge>
-            {profile.cohort && (
+            {/* Cohort chip is admin-only - same rule as MemberCard. */}
+            {showCohort && profile.cohort && (
               <Badge variant="outline" className="text-xs">
                 Cohort {profile.cohort}
               </Badge>
@@ -105,6 +116,8 @@ interface ProfileModalProps {
   profile: DirectoryProfile | null
   /** Called when the dialog wants to close - parent clears state. */
   onOpenChange: (open: boolean) => void
+  /** Forwarded to ProfileView - admin-only cohort chip. */
+  showCohort?: boolean
 }
 
 /**
@@ -112,7 +125,11 @@ interface ProfileModalProps {
  * Keeps each call site to a one-liner: pass the currently-selected
  * profile (or null) and a setter that toggles it.
  */
-export function ProfileModal({ profile, onOpenChange }: ProfileModalProps) {
+export function ProfileModal({
+  profile,
+  onOpenChange,
+  showCohort = false,
+}: ProfileModalProps) {
   return (
     <Dialog open={!!profile} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -122,7 +139,9 @@ export function ProfileModal({ profile, onOpenChange }: ProfileModalProps) {
           </DialogTitle>
           <DialogDescription>Member profile details</DialogDescription>
         </DialogHeader>
-        {profile && <ProfileView profile={profile} />}
+        {profile && (
+          <ProfileView profile={profile} showCohort={showCohort} />
+        )}
       </DialogContent>
     </Dialog>
   )
