@@ -65,11 +65,15 @@ export function LinkOpenButton({
   // No visible "Opened" indicator - the click is tracked internally
   // (`optimistic` + `recordLinkClick`) so the lesson footer's gate
   // can clear, but nothing is surfaced inline on the link card.
+  // The label is rendered verbatim (no `capitalize` transform) since
+  // it's now typically the article title, which arrives already
+  // correctly title-cased and would be mangled by CSS capitalize on
+  // its lowercase connectors ("of", "for", "the").
   const text = label ?? (isLiveSession ? 'Join now' : 'Open')
   return (
     <Button onClick={handleClick} className="inline-flex items-center gap-1.5">
-      <span className="capitalize">{text}</span>
-      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+      <span className="line-clamp-1 text-left">{text}</span>
+      <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
     </Button>
   )
 }

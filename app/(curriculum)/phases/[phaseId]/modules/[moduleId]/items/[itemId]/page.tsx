@@ -2,6 +2,10 @@ import { notFound } from 'next/navigation'
 import { LessonFooter } from '@/components/curriculum/lesson-footer'
 import { LinkOpenButton } from '@/components/curriculum/link-open-button'
 import { ReflectionForm } from '@/components/curriculum/reflection-form'
+import {
+  VideoEmbed,
+  isEmbeddableVideo,
+} from '@/components/curriculum/video-embed'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import {
@@ -185,7 +189,7 @@ export default async function ContentItemPage({
             {duration && <span>{duration}</span>}
           </div>
         )}
-        <h1 className="text-pretty font-serif text-3xl leading-tight text-foreground md:text-4xl">
+        <h1 className="text-pretty font-serif text-xl leading-tight text-foreground md:text-2xl">
           {item.title}
         </h1>
         {item.description && (
@@ -206,28 +210,31 @@ export default async function ContentItemPage({
         </div>
       )}
 
-      {/* External resource CTA. The page header above already carries
-          the title + description, so this card is just the action -
-          no redundant "Open this resource" copy and no raw URL on
-          display. The button label adapts to the resource type so
-          the click affordance is self-describing. */}
-      {hasUrl && (
-        <div className="flex">
-          <LinkOpenButton
+      {/* External resource. For video items with a recognizable
+          provider URL (YouTube / Vimeo / Loom / direct media file)
+          we render an inline 16:9 preview so fellows can play it
+          right in the lesson - reaching the embed counts as the
+          "open" for the completion gate. Anything else falls back to
+          a single CTA whose label is the article title (the click
+          target reads as the thing the fellow is opening). */}
+      {hasUrl &&
+        (item.resource_type === 'video' && isEmbeddableVideo(item.url!) ? (
+          <VideoEmbed
             contentId={item.id}
             url={item.url!}
-            isLiveSession={isLiveSession}
-            label={
-              isLiveSession
-                ? 'Join live session'
-                : resource
-                  ? `Open ${resource.label.toLowerCase()}`
-                  : 'Open resource'
-            }
             alreadyClicked={linkClicked}
           />
-        </div>
-      )}
+        ) : (
+          <div className="flex">
+            <LinkOpenButton
+              contentId={item.id}
+              url={item.url!}
+              isLiveSession={isLiveSession}
+              label={isLiveSession ? 'Join live session' : item.title}
+              alreadyClicked={linkClicked}
+            />
+          </div>
+        ))}
 
       {!hasBody && !hasUrl && !reflectionRequired && (
         <div className="rounded-lg border border-dashed border-border p-8 text-center">
