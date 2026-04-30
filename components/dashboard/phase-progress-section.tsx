@@ -71,20 +71,13 @@ function PhaseCard({
           </p>
         </header>
 
-        {/* My meter - the headline number for this card. */}
+        {/* My meter. Per product direction the card communicates
+            progress through the bar fill alone - no percentage, no
+            "X of Y" counter. The bar still consumes the percent
+            value internally to draw the fill. */}
         <div className="space-y-2">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-sm font-medium text-foreground">You</p>
-            <p className="text-sm tabular-nums text-foreground">
-              {phase.me.percent}%
-            </p>
-          </div>
+          <p className="text-sm font-medium text-foreground">You</p>
           <Progress value={phase.me.percent} className="h-2" />
-          {hasItems && (
-            <p className="text-xs text-muted-foreground">
-              {phase.me.completed} of {phase.itemCount} complete
-            </p>
-          )}
         </div>
 
         {/* Teammates list. Hidden when the user is solo. */}
@@ -136,12 +129,10 @@ function TeammateRow({
       </Avatar>
 
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="truncate text-sm text-foreground">{teammate.name}</p>
-          <p className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {teammate.percent}%
-          </p>
-        </div>
+        {/* Teammate row mirrors the "You" meter: name + bar + count,
+            no raw percentage. The bar fill itself still uses the
+            percent value to draw the meter. */}
+        <p className="truncate text-sm text-foreground">{teammate.name}</p>
         <Progress value={teammate.percent} className="h-1" />
         {totalItems > 0 && (
           <p className="text-[11px] text-muted-foreground">
