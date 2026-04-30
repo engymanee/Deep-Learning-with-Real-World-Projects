@@ -71,20 +71,13 @@ function PhaseCard({
           </p>
         </header>
 
-        {/* My meter - the headline number for this card.
-            Per product feedback we no longer surface the raw
-            percentage; the bar fill plus the "X of Y complete"
-            count communicate progress without the number-on-number
-            redundancy. The bar still uses the percent value
-            internally to draw the fill. */}
+        {/* My meter. Per product direction the card communicates
+            progress through the bar fill alone - no percentage, no
+            "X of Y" counter. The bar still consumes the percent
+            value internally to draw the fill. */}
         <div className="space-y-2">
           <p className="text-sm font-medium text-foreground">You</p>
           <Progress value={phase.me.percent} className="h-2" />
-          {hasItems && (
-            <p className="text-xs text-muted-foreground">
-              {phase.me.completed} of {phase.itemCount} complete
-            </p>
-          )}
         </div>
 
         {/* Teammates list. Hidden when the user is solo. */}
