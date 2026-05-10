@@ -42,7 +42,7 @@ interface RawReflectionRow {
   visibility: 'public' | 'cohort' | 'private'
   created_at: string
   updated_at: string | null
-  content: {
+  lab: {
     id: string
     title: string | null
     year_id: string | null
@@ -80,7 +80,7 @@ export async function loadReflectionFeed(options?: {
     .select(
       `
       id, response as body, visibility, created_at, updated_at,
-      content:content_id ( id, title, year_id, reflection_prompt ),
+      lab:content_id ( id, title, year_id, reflection_prompt ),
       author:profile_id ( id, full_name, email, avatar_url )
       `,
     )
@@ -116,12 +116,12 @@ export async function loadReflectionFeed(options?: {
     visibility: r.visibility,
     created_at: r.created_at,
     updated_at: r.updated_at,
-    content: r.content
+    content: r.lab
       ? {
-          id: r.content.id,
-          title: r.content.title,
-          year_id: r.content.year_id,
-          prompt: r.content.reflection_prompt,
+          id: r.lab.id,
+          title: r.lab.title,
+          year_id: r.lab.year_id,
+          prompt: r.lab.reflection_prompt,
         }
       : null,
     author: r.author,
