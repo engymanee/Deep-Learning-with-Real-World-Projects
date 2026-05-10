@@ -94,14 +94,7 @@ export default async function TeamPage() {
                 href="/dashboard"
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-6 py-3 font-medium hover:opacity-90 transition-opacity"
               >
-                View Dashboard
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/community"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-medium hover:border-primary/40 hover:text-primary transition-colors"
-              >
-                Join Community
+                Go to Dashboard
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
