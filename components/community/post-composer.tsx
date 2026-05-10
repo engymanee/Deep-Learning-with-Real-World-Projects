@@ -26,21 +26,13 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { createCommunityPost } from '@/app/community/actions'
+import { ASK_CATEGORIES } from '@/lib/community/ask-categories'
 
 /** Sentinel for "no framework selected" - SelectItem can't have empty value. */
 const NO_FRAMEWORK = '__none__'
 
 /** Sentinel for "no category selected" in the ask composer. */
 const NO_CATEGORY = '__none__'
-
-/** Categories surfaced in the ask composer. Kept in sync with the
- *  check constraint on community_posts.ask_category in migration 049. */
-const ASK_CATEGORIES = [
-  { value: 'general', label: 'General' },
-  { value: 'instructional', label: 'Instructional' },
-  { value: 'school_team', label: 'School team' },
-  { value: 'waw', label: 'Why-and-what (WAW)' },
-] as const
 
 interface FrameworkOption {
   id: string

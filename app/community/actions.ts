@@ -264,5 +264,106 @@ export async function setAskStatus(input: {
   if (error) return { ok: false, message: error.message }
   revalidatePath('/community')
   revalidatePath('/community/ask')
+  revalidatePath(`/community/stories/${input.postId}`)
+  return { ok: true }
+}
+
+/**
+ * Mark a single comment as the accepted answer for an ask. Setting
+ * the comment id also flips the ask's status to 'answered' so the
+ * lifecycle filter stays accurate. Pass `null` to clear.
+ *
+ * Only the post author or staff can mark/unmark the accepted answer.
+ * The comment must belong to the post (subject_id match) - otherwise
+ * we'd let any comment id be linked, which is a data-integrity bug
+ * waiting to happen.
+ */
+export async function setAcceptedAnswer(input: {
+  postId: string
+  commentId: string | null
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await requireUser()
+  const supabase = await createClient()
+
+  const { data: post } = await supabase
+    .from('community_posts')
+    .select('id, kind, created_by, ask_status')
+    .eq('id', input.postId)
+    .maybeSingle<{
+      id: string
+      kind: string
+      created_by: string
+      ask_status: string | null
+    }>()
+
+  if (!post) return { ok: false, message: 'Post not found.' }
+  if (post.kind !== 'ask') {
+    return { ok: false, message: 'This post is not an ask.' }
+  }
+
+  const isOwner = post.created_by === user.id
+  const isStaff = user.role === 'admin' || user.role === 'facilitator'
+  if (!isOwner && !isStaff) {
+    return {
+      ok: false,
+      message: 'Only the asker or staff can mark an answer.',
+    }
+  }
+
+  // Verify the comment is attached to this post (when we're setting
+  // and not clearing). Closes the path where a malicious caller
+  // links any comment id to any post.
+  if (input.commentId) {
+    const { data: comment } = await supabase
+      .from('community_comments')
+      .select('id, subject_type, subject_id, deleted_at')
+      .eq('id', input.commentId)
+      .maybeSingle<{
+        id: string
+        subject_type: string
+        subject_id: string
+        deleted_at: string | null
+      }>()
+    if (!comment) {
+      return { ok: false, message: 'Comment not found.' }
+    }
+    if (
+      comment.subject_type !== 'post' ||
+      comment.subject_id !== input.postId
+    ) {
+      return {
+        ok: false,
+        message: 'That comment is not on this ask.',
+      }
+    }
+    if (comment.deleted_at) {
+      return {
+        ok: false,
+        message: 'That comment has been removed.',
+      }
+    }
+  }
+
+  // Setting an accepted answer flips status to 'answered' (unless
+  // it was already 'closed'); clearing it returns the ask to 'open'.
+  const nextStatus = input.commentId
+    ? post.ask_status === 'closed'
+      ? 'closed'
+      : 'answered'
+    : 'open'
+
+  const writer = isStaff && !isOwner ? createAdminClient() : supabase
+  const { error } = await writer
+    .from('community_posts')
+    .update({
+      accepted_answer_comment_id: input.commentId,
+      ask_status: nextStatus,
+    })
+    .eq('id', input.postId)
+  if (error) return { ok: false, message: error.message }
+
+  revalidatePath('/community')
+  revalidatePath('/community/ask')
+  revalidatePath(`/community/stories/${input.postId}`)
   return { ok: true }
 }

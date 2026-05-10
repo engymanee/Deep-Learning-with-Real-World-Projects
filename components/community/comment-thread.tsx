@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { Pencil, Reply, Trash2, X } from 'lucide-react'
+import { Check, CheckCircle2, Pencil, Reply, Trash2, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { initialsFor } from '@/lib/types/profile'
@@ -11,6 +12,7 @@ import {
   deleteComment,
   updateComment,
 } from '@/app/community/reflections/actions'
+import { setAcceptedAnswer } from '@/app/community/actions'
 import type { CommentItem } from '@/lib/community/load-reflections'
 
 interface Props {
@@ -29,6 +31,14 @@ interface Props {
     avatarUrl: string | null
     isAdmin: boolean
   } | null
+  /**
+   * When the subject is an Ask post, the asker (or staff) can mark
+   * a single reply as the accepted answer. Pass the current
+   * accepted comment id (or null) plus a flag controlling whether
+   * the viewer is allowed to change it.
+   */
+  acceptedAnswerCommentId?: string | null
+  canAcceptAnswer?: boolean
 }
 
 /**
@@ -48,10 +58,35 @@ export function CommentThread({
   subjectId,
   comments: initialComments,
   currentUser,
+  acceptedAnswerCommentId = null,
+  canAcceptAnswer = false,
 }: Props) {
   const [comments, setComments] = useState<CommentItem[]>(initialComments)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  // Track the accepted answer locally so the badge updates without
+  // a full route refresh. The server action revalidates the page on
+  // the next navigation; this just keeps the current view in sync.
+  const [acceptedId, setAcceptedId] = useState<string | null>(
+    acceptedAnswerCommentId,
+  )
+
+  function toggleAccepted(commentId: string) {
+    if (!canAcceptAnswer) return
+    setError(null)
+    const next = acceptedId === commentId ? null : commentId
+    startTransition(async () => {
+      const result = await setAcceptedAnswer({
+        postId: subjectId,
+        commentId: next,
+      })
+      if (!result.ok) {
+        setError(result.message ?? 'Could not update accepted answer.')
+        return
+      }
+      setAcceptedId(next)
+    })
+  }
 
   // Top-level composer state.
   const [body, setBody] = useState('')
@@ -63,7 +98,12 @@ export function CommentThread({
   const [editBody, setEditBody] = useState('')
 
   // Group by parent so we render top-level → replies in DOM order.
-  const tree = useMemo(() => buildTree(comments), [comments])
+  // When there's an accepted answer, surface it first so the asker
+  // and skim-readers see the resolution immediately.
+  const tree = useMemo(() => buildTree(comments, acceptedId), [
+    comments,
+    acceptedId,
+  ])
 
   function clearComposer() {
     setBody('')
@@ -216,6 +256,9 @@ export function CommentThread({
                 isEditing={editingId === node.comment.id}
                 editBody={editBody}
                 pending={pending}
+                isAccepted={acceptedId === node.comment.id}
+                canToggleAccepted={canAcceptAnswer}
+                onToggleAccepted={() => toggleAccepted(node.comment.id)}
                 onReplyClick={() => {
                   clearComposer()
                   setReplyingTo(node.comment.id)
@@ -244,6 +287,9 @@ export function CommentThread({
                         isEditing={editingId === reply.id}
                         editBody={editBody}
                         pending={pending}
+                        isAccepted={acceptedId === reply.id}
+                        canToggleAccepted={canAcceptAnswer}
+                        onToggleAccepted={() => toggleAccepted(reply.id)}
                         onEditClick={() => {
                           clearComposer()
                           setEditingId(reply.id)
@@ -355,8 +401,14 @@ interface TreeNode {
  * Build a top-level → replies tree. Replies that point to a missing
  * parent (e.g. parent was hard-deleted) are surfaced as top-level so
  * they don't disappear silently.
+ *
+ * `acceptedId` floats the accepted answer (or its top-level ancestor)
+ * to the front of the list so it's the first thing readers see.
  */
-function buildTree(comments: CommentItem[]): TreeNode[] {
+function buildTree(
+  comments: CommentItem[],
+  acceptedId: string | null,
+): TreeNode[] {
   const byId = new Map<string, TreeNode>()
   const tops: TreeNode[] = []
 
@@ -380,6 +432,19 @@ function buildTree(comments: CommentItem[]): TreeNode[] {
       }
     }
   }
+  if (acceptedId) {
+    // The accepted answer is either a top-level comment or a reply.
+    // For top-level: float it to position 0. For a reply: float its
+    // parent. We don't reshuffle replies inside the parent.
+    const idx = tops.findIndex((n) => {
+      if (n.comment.id === acceptedId) return true
+      return n.replies.some((r) => r.id === acceptedId)
+    })
+    if (idx > 0) {
+      const [pinned] = tops.splice(idx, 1)
+      tops.unshift(pinned)
+    }
+  }
   // Replies stay in chronological order (initial comments arrive
   // ASC by created_at from the loader).
   return tops
@@ -391,12 +456,17 @@ interface CommentRowProps {
   isEditing: boolean
   editBody: string
   pending: boolean
+  /** True when this comment is the accepted answer for the parent ask. */
+  isAccepted?: boolean
+  /** True when the viewer is allowed to toggle the accepted answer. */
+  canToggleAccepted?: boolean
   onReplyClick?: () => void
   onEditClick: () => void
   onDeleteClick: () => void
   onEditChange: (v: string) => void
   onEditSubmit: () => void
   onEditCancel: () => void
+  onToggleAccepted?: () => void
 }
 
 function CommentRow({
@@ -405,12 +475,15 @@ function CommentRow({
   isEditing,
   editBody,
   pending,
+  isAccepted = false,
+  canToggleAccepted = false,
   onReplyClick,
   onEditClick,
   onDeleteClick,
   onEditChange,
   onEditSubmit,
   onEditCancel,
+  onToggleAccepted,
 }: CommentRowProps) {
   const authorName =
     comment.author?.full_name?.trim() ||
@@ -435,7 +508,14 @@ function CommentRow({
         </AvatarFallback>
       </Avatar>
 
-      <div className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 py-2">
+      <div
+        className={[
+          'min-w-0 flex-1 rounded-md border bg-card px-3 py-2',
+          isAccepted
+            ? 'border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/20'
+            : 'border-border',
+        ].join(' ')}
+      >
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
           <span className="truncate font-medium text-foreground">
             {authorName}
@@ -444,6 +524,15 @@ function CommentRow({
             {formatRelative(comment.created_at)}
             {comment.updated_at && !comment.is_deleted && ' · edited'}
           </span>
+          {isAccepted && (
+            <Badge
+              variant="outline"
+              className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            >
+              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+              Accepted answer
+            </Badge>
+          )}
         </div>
 
         {comment.is_deleted ? (
@@ -495,6 +584,28 @@ function CommentRow({
               >
                 <Reply className="h-3 w-3" aria-hidden="true" />
                 Reply
+              </button>
+            )}
+            {/*
+              Accept-answer toggle. Visible only when the viewer is
+              allowed (asker or staff). Clicking on an already-
+              accepted comment clears the acceptance.
+            */}
+            {canToggleAccepted && onToggleAccepted && (
+              <button
+                type="button"
+                onClick={onToggleAccepted}
+                disabled={pending}
+                className={[
+                  'inline-flex items-center gap-1 transition-colors disabled:opacity-50',
+                  isAccepted
+                    ? 'text-emerald-700 hover:text-emerald-900 dark:text-emerald-300 dark:hover:text-emerald-100'
+                    : 'text-muted-foreground hover:text-emerald-700 dark:hover:text-emerald-300',
+                ].join(' ')}
+                aria-pressed={isAccepted}
+              >
+                <Check className="h-3 w-3" aria-hidden="true" />
+                {isAccepted ? 'Unmark answer' : 'Mark as answer'}
               </button>
             )}
             {isOwner && (
