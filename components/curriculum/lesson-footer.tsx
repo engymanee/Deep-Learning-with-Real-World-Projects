@@ -116,7 +116,23 @@ export function LessonFooter({
   }
 
   function handleContinue() {
-    if (nextHref) router.push(nextHref)
+    if (!optimistic && !blocked) {
+      // Item not yet completed and no gates blocking - mark complete
+      // before navigating. This ensures reflection items with no link
+      // gates auto-complete on "Go to next item" click.
+      setOptimistic(true)
+      startTransition(async () => {
+        const res = await toggleContentCompletion(contentId, true)
+        if (!res.ok) {
+          setOptimistic(false)
+          return
+        }
+        if (nextHref) router.push(nextHref)
+      })
+    } else if (nextHref) {
+      // Already completed - just navigate.
+      router.push(nextHref)
+    }
   }
 
   // "Completed" indicator. Doubles as the re-open affordance: hover
