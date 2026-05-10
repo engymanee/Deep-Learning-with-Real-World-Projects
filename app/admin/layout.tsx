@@ -8,7 +8,7 @@ import {
   Building2,
   BookOpen,
   Library,
-  Megaphone,
+  Bell,
   MessagesSquare,
 } from 'lucide-react'
 import { TopBar } from '@/components/top-bar'
@@ -62,9 +62,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             label="Community"
           />
           <AdminTab
-            href="/admin/announcements"
-            icon={<Megaphone className="h-4 w-4" />}
-            label="Announcements"
+            href="/admin/notifications"
+            icon={<Bell className="h-4 w-4" />}
+            label="Notifications"
           />
         </nav>
 
