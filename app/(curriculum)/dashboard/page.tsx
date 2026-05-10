@@ -1,5 +1,6 @@
 import { getDashboardData } from '@/lib/dashboard-data'
 import { loadTeamProgress } from '@/lib/team-progress'
+import { WelcomeHero } from '@/components/dashboard/welcome-hero'
 import { LiveSessionCard } from '@/components/dashboard/live-session-card'
 import { NotificationsFeed } from '@/components/notifications/notifications-feed'
 import { PhaseProgressSection } from '@/components/dashboard/phase-progress-section'
@@ -30,6 +31,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-10">
+      {/* Welcome banner - first thing fellows see when they log in */}
+      <WelcomeHero fellowName={data.user.fullName} />
+
       <header className="space-y-2">
         <h1 className="font-serif text-3xl text-primary md:text-4xl">
           Welcome back, {data.user.fullName}
