@@ -14,8 +14,10 @@ import { Label } from '@/components/ui/label'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { KeyRound, Mail } from 'lucide-react'
+import { requestSignInCodeAction } from './actions'
 
 type Method = 'password' | 'code'
+type CodeStep = 'request' | 'verify'
 
 function LoginForm() {
   const router = useRouter()
@@ -30,12 +32,16 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [codeSentTo, setCodeSentTo] = useState<string | null>(null)
+  const [codeStep, setCodeStep] = useState<CodeStep>('request')
+  const [code, setCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   function switchMethod(next: Method) {
     setMethod(next)
     setError(null)
     setCodeSentTo(null)
+    setCodeStep('request')
+    setCode('')
   }
 
   async function handlePasswordLogin(e: React.FormEvent) {
@@ -72,29 +78,48 @@ function LoginForm() {
 
     setIsLoading(true)
     try {
-      const supabase = createClient()
-      const origin =
-        typeof window !== 'undefined' ? window.location.origin : ''
-      const redirectTo = origin
-        ? `${origin}/auth/callback?next=${encodeURIComponent(
-            next.startsWith('/') ? next : '/',
-          )}`
-        : undefined
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          // Don't auto-create accounts - the portal is invite-only. If
-          // the email isn't already registered Supabase will return an
-          // error we surface below.
-          shouldCreateUser: false,
-          emailRedirectTo: redirectTo,
-        },
-      })
-      if (error) throw error
-      setCodeSentTo(email)
+      // Server action issues the OTP via Supabase admin and emails it
+      // through Resend. Returns just-the-code, no magic link.
+      const result = await requestSignInCodeAction(email)
+      if (!result.ok) throw new Error(result.error)
+      setCodeSentTo(result.email)
+      setCodeStep('verify')
+      setCode('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to send login code')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function handleCodeVerify(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    const trimmed = code.replace(/\s+/g, '')
+    if (!trimmed || trimmed.length < 6) {
+      setError('Enter the 6-digit code from your email.')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const supabase = createClient()
+      // `type: 'email'` matches the 6-digit OTP issued by
+      // generateLink({ type: 'magiclink' }) on the server.
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: trimmed,
+        type: 'email',
+      })
+      if (error) throw error
+      router.replace(next.startsWith('/') ? next : '/')
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'That code was invalid or has expired. Try requesting a new one.',
+      )
     } finally {
       setIsLoading(false)
     }
@@ -147,7 +172,7 @@ function LoginForm() {
               {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
-        ) : (
+        ) : codeStep === 'request' ? (
           <form onSubmit={handleCodeSend} className="flex flex-col gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email-code">Email</Label>
@@ -161,8 +186,8 @@ function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                We&apos;ll email you a one-time link. Click it to sign in &mdash; no
-                password required.
+                We&apos;ll email you a 6-digit code. Come back to this tab and type it
+                in to sign in &mdash; no password required.
               </p>
             </div>
             {error && (
@@ -170,19 +195,68 @@ function LoginForm() {
                 {error}
               </p>
             )}
-            {codeSentTo && !error && (
-              <p
-                role="status"
-                className="rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground"
-              >
-                Check{' '}
-                <span className="font-medium">{codeSentTo}</span> for a login link. You
-                can close this tab &mdash; opening the link will sign you in.
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Sending code...' : 'Email me a sign-in code'}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={handleCodeVerify} className="flex flex-col gap-4">
+            <p
+              role="status"
+              className="rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground"
+            >
+              We sent a 6-digit code to{' '}
+              <span className="font-medium">{codeSentTo}</span>. Enter it below to
+              finish signing in.
+            </p>
+            <div className="grid gap-2">
+              <Label htmlFor="otp-code">Sign-in code</Label>
+              <Input
+                id="otp-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder="123456"
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                className="text-center text-lg tracking-[0.5em] font-mono"
+              />
+            </div>
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
               </p>
             )}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Sending code...' : codeSentTo ? 'Resend login code' : 'Email me a login code'}
+              {isLoading ? 'Verifying...' : 'Verify and sign in'}
             </Button>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => {
+                  setCodeStep('request')
+                  setCode('')
+                  setError(null)
+                }}
+                className="underline underline-offset-2 hover:text-foreground"
+                disabled={isLoading}
+              >
+                Use a different email
+              </button>
+              <button
+                type="button"
+                onClick={(ev) => {
+                  setCode('')
+                  handleCodeSend(ev)
+                }}
+                className="underline underline-offset-2 hover:text-foreground"
+                disabled={isLoading}
+              >
+                Resend code
+              </button>
+            </div>
           </form>
         )}
 
