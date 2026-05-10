@@ -54,6 +54,7 @@ export async function createCommunityPost(input: {
   body: string
   frameworkResourceId?: string | null
   askCategory?: string | null
+  starRating?: number | null
 }): Promise<CreatePostResult> {
   try {
     const user = await requireUser()
@@ -129,6 +130,15 @@ export async function createCommunityPost(input: {
       askStatus = 'open'
     }
 
+    // Star rating: only allowed on wins, must be 1-5 if provided.
+    let starRating: number | null = null
+    if (input.kind === 'win' && input.starRating) {
+      if (input.starRating < 1 || input.starRating > 5) {
+        return { ok: false, message: 'Rating must be between 1 and 5.' }
+      }
+      starRating = input.starRating
+    }
+
     // Auto excerpt: first 280 chars of body, ending on a clean break.
     const excerpt =
       body.length > MAX_EXCERPT
@@ -148,6 +158,7 @@ export async function createCommunityPost(input: {
         framework_resource_id: frameworkResourceId,
         ask_category: askCategory,
         ask_status: askStatus,
+        star_rating: starRating,
       })
       .select('id')
       .single()

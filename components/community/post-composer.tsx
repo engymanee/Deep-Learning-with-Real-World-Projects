@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import { Plus, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -76,6 +76,11 @@ interface Props {
    * picker. Used by the Asks composer to enforce categorisation.
    */
   requireAskCategory?: boolean
+  /**
+   * When true, the composer surfaces a star rating picker (1-5).
+   * Used by the Wins composer to capture subjective value rating.
+   */
+  requireStarRating?: boolean
 }
 
 /**
@@ -95,16 +100,15 @@ export function PostComposer({
   canPost,
   frameworks,
   requireAskCategory = false,
+  requireStarRating = false,
 }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
-  // The framework picker is optional even when offered. The "none"
-  // sentinel keeps the select component happy (it doesn't allow
-  // empty-string values) without forcing the user to pick.
   const [framework, setFramework] = useState<string>(NO_FRAMEWORK)
   const [askCategory, setAskCategory] = useState<string>(NO_CATEGORY)
+  const [starRating, setStarRating] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -117,6 +121,7 @@ export function PostComposer({
     setBody('')
     setFramework(NO_FRAMEWORK)
     setAskCategory(NO_CATEGORY)
+    setStarRating(null)
     setError(null)
   }
 
@@ -130,18 +135,20 @@ export function PostComposer({
     if (requireAskCategory && askCategory === NO_CATEGORY) {
       return setError('Pick a category for your question.')
     }
+    if (requireStarRating && !starRating) {
+      return setError('Rate your win (1-5 stars).')
+    }
 
     startTransition(async () => {
       const result = await createCommunityPost({
         kind: writeKind,
         title: t,
         body: b,
-        // Strip the sentinel before sending; the server action treats
-        // null / undefined as "no framework".
         frameworkResourceId:
           framework === NO_FRAMEWORK ? null : framework,
         askCategory:
           askCategory === NO_CATEGORY ? null : askCategory,
+        starRating: requireStarRating ? starRating : null,
       })
       if (!result.ok) {
         setError(result.message)
@@ -149,7 +156,6 @@ export function PostComposer({
       }
       reset()
       setOpen(false)
-      // Refresh server data so the new post shows in the feed.
       router.refresh()
     })
   }
@@ -261,6 +267,36 @@ export function PostComposer({
               <p className="text-xs text-muted-foreground">
                 Tag the protocol you used so other fellows can learn
                 from your example.
+              </p>
+            </div>
+          )}
+
+          {requireStarRating && (
+            <div className="flex flex-col gap-1.5">
+              <Label>How valuable was this win?</Label>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    onClick={() => setStarRating(rating)}
+                    disabled={pending}
+                    className="transition-colors hover:text-yellow-400"
+                  >
+                    <Star
+                      className={[
+                        'h-6 w-6',
+                        starRating && rating <= starRating
+                          ? 'fill-yellow-400 text-yellow-400'
+                          : 'text-muted-foreground',
+                      ].join(' ')}
+                      aria-hidden="true"
+                    />
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Rate the impact and applicability of this win.
               </p>
             </div>
           )}

@@ -29,6 +29,11 @@ interface Props {
    * by the Asks section to make categorisation a hard requirement.
    */
   requireAskCategory?: boolean
+  /**
+   * When true, the composer requires + surfaces a star rating picker
+   * (1-5 stars). Used by the Wins section to capture win valuation.
+   */
+  requireStarRating?: boolean
 }
 
 /**
@@ -42,6 +47,7 @@ export function SectionHeader({
   canPost,
   frameworks,
   requireAskCategory = false,
+  requireStarRating = false,
 }: Props) {
   return (
     <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
@@ -76,6 +82,7 @@ export function SectionHeader({
             canPost={canPost}
             frameworks={frameworks}
             requireAskCategory={requireAskCategory}
+            requireStarRating={requireStarRating}
           />
         </div>
       )}
