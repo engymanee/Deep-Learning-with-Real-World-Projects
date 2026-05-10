@@ -116,17 +116,27 @@ export default async function CommunityOverviewPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Community of Practice
-        </p>
-        <h1 className="font-serif text-3xl text-foreground sm:text-4xl">
-          Welcome to the Fellowship
-        </h1>
-        <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-          Browse fellow bios, catch up on what is new, share reflections and
-          wins, and ask the community when you are stuck.
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Community of Practice
+          </p>
+          <h1 className="font-serif text-3xl text-foreground sm:text-4xl">
+            Welcome to the Fellowship
+          </h1>
+          <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+            Browse fellow bios, catch up on what is new, share reflections and
+            wins, and ask the community when you are stuck.
+          </p>
+        </div>
+        {/* Quick path to the curated weekly read-out. */}
+        <Link
+          href="/community/dashboard"
+          className="inline-flex items-center gap-1 self-start rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary sm:self-auto"
+        >
+          This week&apos;s dashboard
+          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+        </Link>
       </header>
 
       <section className="flex flex-col gap-3">
