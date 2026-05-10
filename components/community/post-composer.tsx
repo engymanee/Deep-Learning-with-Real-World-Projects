@@ -161,7 +161,8 @@ export function PostComposer({
     startTransition(async () => {
       const result = await createCommunityPost({
         kind: writeKind,
-        title: requireStarRating ? framework : title.trim(),
+        // For wins, use body as title (no separate title field); for other posts, use title
+        title: requireStarRating ? body.trim().split('\n')[0] : title.trim(),
         body: b,
         frameworkResourceId:
           framework === NO_FRAMEWORK ? null : framework,
