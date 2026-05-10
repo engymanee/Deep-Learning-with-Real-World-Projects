@@ -3,12 +3,7 @@
 import { useState } from 'react'
 import { Heart, Lightbulb, ThumbsUp, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownTrigger,
-} from '@/components/ui/dropdown-menu'
+import { MessageCircle } from 'lucide-react'
 import { addReactionToReflection } from '@/app/(curriculum)/phases/reflection-actions'
 
 interface ReflectionReactionsProps {

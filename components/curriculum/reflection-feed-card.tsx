@@ -101,10 +101,7 @@ export function ReflectionFeedCard({
       <ReflectionDetail
         isOpen={isDetailOpen}
         onOpenChange={setIsDetailOpen}
-        reflection={{
-          ...reflection,
-          title: reflection.contentTitle,
-        }}
+        reflection={reflection}
         reactions={reactions}
         userReactions={userReactions}
         commentCount={commentCount}

@@ -58,7 +58,7 @@ export async function loadReflectionFeed(options: {
   }
 
   // Process reactions into aggregated counts
-  const reflections = (data ?? []).map((item) => {
+  const reflections = (data ?? []).map((item: any) => {
     const reactionCounts = {
       like: 0,
       love: 0,
@@ -75,15 +75,18 @@ export async function loadReflectionFeed(options: {
       })
     }
 
+    const contentItem = Array.isArray(item.content_item) ? item.content_item[0] : item.content_item
+    const profile = Array.isArray(item.profile) ? item.profile[0] : item.profile
+
     return {
       id: item.id,
       body: item.body,
-      title: item.content_item?.title || 'Reflection',
-      contentTitle: item.content_item?.title || 'Content',
+      title: contentItem?.title || 'Reflection',
+      contentTitle: contentItem?.title || 'Content',
       author: {
-        id: item.profile?.id || '',
-        full_name: item.profile?.full_name || 'Anonymous',
-        avatar_url: item.profile?.avatar_url || undefined,
+        id: profile?.id || '',
+        full_name: profile?.full_name || 'Anonymous',
+        avatar_url: profile?.avatar_url || undefined,
       },
       created_at: item.created_at,
       reactions: reactionCounts,
@@ -175,15 +178,18 @@ export async function loadReflectionDetail(reflectionId: string) {
     })
   }
 
+  const contentItem = Array.isArray(reflection.content_item) ? reflection.content_item[0] : reflection.content_item
+  const profile = Array.isArray(reflection.profile) ? reflection.profile[0] : reflection.profile
+
   return {
     id: reflection.id,
     body: reflection.body,
-    title: reflection.content_item?.title || 'Reflection',
-    contentTitle: reflection.content_item?.title || 'Content',
+    title: contentItem?.title || 'Reflection',
+    contentTitle: contentItem?.title || 'Content',
     author: {
-      id: reflection.profile?.id || '',
-      full_name: reflection.profile?.full_name || 'Anonymous',
-      avatar_url: reflection.profile?.avatar_url || undefined,
+      id: profile?.id || '',
+      full_name: profile?.full_name || 'Anonymous',
+      avatar_url: profile?.avatar_url || undefined,
     },
     created_at: reflection.created_at,
     reactions: reactionCounts,
