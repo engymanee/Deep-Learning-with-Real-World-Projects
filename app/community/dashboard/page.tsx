@@ -62,7 +62,7 @@ export default async function CommunityDashboardPage() {
         </Button>
       </header>
 
-      {/* Stat cards */}
+      {/* Stat tiles */}
       <section
         aria-label="Community at a glance"
         className="grid grid-cols-2 gap-3 md:grid-cols-5"
@@ -130,9 +130,9 @@ export default async function CommunityDashboardPage() {
                     <Sparkles className="h-3 w-3" />
                     Featured
                   </Badge>
-                  {data.featuredWin.framework_name && (
+                  {data.featuredWin.framework?.title && (
                     <Badge variant="outline">
-                      {data.featuredWin.framework_name}
+                      {data.featuredWin.framework.title}
                     </Badge>
                   )}
                 </div>
@@ -145,8 +145,10 @@ export default async function CommunityDashboardPage() {
                   </p>
                 )}
                 <AuthorLine
-                  name={data.featuredWin.author_name}
-                  image={data.featuredWin.author_image}
+                  name={data.featuredWin.author?.full_name ?? null}
+                  email={data.featuredWin.author?.email ?? null}
+                  image={data.featuredWin.author?.avatar_url ?? null}
+                  timestamp={data.featuredWin.published_at}
                 />
               </Link>
             ) : (
@@ -164,12 +166,11 @@ export default async function CommunityDashboardPage() {
                       href={`/community/stories/${post.id}`}
                       className="block py-3 transition-colors hover:bg-muted/50"
                     >
-                      <p className="font-medium text-foreground">
-                        {post.title}
-                      </p>
+                      <p className="font-medium text-foreground">{post.title}</p>
                       <AuthorLine
-                        name={post.author_name}
-                        image={post.author_image}
+                        name={post.author?.full_name ?? null}
+                        email={post.author?.email ?? null}
+                        image={post.author?.avatar_url ?? null}
                         timestamp={post.published_at}
                       />
                     </Link>
@@ -199,25 +200,28 @@ export default async function CommunityDashboardPage() {
               >
                 <Avatar className="h-14 w-14">
                   <AvatarImage
-                    src={data.memberOfWeek.profile_image_url ?? undefined}
+                    src={data.memberOfWeek.avatar_url ?? undefined}
                     alt=""
                   />
                   <AvatarFallback>
-                    {initialsFor(data.memberOfWeek.full_name)}
+                    {initialsFor(
+                      data.memberOfWeek.full_name,
+                      data.memberOfWeek.email,
+                    )}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="font-serif text-lg leading-tight text-foreground group-hover:text-primary">
                     {data.memberOfWeek.full_name ?? 'Member'}
                   </p>
-                  {data.memberOfWeek.headline && (
+                  {data.memberOfWeek.title && (
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      {data.memberOfWeek.headline}
+                      {data.memberOfWeek.title}
                     </p>
                   )}
-                  {data.memberOfWeek.community_role_label && (
+                  {data.memberOfWeek.community_role && (
                     <Badge variant="outline" className="mt-2 capitalize">
-                      {data.memberOfWeek.community_role_label}
+                      {data.memberOfWeek.community_role.replace(/_/g, ' ')}
                     </Badge>
                   )}
                 </div>
@@ -226,10 +230,10 @@ export default async function CommunityDashboardPage() {
               <p className="rounded-md border border-dashed border-border p-3 text-center text-sm text-muted-foreground">
                 No member of the week scheduled. Admins can pick one from{' '}
                 <Link
-                  href="/admin/community"
+                  href="/admin/community/moderation"
                   className="underline hover:text-foreground"
                 >
-                  Admin → Community
+                  Admin → Moderation
                 </Link>
                 .
               </p>
@@ -279,14 +283,15 @@ export default async function CommunityDashboardPage() {
                         </p>
                         {post.ask_category && (
                           <Badge variant="outline" className="shrink-0">
-                            {ASK_CATEGORY_BY_VALUE.get(post.ask_category)
-                              ?.label ?? post.ask_category}
+                            {ASK_CATEGORY_BY_VALUE[post.ask_category]?.label ??
+                              post.ask_category}
                           </Badge>
                         )}
                       </div>
                       <AuthorLine
-                        name={post.author_name}
-                        image={post.author_image}
+                        name={post.author?.full_name ?? null}
+                        email={post.author?.email ?? null}
+                        image={post.author?.avatar_url ?? null}
                         timestamp={post.published_at}
                       />
                     </Link>
@@ -309,8 +314,7 @@ export default async function CommunityDashboardPage() {
             </div>
             <Button asChild size="sm" variant="ghost">
               <Link href="/community/reflections" className="gap-1">
-                <ArrowRight className="h-4 w-4" />
-                <span className="sr-only">See all reflections</span>
+                See all <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
           </CardHeader>
@@ -326,17 +330,26 @@ export default async function CommunityDashboardPage() {
                     key={r.id}
                     className="rounded-md border border-border bg-card p-3"
                   >
-                    {r.lab_title && (
-                      <p className="text-xs font-medium uppercase tracking-wide text-primary">
-                        {r.lab_title}
+                    {/* Breadcrumb back to the lab so readers know where the
+                        reflection came from. */}
+                    {r.content && (
+                      <p className="text-xs text-muted-foreground">
+                        {r.content.lab?.phase?.title && (
+                          <>
+                            {r.content.lab.phase.title}
+                            <span className="mx-1">·</span>
+                          </>
+                        )}
+                        {r.content.lab?.title ?? r.content.title ?? 'Lab'}
                       </p>
                     )}
                     <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-foreground">
                       {r.body}
                     </p>
                     <AuthorLine
-                      name={r.author_name}
-                      image={r.author_image}
+                      name={r.profile?.full_name ?? null}
+                      email={r.profile?.email ?? null}
+                      image={r.profile?.avatar_url ?? null}
                       timestamp={r.created_at}
                     />
                   </li>
@@ -351,9 +364,9 @@ export default async function CommunityDashboardPage() {
 }
 
 /**
- * Compact stat tile linking to the matching feed. Accent variant
- * used for "open asks" because that's the count fellows should
- * actually act on.
+ * Compact tile used in the top stat strip. Each tile is a link into
+ * the corresponding feed so a single tap deep-links to the relevant
+ * page.
  */
 function StatTile({
   href,
@@ -372,23 +385,17 @@ function StatTile({
     <Link
       href={href}
       className={[
-        'group rounded-lg border p-4 transition-colors',
+        'group flex flex-col rounded-lg border bg-card p-3 transition-colors',
         accent
-          ? 'border-primary/40 bg-primary/5 hover:bg-primary/10'
-          : 'border-border bg-card hover:border-primary/30',
+          ? 'border-primary/30 hover:border-primary'
+          : 'border-border hover:border-primary/40',
       ].join(' ')}
     >
-      <div className="flex items-center justify-between">
-        <Icon
-          className={[
-            'h-4 w-4',
-            accent ? 'text-primary' : 'text-muted-foreground',
-          ].join(' ')}
-          aria-hidden="true"
-        />
-        <span className="font-serif text-2xl text-foreground">{value}</span>
-      </div>
-      <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+      <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+        {label}
+      </span>
+      <span className="mt-1 font-serif text-2xl text-foreground">{value}</span>
     </Link>
   )
 }
@@ -398,10 +405,12 @@ function StatTile({
  */
 function AuthorLine({
   name,
+  email,
   image,
   timestamp,
 }: {
   name: string | null
+  email: string | null
   image: string | null
   timestamp?: string | null
 }) {
@@ -410,7 +419,7 @@ function AuthorLine({
       <Avatar className="h-5 w-5">
         <AvatarImage src={image ?? undefined} alt="" />
         <AvatarFallback className="text-[10px]">
-          {initialsFor(name)}
+          {initialsFor(name, email)}
         </AvatarFallback>
       </Avatar>
       <span className="truncate">{name ?? 'Member'}</span>
@@ -424,19 +433,17 @@ function AuthorLine({
   )
 }
 
-function formatRelative(iso: string) {
-  const ts = Date.parse(iso)
-  if (Number.isNaN(ts)) return ''
-  const diff = Date.now() - ts
-  const min = Math.round(diff / 60_000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min}m ago`
-  const hr = Math.round(min / 60)
-  if (hr < 24) return `${hr}h ago`
-  const d = Math.round(hr / 24)
-  if (d < 7) return `${d}d ago`
-  return new Date(ts).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  })
+/** Relative timestamp shared by all dashboard cards. */
+function formatRelative(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  if (Number.isNaN(ms)) return ''
+  const minutes = Math.round(ms / 60_000)
+  if (minutes < 60) return minutes <= 1 ? 'just now' : `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.round(hours / 24)
+  if (days < 7) return `${days}d ago`
+  const weeks = Math.round(days / 7)
+  if (weeks < 5) return `${weeks}w ago`
+  return new Date(iso).toLocaleDateString()
 }

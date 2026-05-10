@@ -2,7 +2,35 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import type { CommunityPostListItem } from '@/components/community/post-feed'
-import type { ReflectionItem } from '@/lib/community/load-reflections'
+
+/**
+ * Trimmed reflection shape for the dashboard cards. We don't reuse
+ * `ReflectionFeedItem` from `load-reflections` because the dashboard
+ * needs the full programme breadcrumb (content -> lab -> phase) and
+ * doesn't need the comment list - keeping a separate type here makes
+ * the data the page receives explicit.
+ */
+export interface DashboardReflectionItem {
+  id: string
+  body: string
+  visibility: 'public' | 'cohort' | 'private'
+  created_at: string
+  profile: {
+    id: string
+    full_name: string | null
+    email: string | null
+    avatar_url: string | null
+  } | null
+  content: {
+    id: string
+    title: string | null
+    lab: {
+      id: string
+      title: string | null
+      phase: { id: string; title: string | null } | null
+    } | null
+  } | null
+}
 
 /**
  * Aggregated counters surfaced on the /community dashboard header
@@ -192,7 +220,7 @@ interface RawReflectionRow {
  */
 export async function loadRecentReflections(
   limit = 6,
-): Promise<ReflectionItem[]> {
+): Promise<DashboardReflectionItem[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('user_content_reflections')
@@ -235,8 +263,6 @@ export async function loadRecentReflections(
             : null,
         }
       : null,
-    isOwn: false,
-    comments: [],
   }))
 }
 
@@ -304,5 +330,97 @@ function toListItem(p: RawPostRow): CommunityPostListItem {
     ask_category: p.ask_category,
     ask_status: p.ask_status,
     author: p.author,
+  }
+}
+
+/**
+ * Aggregate everything the dashboard page needs in a single call.
+ * Fans out the loaders in parallel so the route still resolves
+ * quickly even though each query hits a different table.
+ *
+ * Shape is intentionally page-shaped rather than DB-shaped: the
+ * page consumes `data.counts.*` for stat tiles, `featuredWin` for
+ * the hero card, etc.
+ */
+export interface CommunityDashboardData {
+  counts: {
+    members: number
+    wins: number
+    openAsks: number
+    reflections: number
+    stories: number
+  }
+  featuredWin: CommunityPostListItem | null
+  recentWins: CommunityPostListItem[]
+  openAsks: CommunityPostListItem[]
+  recentReflections: DashboardReflectionItem[]
+  memberOfWeek: MemberOfTheWeek | null
+}
+
+export async function loadCommunityDashboard(): Promise<CommunityDashboardData> {
+  const supabase = await createClient()
+
+  const [
+    membersRes,
+    winsRes,
+    openAsksRes,
+    reflectionsRes,
+    storiesRes,
+    featuredWinRes,
+    recentWins,
+    openAsks,
+    recentReflections,
+    memberOfWeek,
+  ] = await Promise.all([
+    // Counts - lifetime, head-only so we don't pull rows.
+    supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .in('role', ['fellow', 'facilitator'])
+      .is('deactivated_at', null),
+    supabase
+      .from('community_posts')
+      .select('id', { count: 'exact', head: true })
+      .eq('kind', 'win')
+      .eq('is_archived', false)
+      .not('published_at', 'is', null),
+    supabase
+      .from('community_posts')
+      .select('id', { count: 'exact', head: true })
+      .in('kind', ['ask', 'question'])
+      .eq('is_archived', false)
+      .eq('ask_status', 'open')
+      .not('published_at', 'is', null),
+    supabase
+      .from('user_content_reflections')
+      .select('id', { count: 'exact', head: true })
+      .neq('visibility', 'private'),
+    supabase
+      .from('community_posts')
+      .select('id', { count: 'exact', head: true })
+      .in('kind', ['reflection', 'story'])
+      .eq('is_archived', false)
+      .not('published_at', 'is', null),
+    // Featured win - the most recently pinned, non-archived win.
+    loadFeaturedWins(1),
+    loadFeaturedWins(5),
+    loadOpenAsks(5),
+    loadRecentReflections(5),
+    loadMemberOfTheWeek(),
+  ])
+
+  return {
+    counts: {
+      members: membersRes.count ?? 0,
+      wins: winsRes.count ?? 0,
+      openAsks: openAsksRes.count ?? 0,
+      reflections: reflectionsRes.count ?? 0,
+      stories: storiesRes.count ?? 0,
+    },
+    featuredWin: featuredWinRes[0] ?? null,
+    recentWins,
+    openAsks,
+    recentReflections,
+    memberOfWeek,
   }
 }

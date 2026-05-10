@@ -94,7 +94,9 @@ export function MemberOfWeekPicker({ profiles, current }: Props) {
               src={current.profileImageUrl ?? undefined}
               alt=""
             />
-            <AvatarFallback>{initialsFor(current.fullName)}</AvatarFallback>
+            <AvatarFallback>
+              {initialsFor(current.fullName, null)}
+            </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1 text-sm font-medium text-foreground">

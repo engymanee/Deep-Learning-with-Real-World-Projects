@@ -47,6 +47,17 @@ export const ASK_CATEGORIES: readonly AskCategoryDef[] = [
 
 export const ASK_CATEGORY_VALUES = ASK_CATEGORIES.map((c) => c.value)
 
+/** O(1) lookup table keyed by `value`. Useful when rendering a list
+ *  of asks without re-running `.find()` on every iteration. */
+export const ASK_CATEGORY_BY_VALUE: Record<string, AskCategoryDef> =
+  ASK_CATEGORIES.reduce(
+    (acc, c) => {
+      acc[c.value] = c
+      return acc
+    },
+    {} as Record<string, AskCategoryDef>,
+  )
+
 export function askCategoryLabel(value: string | null | undefined): string {
   if (!value) return 'Ask'
   const match = ASK_CATEGORIES.find((c) => c.value === value)

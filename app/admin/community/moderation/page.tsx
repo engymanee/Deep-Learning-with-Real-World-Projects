@@ -250,7 +250,7 @@ export default async function ModerationHubPage() {
                         alt=""
                       />
                       <AvatarFallback>
-                        {initialsFor(post.author?.full_name ?? null)}
+                        {initialsFor(post.author?.full_name ?? null, null)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
@@ -337,7 +337,7 @@ export default async function ModerationHubPage() {
                       alt=""
                     />
                     <AvatarFallback>
-                      {initialsFor(comment.profile?.full_name ?? null)}
+                      {initialsFor(comment.profile?.full_name ?? null, null)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
