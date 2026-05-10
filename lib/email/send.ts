@@ -7,6 +7,10 @@ import {
   renderNotificationEmail,
   type NotificationEmailArgs,
 } from './templates/notification'
+import {
+  renderSignInCodeEmail,
+  type SignInCodeEmailArgs,
+} from './templates/sign-in-code'
 
 /**
  * High-level wrapper used by invite flows. Renders the branded
@@ -24,6 +28,26 @@ export async function sendInvitationEmail(
     html,
     text,
     tags: [{ name: 'category', value: 'invitation' }],
+  })
+}
+
+/**
+ * Sends the "here is your sign-in code" email used by the
+ * passwordless login flow. We keep this code-only (no magic link) so
+ * the recipient must return to the open login tab and type the digits,
+ * which is the explicit UX the admin asked for.
+ */
+export async function sendSignInCodeEmail(
+  to: string,
+  args: SignInCodeEmailArgs,
+): Promise<SendResult> {
+  const { subject, html, text } = renderSignInCodeEmail(args)
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    tags: [{ name: 'category', value: 'sign-in-code' }],
   })
 }
 
