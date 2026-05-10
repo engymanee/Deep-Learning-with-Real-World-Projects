@@ -71,6 +71,22 @@ export function TopBar() {
         >
           Community
         </Link>
+        <Link
+          href="/schedule"
+          className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+        >
+          Schedule
+        </Link>
+        {user?.role === 'admin' && (
+          <>
+            <Link
+              href="/schedule/admin"
+              className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+            >
+              Schedule Admin
+            </Link>
+          </>
+        )}
         {user?.role === 'admin' && (
           <Link
             href="/admin"
