@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -37,10 +36,63 @@ export const metadata = {
 export default async function TeamPage() {
   const user = await requireUser()
 
-  // Without a school assignment the user has no "team" yet, so we
-  // route them to /community where they can still find peers.
+  // Without a school assignment, the user has no "team" yet. Render
+  // the page in a friendly empty state so the nav link still lands
+  // on /team (and not on /community, which used to silently redirect
+  // here and made it look like the link was broken).
   if (!user.schoolTeamId) {
-    redirect('/community')
+    return (
+      <div className="min-h-screen bg-background">
+        <TopBar />
+        <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-12 sm:py-16">
+          <header className="flex flex-col gap-2">
+            <p className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              My Team
+            </p>
+            <h1 className="font-serif text-3xl text-foreground text-balance sm:text-4xl">
+              You&apos;re not on a school team yet
+            </h1>
+            <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+              Once a facilitator adds you to a school cohort, this page
+              will show your teammates&apos; progress, your next session
+              together, and the reflections they&apos;ve shared with the
+              team.
+            </p>
+          </header>
+
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-6">
+            <p className="text-sm text-foreground">
+              In the meantime, you can still meet other fellows and join
+              the wider conversation.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/community/bios"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary"
+              >
+                Browse fellow bios
+                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              </Link>
+              <Link
+                href="/community"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary"
+              >
+                Open the community
+                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              </Link>
+              <Link
+                href="/profile"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary"
+              >
+                Update my profile
+                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   const [progress, sidebar] = await Promise.all([
