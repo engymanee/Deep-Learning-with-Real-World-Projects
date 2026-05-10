@@ -14,34 +14,24 @@ import { Label } from '@/components/ui/label'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { KeyRound, Mail } from 'lucide-react'
-import type { EmailOtpType } from '@supabase/supabase-js'
-import { requestSignInCodeAction } from './actions'
-import { completeInviteCodeActivationAction } from '../activate/actions'
+import { requestSignInCodeAction, verifyEmailLoginCodeAction } from './actions'
 
 type Method = 'password' | 'code'
 type CodeStep = 'request' | 'verify'
 
 /**
- * The login page supports a deep link from the invitation email:
+ * The login page supports a deep link from the invitation email's
+ * "Email me a code" branch:
  *
- *   /auth/login?email=fellow@school.edu&from=invite&otp_type=invite&next=/auth/set-password
+ *   /auth/login?email=fellow@school.edu&from=invite&next=/
  *
- * When `from=invite` is present we skip the email-input step and
- * land the user straight on the verify-code form with their email
- * pre-filled. `otp_type` tells `verifyOtp` whether to use 'invite'
- * (new users) or 'email' (existing users whose invite was resent
- * via magiclink).
+ * When `from=invite` is present and the URL pre-fills an email, we
+ * skip the email-input step and land the user straight on the
+ * verify-code form. The 6-digit code itself is owned by our own
+ * `email_login_codes` table (see lib/auth/email-login-code.ts) and is
+ * verified by the `verifyEmailLoginCodeAction` server action - so the
+ * client never has to know about Supabase OTP types.
  */
-function isOtpType(value: string | null): value is EmailOtpType {
-  return (
-    value === 'email' ||
-    value === 'invite' ||
-    value === 'magiclink' ||
-    value === 'recovery' ||
-    value === 'signup' ||
-    value === 'email_change'
-  )
-}
 
 function LoginForm() {
   const router = useRouter()
@@ -52,10 +42,6 @@ function LoginForm() {
   const next = searchParams.get('next') ?? '/'
   const fromInvite = searchParams.get('from') === 'invite'
   const presetEmail = searchParams.get('email') ?? ''
-  const presetOtpRaw = searchParams.get('otp_type')
-  const presetOtpType: EmailOtpType = isOtpType(presetOtpRaw)
-    ? presetOtpRaw
-    : 'email'
 
   const [method, setMethod] = useState<Method>(fromInvite ? 'code' : 'password')
   const [email, setEmail] = useState(presetEmail)
@@ -67,10 +53,6 @@ function LoginForm() {
   const [codeStep, setCodeStep] = useState<CodeStep>(
     fromInvite && presetEmail ? 'verify' : 'request',
   )
-  // The verifyOtp call needs to know which type the OTP was issued
-  // as. Invite codes from new users are 'invite'; resent codes (or
-  // regular sign-in codes) are 'email'.
-  const [otpType, setOtpType] = useState<EmailOtpType>(presetOtpType)
   const [code, setCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -80,7 +62,6 @@ function LoginForm() {
     setCodeSentTo(null)
     setCodeStep('request')
     setCode('')
-    setOtpType('email')
   }
 
   async function handlePasswordLogin(e: React.FormEvent) {
@@ -117,15 +98,15 @@ function LoginForm() {
 
     setIsLoading(true)
     try {
-      // Server action issues the OTP via Supabase admin and emails it
-      // through Resend. Returns just-the-code, no magic link. Codes
-      // from this path are always magiclink-type, which verifies as
-      // type 'email' on the client.
+      // Server action stores a fresh 6-digit code in our own
+      // email_login_codes table (any prior open code for this email
+      // is invalidated) and emails just the digits via Resend. No
+      // Supabase session is created here - that only happens after
+      // verify succeeds.
       const result = await requestSignInCodeAction(email)
       if (!result.ok) throw new Error(result.error)
       setCodeSentTo(result.email)
       setCodeStep('verify')
-      setOtpType('email')
       setCode('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to send login code')
@@ -138,38 +119,25 @@ function LoginForm() {
     e.preventDefault()
     setError(null)
 
-    const trimmed = code.replace(/\s+/g, '')
-    if (!trimmed || trimmed.length < 6) {
+    const trimmed = code.replace(/\D/g, '')
+    if (trimmed.length !== 6) {
       setError('Enter the 6-digit code from your email.')
       return
     }
 
     setIsLoading(true)
     try {
-      const supabase = createClient()
-      // `otpType` is set to 'invite' when the user is verifying a
-      // brand-new invitation code, and 'email' for regular sign-in
-      // codes (or resent invitations). Both flows use a 6-digit OTP.
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: trimmed,
-        type: otpType,
+      // Server action: verifies the 6-digit code against our own
+      // table, then mints a Supabase session on the response cookies.
+      // If the user is completing an invitation, the action also flips
+      // the invitations row to accepted.
+      const result = await verifyEmailLoginCodeAction(email, trimmed, {
+        fromInvite,
       })
-      if (error) throw error
-
-      // The user came in from the invitation email and just finished
-      // the code path - flip the invitations row to accepted so admins
-      // see "Activated" instead of a stale "Invited". Best-effort: a
-      // failure here must not block the navigation.
-      if (fromInvite) {
-        try {
-          await completeInviteCodeActivationAction(email)
-        } catch {
-          // ignore - admin status is non-blocking
-        }
-      }
+      if (!result.ok) throw new Error(result.error)
 
       router.replace(next.startsWith('/') ? next : '/')
+      router.refresh()
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -261,16 +229,16 @@ function LoginForm() {
               role="status"
               className="rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground"
             >
-              {otpType === 'invite' ? (
+              {fromInvite ? (
                 <>
-                  Welcome! Enter the 6-digit code from your invitation email
+                  Welcome! Enter the 6-digit code we just emailed
                   {codeSentTo ? (
                     <>
-                      {' '}sent to{' '}
+                      {' '}to{' '}
                       <span className="font-medium">{codeSentTo}</span>
                     </>
                   ) : null}{' '}
-                  to finish setting up your account.
+                  to finish activating your account.
                 </>
               ) : (
                 <>

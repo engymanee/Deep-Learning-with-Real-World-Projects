@@ -111,12 +111,12 @@ function ActivateForm() {
       if (!result.ok) throw new Error(result.error)
 
       // Hand off to the regular login page on the verify-code step,
-      // pre-filled with email + invite framing. The fresh OTP we just
-      // sent is verified there with type 'email'.
+      // pre-filled with email + invite framing. The fresh code we
+      // just stored in email_login_codes is verified server-side by
+      // verifyEmailLoginCodeAction.
       const qs = new URLSearchParams({
         from: 'invite',
         email,
-        otp_type: 'email',
         next: next.startsWith('/') ? next : '/',
       })
       router.replace(`/auth/login?${qs.toString()}`)
