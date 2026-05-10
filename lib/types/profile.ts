@@ -29,6 +29,38 @@ export interface DirectoryProfile {
    * call-sites that only populate `school_name`.
    */
   school_names?: string[]
+
+  // ---- Community of Practice phase 1 enrichments (migration 049) -----
+  // All optional so call-sites that don't fetch them keep working.
+  // The bios directory + profile editor are the only loaders that
+  // populate these today.
+
+  /** LinkedIn profile URL ("https://www.linkedin.com/in/..."). */
+  linkedin_url?: string | null
+  /** Twitter / X profile URL. */
+  twitter_url?: string | null
+  /** Personal or school website URL. */
+  website_url?: string | null
+  /** Short answer to "What are you looking for from the community?" */
+  looking_for?: string | null
+  /** Short answer to "What are you willing to help others with?" */
+  willing_to_help?: string | null
+  /** Years working in education (positive integer or null). */
+  years_in_education?: number | null
+  /**
+   * Self-described community role - free text but typically one of
+   * 'Educator' | 'Coach' | 'School Leader' | 'Program Staff'.
+   * Surfaced on the member card to make the directory easier to
+   * scan; doesn't replace the DB `role` (which controls auth).
+   */
+  community_role?: string | null
+  /**
+   * Window during which the member is the featured "Member of the
+   * Week" on /community. We compare against `now()` server-side and
+   * only surface a single banner at a time.
+   */
+  featured_member_from?: string | null
+  featured_member_until?: string | null
 }
 
 /** Display-only role label: hides 'admin' from non-admin contexts. */

@@ -18,6 +18,17 @@ interface RawProfile {
   role: string | null
   cohort: string | null
   bio: string | null
+  // Community of Practice phase 1 fields (migration 049). Optional
+  // because legacy seed data may be NULL.
+  linkedin_url: string | null
+  twitter_url: string | null
+  website_url: string | null
+  looking_for: string | null
+  willing_to_help: string | null
+  years_in_education: number | null
+  community_role: string | null
+  featured_member_from: string | null
+  featured_member_until: string | null
 }
 
 interface RawMembership {
@@ -52,7 +63,10 @@ export default async function CommunityBiosPage() {
   const { data: rawProfiles } = await supabase
     .from('profiles')
     .select(
-      `id, full_name, email, title, avatar_url, role, cohort, bio`,
+      `id, full_name, email, title, avatar_url, role, cohort, bio,
+       linkedin_url, twitter_url, website_url,
+       looking_for, willing_to_help, years_in_education, community_role,
+       featured_member_from, featured_member_until`,
     )
     .in('role', ['fellow', 'facilitator', 'admin'])
     .is('deactivated_at', null)
@@ -106,6 +120,16 @@ export default async function CommunityBiosPage() {
       // in `school_names` for the team-filter dropdown.
       school_name: teams[0] ?? null,
       school_names: teams,
+      // CoP phase 1 enrichments. Pass-through; null-safe.
+      linkedin_url: p.linkedin_url,
+      twitter_url: p.twitter_url,
+      website_url: p.website_url,
+      looking_for: p.looking_for,
+      willing_to_help: p.willing_to_help,
+      years_in_education: p.years_in_education,
+      community_role: p.community_role,
+      featured_member_from: p.featured_member_from,
+      featured_member_until: p.featured_member_until,
     }
   })
 

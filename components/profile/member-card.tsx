@@ -106,6 +106,25 @@ export function MemberCard({
               Cohort {profile.cohort}
             </Badge>
           )}
+          {/*
+            Community-role chip ("Educator", "Coach", ...) is shown
+            when the member set one. We don't gate on showCohort
+            because community_role is self-described, not staging
+            metadata.
+          */}
+          {profile.community_role && (
+            <Badge variant="outline" className="text-[10px]">
+              {profile.community_role}
+            </Badge>
+          )}
+          {/* Years-in-education badge stays compact ("5y") so it
+              fits on the same row without forcing the chip wrap. */}
+          {typeof profile.years_in_education === 'number' &&
+            profile.years_in_education > 0 && (
+              <Badge variant="outline" className="text-[10px]">
+                {profile.years_in_education}y in ed
+              </Badge>
+            )}
         </div>
 
         {showBio && (
@@ -113,6 +132,24 @@ export function MemberCard({
             {profile.bio}
           </p>
         )}
+
+        {/*
+          Surface the most useful "what they want / what they offer"
+          line on detailed cards so the directory reads as a real
+          help-network instead of a static photo grid. We prefer the
+          looking_for line because community-flow-wise that's what
+          peers can act on; if it's missing we fall back to the
+          willing_to_help line.
+        */}
+        {variant === 'detailed' &&
+          (profile.looking_for?.trim() || profile.willing_to_help?.trim()) && (
+            <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {profile.looking_for?.trim() ? 'Looking for: ' : 'Can help: '}
+              </span>
+              {profile.looking_for?.trim() ?? profile.willing_to_help?.trim()}
+            </p>
+          )}
       </div>
     </Tag>
   )

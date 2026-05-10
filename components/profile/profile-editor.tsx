@@ -20,6 +20,39 @@ interface Props {
     title: string | null
     bio: string | null
     avatarUrl: string | null
+    // Community of Practice phase 1 (migration 049) extras. Each is
+    // independently optional so an empty value clears the field.
+    linkedinUrl: string | null
+    twitterUrl: string | null
+    websiteUrl: string | null
+    lookingFor: string | null
+    willingToHelp: string | null
+    yearsInEducation: number | null
+    communityRole: string | null
+  }
+}
+
+/**
+ * Suggested values for the "Community role" picker. Free text is
+ * still allowed via the input, but offering well-known options
+ * keeps the directory's role facet clean.
+ */
+const COMMUNITY_ROLE_SUGGESTIONS = [
+  'Educator',
+  'Coach',
+  'School Leader',
+  'Program Staff',
+  'Other',
+] as const
+
+/** Lightweight URL sanity check used before submit. */
+function looksLikeUrl(value: string): boolean {
+  if (!value) return true
+  try {
+    const u = new URL(value)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
   }
 }
 
@@ -51,6 +84,21 @@ export function ProfileEditor({ initial }: Props) {
   const [fullName, setFullName] = useState(initial.fullName)
   const [title, setTitle] = useState(initial.title ?? '')
   const [bio, setBio] = useState(initial.bio ?? '')
+
+  // "Beyond the basics" - Community of Practice fields. Stored as
+  // strings on the form (incl. years) so empty values consistently
+  // mean "clear the field" when posted.
+  const [linkedinUrl, setLinkedinUrl] = useState(initial.linkedinUrl ?? '')
+  const [twitterUrl, setTwitterUrl] = useState(initial.twitterUrl ?? '')
+  const [websiteUrl, setWebsiteUrl] = useState(initial.websiteUrl ?? '')
+  const [lookingFor, setLookingFor] = useState(initial.lookingFor ?? '')
+  const [willingToHelp, setWillingToHelp] = useState(
+    initial.willingToHelp ?? '',
+  )
+  const [yearsInEducation, setYearsInEducation] = useState(
+    initial.yearsInEducation == null ? '' : String(initial.yearsInEducation),
+  )
+  const [communityRole, setCommunityRole] = useState(initial.communityRole ?? '')
 
   // Avatar state. `previewUrl` is what's shown in the <Avatar>; it
   // updates as soon as the user picks a file (object URL) or hits
@@ -108,10 +156,41 @@ export function ProfileEditor({ initial }: Props) {
       return
     }
 
+    // Quick client-side URL sanity check so the user gets immediate
+    // feedback for typos without a round-trip. Server re-validates.
+    const urlPairs: Array<[string, string]> = [
+      ['LinkedIn URL', linkedinUrl.trim()],
+      ['Twitter / X URL', twitterUrl.trim()],
+      ['Website URL', websiteUrl.trim()],
+    ]
+    for (const [label, value] of urlPairs) {
+      if (value && !looksLikeUrl(value)) {
+        setError(`${label} must start with http:// or https://`)
+        return
+      }
+    }
+
+    // Years must be a non-negative integer when present.
+    const yearsRaw = yearsInEducation.trim()
+    if (yearsRaw.length > 0) {
+      const years = Number(yearsRaw)
+      if (!Number.isInteger(years) || years < 0 || years > 80) {
+        setError('Years in education must be a whole number between 0 and 80.')
+        return
+      }
+    }
+
     const fd = new FormData()
     fd.append('fullName', trimmedName)
     fd.append('title', title.trim())
     fd.append('bio', bio.trim())
+    fd.append('linkedinUrl', linkedinUrl.trim())
+    fd.append('twitterUrl', twitterUrl.trim())
+    fd.append('websiteUrl', websiteUrl.trim())
+    fd.append('lookingFor', lookingFor.trim())
+    fd.append('willingToHelp', willingToHelp.trim())
+    fd.append('yearsInEducation', yearsRaw)
+    fd.append('communityRole', communityRole.trim())
     if (pickedFile) fd.append('avatar', pickedFile)
     if (shouldRemove) fd.append('removeAvatar', '1')
 
@@ -251,6 +330,132 @@ export function ProfileEditor({ initial }: Props) {
             {bio.length} / 4000
           </p>
         </div>
+
+        {/*
+          Beyond the basics — Community of Practice fields. Grouped
+          inside a labelled fieldset so the visual hierarchy makes
+          it clear these are richer, optional details that power
+          the Community directory.
+        */}
+        <fieldset className="mt-2 flex flex-col gap-4 rounded-lg border border-border bg-muted/20 p-4">
+          <legend className="-mt-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Community profile
+          </legend>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            These optional fields power the Community directory. They
+            help fellows find peers to learn from and collaborators
+            who can help.
+          </p>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="profile-community-role">Role in community</Label>
+              <Input
+                id="profile-community-role"
+                value={communityRole}
+                onChange={(e) => setCommunityRole(e.target.value)}
+                placeholder="e.g. Educator, Coach, School Leader"
+                list="profile-community-role-options"
+                maxLength={80}
+              />
+              <datalist id="profile-community-role-options">
+                {COMMUNITY_ROLE_SUGGESTIONS.map((opt) => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="profile-years-in-education">
+                Years in education
+              </Label>
+              <Input
+                id="profile-years-in-education"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={80}
+                step={1}
+                value={yearsInEducation}
+                onChange={(e) => setYearsInEducation(e.target.value)}
+                placeholder="e.g. 8"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="profile-looking-for">
+              What are you looking for from the community?
+            </Label>
+            <Textarea
+              id="profile-looking-for"
+              value={lookingFor}
+              onChange={(e) => setLookingFor(e.target.value)}
+              placeholder="e.g. Coaching on instructional walkthroughs, peers facing the same challenge..."
+              rows={3}
+              maxLength={500}
+            />
+            <p className="text-right text-xs text-muted-foreground">
+              {lookingFor.length} / 500
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="profile-willing-to-help">
+              What are you willing to help others with?
+            </Label>
+            <Textarea
+              id="profile-willing-to-help"
+              value={willingToHelp}
+              onChange={(e) => setWillingToHelp(e.target.value)}
+              placeholder="e.g. Designing PD agendas, building data dashboards, master schedules..."
+              rows={3}
+              maxLength={500}
+            />
+            <p className="text-right text-xs text-muted-foreground">
+              {willingToHelp.length} / 500
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="profile-linkedin">LinkedIn</Label>
+              <Input
+                id="profile-linkedin"
+                type="url"
+                inputMode="url"
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                placeholder="https://www.linkedin.com/in/..."
+                maxLength={500}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="profile-twitter">Twitter / X</Label>
+              <Input
+                id="profile-twitter"
+                type="url"
+                inputMode="url"
+                value={twitterUrl}
+                onChange={(e) => setTwitterUrl(e.target.value)}
+                placeholder="https://x.com/..."
+                maxLength={500}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="profile-website">Website</Label>
+              <Input
+                id="profile-website"
+                type="url"
+                inputMode="url"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                placeholder="https://..."
+                maxLength={500}
+              />
+            </div>
+          </div>
+        </fieldset>
 
         {error && (
           <p
