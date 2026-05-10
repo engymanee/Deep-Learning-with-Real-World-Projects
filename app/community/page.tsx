@@ -67,18 +67,30 @@ export default async function CommunityOverviewPage() {
     .returns<RawPostRow[]>()
 
   // Per-section counts so the tile grid matches the sidebar pills.
+  // Sections that aren't backed by community_posts (bios, reflections)
+  // each have a bespoke count query; the rest are the standard
+  // "rows in community_posts of these kinds" tally.
   const countPromises = COMMUNITY_SECTIONS.map((s) => {
-    if (s.postKinds === null) {
+    if (s.slug === 'bios') {
       return supabase
         .from('profiles')
         .select('id', { count: 'exact', head: true })
         .in('role', ['fellow', 'facilitator'])
         .is('deactivated_at', null)
     }
+    if (s.slug === 'reflections') {
+      // Reflections live in user_content_reflections (post phase 2);
+      // we skip private rows so the count matches what the feed
+      // actually surfaces.
+      return supabase
+        .from('user_content_reflections')
+        .select('id', { count: 'exact', head: true })
+        .neq('visibility', 'private')
+    }
     return supabase
       .from('community_posts')
       .select('id', { count: 'exact', head: true })
-      .in('kind', s.postKinds)
+      .in('kind', s.postKinds ?? [])
       .not('published_at', 'is', null)
   })
 

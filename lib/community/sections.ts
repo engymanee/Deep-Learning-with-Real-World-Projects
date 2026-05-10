@@ -94,19 +94,23 @@ export const COMMUNITY_SECTIONS: CommunitySection[] = [
     slug: 'reflections',
     label: 'Fellow Reflections',
     description:
-      'Participant stories, examples from practice, and shared insights from the work.',
+      'Reflections from programme labs and content - shared with peers, with comments to learn from each other.',
     icon: BookOpen,
-    // Include legacy `story` rows so existing content surfaces here.
-    postKinds: ['reflection', 'story'],
-    writeKind: 'reflection',
+    // Reflections are now driven entirely by `user_content_reflections`
+    // (see /community/reflections page). The section no longer has a
+    // free-form post composer; legacy `community_posts` rows of kind
+    // `reflection`/`story` are still readable via /community/stories
+    // but no longer surface here. `postKinds: null` keeps loadSection
+    // from being called for this slug.
+    postKinds: null,
+    writeKind: null,
     staffOnly: false,
     emptyTitle: 'No reflections yet',
     emptyCopy:
-      'Share what you are noticing, learning, or rethinking - others are listening.',
-    composerTitlePlaceholder: 'A moment from this week…',
-    composerBodyPlaceholder:
-      'What are you sitting with? What did this week teach you?',
-    composerCta: 'Share reflection',
+      'Reflections will appear here as fellows respond to lab prompts and content. Open a lab in your phase to share one.',
+    composerTitlePlaceholder: '',
+    composerBodyPlaceholder: '',
+    composerCta: '',
   },
   {
     id: 'wins',
