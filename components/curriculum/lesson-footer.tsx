@@ -177,20 +177,21 @@ export function LessonFooter({
               <Button
                 type="button"
                 onClick={handleContinue}
-                className="inline-flex items-center gap-1.5"
+                size="lg"
+                className="inline-flex items-center gap-2"
               >
                 Go to next item
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </Button>
             ) : (
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push('/dashboard')}
-                className="inline-flex items-center gap-1.5"
+                className="inline-flex items-center gap-2"
               >
                 Back to dashboard
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </Button>
             )}
             {completedBadge}

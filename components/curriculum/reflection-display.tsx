@@ -58,16 +58,16 @@ export function ReflectionDisplay({
           </div>
 
           {/* Navigation button */}
-          <div className="flex justify-end">
+          <div className="flex justify-center pt-2">
             {nextHref && (
               <Link href={nextHref}>
                 <Button
                   variant="default"
-                  size="sm"
+                  size="lg"
                   className="gap-2"
                 >
                   Go to next item
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-5 w-5" />
                 </Button>
               </Link>
             )}
