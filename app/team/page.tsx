@@ -24,10 +24,10 @@ export default async function TeamPage() {
                 <h1 className="font-serif text-4xl sm:text-5xl text-foreground font-bold mb-4">
                   Welcome to the Wisdom at Work Fellows&apos; Portal
                 </h1>
-                <p className="text-lg text-foreground font-medium mb-3">
+                <p className="text-lg text-foreground font-medium mb-3 text-center">
                   Congratulations and welcome to the Wisdom at Work Fellowship!
                 </p>
-                <p className="text-base text-muted-foreground leading-relaxed">
+                <p className="text-base text-muted-foreground leading-relaxed text-center">
                   This site is your dashboard for the WAW Syllabus, Learning Journals, Additional Resources.
                 </p>
               </div>
@@ -65,7 +65,7 @@ export default async function TeamPage() {
 
         {/* Curriculum structure section */}
         <section className="bg-background">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
+          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12 text-center text-sm">
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-Q4wysyC8JWLi02dGNyrSqptIHF6gYQ.png"
               alt="Wisdom at Work Three-Year Curriculum Structure"
@@ -79,7 +79,7 @@ export default async function TeamPage() {
           <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8">
               <div className="flex-1">
-                <p className="italic text-foreground leading-relaxed mb-4">
+                <p className="italic text-foreground leading-relaxed mb-4 text-xs">
                   This project was made possible through the support of Grant 63617 from the John Templeton Foundation. The opinions expressed in this project are those of the grantee and do not necessarily reflect the views of the John Templeton Foundation.
                 </p>
               </div>
