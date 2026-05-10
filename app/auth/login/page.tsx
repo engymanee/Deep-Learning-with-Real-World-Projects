@@ -14,10 +14,33 @@ import { Label } from '@/components/ui/label'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { KeyRound, Mail } from 'lucide-react'
+import type { EmailOtpType } from '@supabase/supabase-js'
 import { requestSignInCodeAction } from './actions'
 
 type Method = 'password' | 'code'
 type CodeStep = 'request' | 'verify'
+
+/**
+ * The login page supports a deep link from the invitation email:
+ *
+ *   /auth/login?email=fellow@school.edu&from=invite&otp_type=invite&next=/auth/set-password
+ *
+ * When `from=invite` is present we skip the email-input step and
+ * land the user straight on the verify-code form with their email
+ * pre-filled. `otp_type` tells `verifyOtp` whether to use 'invite'
+ * (new users) or 'email' (existing users whose invite was resent
+ * via magiclink).
+ */
+function isOtpType(value: string | null): value is EmailOtpType {
+  return (
+    value === 'email' ||
+    value === 'invite' ||
+    value === 'magiclink' ||
+    value === 'recovery' ||
+    value === 'signup' ||
+    value === 'email_change'
+  )
+}
 
 function LoginForm() {
   const router = useRouter()
@@ -26,13 +49,27 @@ function LoginForm() {
   // on /admin, fellows on /dashboard) instead of hard-coding /dashboard
   // for every account type.
   const next = searchParams.get('next') ?? '/'
+  const fromInvite = searchParams.get('from') === 'invite'
+  const presetEmail = searchParams.get('email') ?? ''
+  const presetOtpRaw = searchParams.get('otp_type')
+  const presetOtpType: EmailOtpType = isOtpType(presetOtpRaw)
+    ? presetOtpRaw
+    : 'email'
 
-  const [method, setMethod] = useState<Method>('password')
-  const [email, setEmail] = useState('')
+  const [method, setMethod] = useState<Method>(fromInvite ? 'code' : 'password')
+  const [email, setEmail] = useState(presetEmail)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [codeSentTo, setCodeSentTo] = useState<string | null>(null)
-  const [codeStep, setCodeStep] = useState<CodeStep>('request')
+  const [codeSentTo, setCodeSentTo] = useState<string | null>(
+    fromInvite && presetEmail ? presetEmail : null,
+  )
+  const [codeStep, setCodeStep] = useState<CodeStep>(
+    fromInvite && presetEmail ? 'verify' : 'request',
+  )
+  // The verifyOtp call needs to know which type the OTP was issued
+  // as. Invite codes from new users are 'invite'; resent codes (or
+  // regular sign-in codes) are 'email'.
+  const [otpType, setOtpType] = useState<EmailOtpType>(presetOtpType)
   const [code, setCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -42,6 +79,7 @@ function LoginForm() {
     setCodeSentTo(null)
     setCodeStep('request')
     setCode('')
+    setOtpType('email')
   }
 
   async function handlePasswordLogin(e: React.FormEvent) {
@@ -79,11 +117,14 @@ function LoginForm() {
     setIsLoading(true)
     try {
       // Server action issues the OTP via Supabase admin and emails it
-      // through Resend. Returns just-the-code, no magic link.
+      // through Resend. Returns just-the-code, no magic link. Codes
+      // from this path are always magiclink-type, which verifies as
+      // type 'email' on the client.
       const result = await requestSignInCodeAction(email)
       if (!result.ok) throw new Error(result.error)
       setCodeSentTo(result.email)
       setCodeStep('verify')
+      setOtpType('email')
       setCode('')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to send login code')
@@ -105,12 +146,13 @@ function LoginForm() {
     setIsLoading(true)
     try {
       const supabase = createClient()
-      // `type: 'email'` matches the 6-digit OTP issued by
-      // generateLink({ type: 'magiclink' }) on the server.
+      // `otpType` is set to 'invite' when the user is verifying a
+      // brand-new invitation code, and 'email' for regular sign-in
+      // codes (or resent invitations). Both flows use a 6-digit OTP.
       const { error } = await supabase.auth.verifyOtp({
         email,
         token: trimmed,
-        type: 'email',
+        type: otpType,
       })
       if (error) throw error
       router.replace(next.startsWith('/') ? next : '/')
@@ -205,9 +247,24 @@ function LoginForm() {
               role="status"
               className="rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground"
             >
-              We sent a 6-digit code to{' '}
-              <span className="font-medium">{codeSentTo}</span>. Enter it below to
-              finish signing in.
+              {otpType === 'invite' ? (
+                <>
+                  Welcome! Enter the 6-digit code from your invitation email
+                  {codeSentTo ? (
+                    <>
+                      {' '}sent to{' '}
+                      <span className="font-medium">{codeSentTo}</span>
+                    </>
+                  ) : null}{' '}
+                  to finish setting up your account.
+                </>
+              ) : (
+                <>
+                  We sent a 6-digit code to{' '}
+                  <span className="font-medium">{codeSentTo}</span>. Enter it below
+                  to finish signing in.
+                </>
+              )}
             </p>
             <div className="grid gap-2">
               <Label htmlFor="otp-code">Sign-in code</Label>
