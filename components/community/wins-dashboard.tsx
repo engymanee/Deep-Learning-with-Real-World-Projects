@@ -120,9 +120,9 @@ export function WinsDashboard({
                       ? new Date(win.published_at).toLocaleDateString()
                       : 'Recently'}
                   </p>
-                  {win.framework_resource && (
+                  {win.framework && (
                     <Badge variant="secondary" className="w-fit text-xs">
-                      {win.framework_resource.title}
+                      {win.framework.title}
                     </Badge>
                   )}
                 </li>
