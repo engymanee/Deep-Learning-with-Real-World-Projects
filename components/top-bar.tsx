@@ -54,10 +54,10 @@ export function TopBar() {
           Dashboard
         </Link>
         <Link
-          href="/team"
+          href="/about"
           className="text-sm font-medium text-white/80 hover:text-white transition-colors"
         >
-          My Team
+          About
         </Link>
         <Link
           href="/resources"
