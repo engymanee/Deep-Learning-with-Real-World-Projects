@@ -661,13 +661,6 @@ function GridCard({
           </div>
         )}
 
-        {/* Footer strip is now just the added-on date. The whole
-            card is already a link to the resource, so the explicit
-            "Open" CTA was redundant and competed visually with the
-            title. Less chrome, more focus on the content. */}
-        <div className="border-t border-border pt-2 text-[11px] text-muted-foreground">
-          <DateLabel iso={resource.createdAt} />
-        </div>
       </div>
     </a>
   )
@@ -737,7 +730,6 @@ function ListRow({
             </p>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <DateLabel iso={resource.createdAt} />
             {resource.tags.slice(0, 4).map((t) => (
               <Badge key={t} variant="secondary" className="text-[10px]">
                 {t}
@@ -778,19 +770,6 @@ function CohortBadgeRow({
       ))}
     </div>
   )
-}
-
-function DateLabel({ iso }: { iso: string | null }) {
-  if (!iso) return <span aria-hidden="true">&nbsp;</span>
-  // Server can ship an ISO string; rendering it via Intl keeps the
-  // output stable between SSR + CSR (no time zone drift in copy).
-  const date = new Date(iso)
-  const formatted = date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-  return <time dateTime={iso}>Added {formatted}</time>
 }
 
 function EmptyState({
