@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { COHORTS, type Cohort } from '@/lib/cohorts'
 import { PreviewLauncher, type PreviewFellow } from '@/components/admin/preview-launcher'
+import { TestEmailButton } from '@/components/admin/test-email-button'
 
 type FellowProfileRow = {
   id: string
@@ -389,9 +390,12 @@ export default async function AdminHomePage() {
 
       {/* Quick management actions */}
       <section>
-        <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Manage
-        </h3>
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Manage
+          </h3>
+          <TestEmailButton />
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <ActionCard
             href="/admin/users"
