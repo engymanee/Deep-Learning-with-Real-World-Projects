@@ -34,6 +34,11 @@ interface Props {
    * (1-5 stars). Used by the Wins section to capture win valuation.
    */
   requireStarRating?: boolean
+  /**
+   * When true, the composer requires + surfaces visibility/scope options
+   * (public, cohort, school_team). Used by the Wins section.
+   */
+  requireVisibilitySettings?: boolean
 }
 
 /**
@@ -48,6 +53,7 @@ export function SectionHeader({
   frameworks,
   requireAskCategory = false,
   requireStarRating = false,
+  requireVisibilitySettings = false,
 }: Props) {
   return (
     <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
@@ -83,6 +89,7 @@ export function SectionHeader({
             frameworks={frameworks}
             requireAskCategory={requireAskCategory}
             requireStarRating={requireStarRating}
+            requireVisibilitySettings={requireVisibilitySettings}
           />
         </div>
       )}

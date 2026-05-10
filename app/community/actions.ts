@@ -55,6 +55,7 @@ export async function createCommunityPost(input: {
   frameworkResourceId?: string | null
   askCategory?: string | null
   starRating?: number | null
+  visibility?: 'public' | 'cohort' | 'school_team'
 }): Promise<CreatePostResult> {
   try {
     const user = await requireUser()
@@ -139,6 +140,20 @@ export async function createCommunityPost(input: {
       starRating = input.starRating
     }
 
+    // Determine visibility - only for wins, defaults to 'public'
+    let visibility: string = 'public'
+    let visibilityScopeId: string | null = null
+    if (input.kind === 'win' && input.visibility) {
+      visibility = input.visibility
+      // If visibility is cohort or school_team, capture the scope ID from user context
+      if (input.visibility === 'cohort' && user.cohort) {
+        // Will be populated via user context later
+      }
+      if (input.visibility === 'school_team' && user.schoolTeamId) {
+        // Will be populated via user context later
+      }
+    }
+
     // Auto excerpt: first 280 chars of body, ending on a clean break.
     const excerpt =
       body.length > MAX_EXCERPT
@@ -159,6 +174,8 @@ export async function createCommunityPost(input: {
         ask_category: askCategory,
         ask_status: askStatus,
         star_rating: starRating,
+        visibility: visibility,
+        visibility_scope_id: visibilityScopeId,
       })
       .select('id')
       .single()

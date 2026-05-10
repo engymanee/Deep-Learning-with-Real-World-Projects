@@ -61,6 +61,7 @@ export default async function WinsPage({ searchParams }: PageProps) {
         canPost={true}
         frameworks={frameworks}
         requireStarRating
+        requireVisibilitySettings
       />
 
       {/* Analytics Dashboard */}

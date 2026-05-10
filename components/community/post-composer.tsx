@@ -81,6 +81,12 @@ interface Props {
    * Used by the Wins composer to capture subjective value rating.
    */
   requireStarRating?: boolean
+  /**
+   * When true, the composer surfaces visibility/scope options
+   * (public, cohort, school_team). Used by the Wins composer to
+   * control who can see each win. Only for wins kind.
+   */
+  requireVisibilitySettings?: boolean
 }
 
 /**
@@ -101,6 +107,7 @@ export function PostComposer({
   frameworks,
   requireAskCategory = false,
   requireStarRating = false,
+  requireVisibilitySettings = false,
 }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -109,6 +116,7 @@ export function PostComposer({
   const [framework, setFramework] = useState<string>(NO_FRAMEWORK)
   const [askCategory, setAskCategory] = useState<string>(NO_CATEGORY)
   const [starRating, setStarRating] = useState<number | null>(null)
+  const [visibility, setVisibility] = useState<'public' | 'cohort' | 'school_team'>('public')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -122,6 +130,7 @@ export function PostComposer({
     setFramework(NO_FRAMEWORK)
     setAskCategory(NO_CATEGORY)
     setStarRating(null)
+    setVisibility('public')
     setError(null)
   }
 
@@ -159,6 +168,7 @@ export function PostComposer({
         askCategory:
           askCategory === NO_CATEGORY ? null : askCategory,
         starRating: requireStarRating ? starRating : null,
+        visibility: requireVisibilitySettings ? visibility : undefined,
       })
       if (!result.ok) {
         setError(result.message)
@@ -338,6 +348,35 @@ export function PostComposer({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {requireVisibilitySettings && (
+            <div className="flex flex-col gap-1.5 border-t pt-4">
+              <Label htmlFor="visibility-select">Who can see this win?</Label>
+              <Select
+                value={visibility}
+                onValueChange={(v) => setVisibility(v as 'public' | 'cohort' | 'school_team')}
+                disabled={pending}
+              >
+                <SelectTrigger id="visibility-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="school_team">
+                    Visible to my school team only
+                  </SelectItem>
+                  <SelectItem value="cohort">
+                    All fellows in my cohort
+                  </SelectItem>
+                  <SelectItem value="public">
+                    All fellows
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose who can see this win in the community.
+              </p>
             </div>
           )}
 
