@@ -11,6 +11,10 @@ import {
   renderSignInCodeEmail,
   type SignInCodeEmailArgs,
 } from './templates/sign-in-code'
+import {
+  renderPasswordSetupEmail,
+  type PasswordSetupEmailArgs,
+} from './templates/password-setup'
 
 /**
  * High-level wrapper used by invite flows. Renders the branded
@@ -48,6 +52,29 @@ export async function sendSignInCodeEmail(
     html,
     text,
     tags: [{ name: 'category', value: 'sign-in-code' }],
+  })
+}
+
+/**
+ * Sends the "set or reset your password" email triggered from the
+ * login page. Used both for first-time password setup (a fellow who
+ * activated via email-code now wants a password) and for password
+ * resets. The link goes to /auth/activate in password-only mode.
+ */
+export async function sendPasswordSetupEmail(
+  to: string,
+  args: PasswordSetupEmailArgs,
+): Promise<SendResult> {
+  const { subject, html, text } = renderPasswordSetupEmail(args)
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    tags: [
+      { name: 'category', value: 'password-setup' },
+      { name: 'is_reset', value: args.isReset ? 'true' : 'false' },
+    ],
   })
 }
 

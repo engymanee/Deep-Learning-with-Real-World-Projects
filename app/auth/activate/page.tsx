@@ -75,6 +75,13 @@ function ActivateForm() {
   const type: EmailOtpType = isOtpType(typeRaw) ? typeRaw : 'invite'
   const email = (params.get('email') ?? '').trim().toLowerCase()
   const next = params.get('next') ?? '/'
+  // `mode=password-only` is set by the login page's "Set or reset
+  // password" flow. We use it (and also `type=recovery`, which the
+  // same flow always sets) to hide the "Email me a code" choice and
+  // re-skin this page as a password setup / reset screen instead of
+  // an activation screen.
+  const modeRaw = params.get('mode')
+  const isPasswordOnly = modeRaw === 'password-only' || type === 'recovery'
 
   const [method, setMethod] = useState<Method>('password')
   const [password, setPassword] = useState('')
@@ -206,9 +213,22 @@ function ActivateForm() {
   return (
     <Card>
       <CardHeader className="space-y-2">
-        <CardTitle className="font-serif text-2xl">Activate your account</CardTitle>
+        <CardTitle className="font-serif text-2xl">
+          {isPasswordOnly ? 'Set your password' : 'Activate your account'}
+        </CardTitle>
         <CardDescription>
-          {email ? (
+          {isPasswordOnly ? (
+            email ? (
+              <>
+                Choose a new password for{' '}
+                <span className="font-medium text-foreground">{email}</span>. After
+                this, you can sign in with either your password or a one-time email
+                code.
+              </>
+            ) : (
+              'Choose a new password for your Wisdom At Work account.'
+            )
+          ) : email ? (
             <>
               You&apos;re activating{' '}
               <span className="font-medium text-foreground">{email}</span>. Choose how
@@ -231,20 +251,22 @@ function ActivateForm() {
           </p>
         )}
 
-        <MethodPicker
-          method={method}
-          onChange={(m) => {
-            setMethod(m)
-            setError(null)
-            // Switching methods resets the code-path step so the
-            // recipient can't accidentally land on the verify form
-            // for a code that hasn't been requested yet.
-            setCodeStep('request')
-            setCode('')
-            setCodeSentTo(null)
-          }}
-          disabled={isSubmitting}
-        />
+        {!isPasswordOnly && (
+          <MethodPicker
+            method={method}
+            onChange={(m) => {
+              setMethod(m)
+              setError(null)
+              // Switching methods resets the code-path step so the
+              // recipient can't accidentally land on the verify form
+              // for a code that hasn't been requested yet.
+              setCodeStep('request')
+              setCode('')
+              setCodeSentTo(null)
+            }}
+            disabled={isSubmitting}
+          />
+        )}
 
         {method === 'password' ? (
           <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
@@ -285,7 +307,13 @@ function ActivateForm() {
               className="w-full"
               disabled={!linkLooksValid || isSubmitting}
             >
-              {isSubmitting ? 'Activating...' : 'Set password and sign in'}
+              {isSubmitting
+                ? isPasswordOnly
+                  ? 'Saving...'
+                  : 'Activating...'
+                : isPasswordOnly
+                  ? 'Save password and sign in'
+                  : 'Set password and sign in'}
             </Button>
           </form>
         ) : codeStep === 'request' ? (
