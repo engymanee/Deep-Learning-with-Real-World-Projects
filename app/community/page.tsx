@@ -4,7 +4,6 @@ import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
 import { COMMUNITY_SECTIONS } from '@/lib/community/sections'
 import { Badge } from '@/components/ui/badge'
-import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: 'Community | Leadership Fellowship',
@@ -167,7 +166,6 @@ export default async function CommunityOverviewPage() {
         </ul>
       </section>
     </div>
-    <Footer />
     </>
   )
 }

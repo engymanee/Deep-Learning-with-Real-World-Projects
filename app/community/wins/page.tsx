@@ -13,7 +13,6 @@ import {
   loadRecentWins,
 } from '@/lib/community/load-wins'
 import { WinsDashboard } from '@/components/community/wins-dashboard'
-import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: 'Wins & Progress | Community | Leadership Fellowship',
@@ -100,7 +99,6 @@ export default async function WinsPage({ searchParams }: PageProps) {
         />
       </div>
     </div>
-    <Footer />
     </>
   )
 }

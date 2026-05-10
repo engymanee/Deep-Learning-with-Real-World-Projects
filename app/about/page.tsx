@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { requireUser } from '@/lib/auth-server'
 import { TopBar } from '@/components/top-bar'
-import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: 'WaW Fellowship | Wisdom at Work',
@@ -102,7 +101,6 @@ export default async function TeamPage() {
           </div>
         </section>
       </main>
-      <Footer />
     </div>
   )
 }

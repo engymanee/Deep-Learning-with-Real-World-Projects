@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { BiosDirectory } from '@/components/community/bios-directory'
 import { SectionHeader } from '@/components/community/section-header'
 import { getSectionBySlug } from '@/lib/community/sections'
-import { Footer } from '@/components/footer'
 import type { DirectoryProfile } from '@/lib/types/profile'
 
 export const metadata = {
@@ -154,7 +153,6 @@ export default async function CommunityBiosPage() {
         />
       )}
     </div>
-    <Footer />
     </>
   )
 }

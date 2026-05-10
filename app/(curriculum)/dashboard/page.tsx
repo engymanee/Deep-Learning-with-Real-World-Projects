@@ -3,7 +3,6 @@ import { loadTeamProgress } from '@/lib/team-progress'
 import { LiveSessionCard } from '@/components/dashboard/live-session-card'
 import { NotificationsFeed } from '@/components/notifications/notifications-feed'
 import { PhaseProgressSection } from '@/components/dashboard/phase-progress-section'
-import { Footer } from '@/components/footer'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,7 +60,6 @@ export default async function DashboardPage() {
           teammateCount={teamProgress.teammateCount}
         />
       </div>
-      <Footer />
     </>
   )
 }

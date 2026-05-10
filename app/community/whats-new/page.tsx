@@ -3,7 +3,6 @@ import { PostFeed } from '@/components/community/post-feed'
 import { SectionHeader } from '@/components/community/section-header'
 import { getSectionBySlug } from '@/lib/community/sections'
 import { loadSectionPosts } from '@/lib/community/load-section'
-import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: "What's New? | Community | Leadership Fellowship",
@@ -37,7 +36,6 @@ export default async function WhatsNewPage() {
         emptyCopy={section.emptyCopy}
       />
     </div>
-    <Footer />
     </>
   )
 }

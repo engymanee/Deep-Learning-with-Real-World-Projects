@@ -9,20 +9,8 @@ import {
   Users,
 } from 'lucide-react'
 import { requireUser } from '@/lib/auth-server'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { initialsFor } from '@/lib/types/profile'
-import { loadCommunityDashboard } from '@/lib/community/load-dashboard'
+import { createClient } from '@/lib/supabase/server'
 import { ASK_CATEGORY_BY_VALUE } from '@/lib/community/ask-categories'
-import { Footer } from '@/components/footer'
 
 export const dynamic = 'force-dynamic'
 
@@ -432,7 +420,6 @@ function AuthorLine({
         </>
       )}
     </div>
-    <Footer />
     </>
   )
 }

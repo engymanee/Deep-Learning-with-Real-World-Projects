@@ -7,7 +7,6 @@ import {
   loadReflectionFeed,
   type CommentItem,
 } from '@/lib/community/load-reflections'
-import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: 'Fellow Reflections | Community | Leadership Fellowship',
@@ -110,7 +109,6 @@ export default async function ReflectionsPage() {
         emptyCopy={section.emptyCopy}
       />
     </div>
-    <Footer />
     </>
   )
 }
