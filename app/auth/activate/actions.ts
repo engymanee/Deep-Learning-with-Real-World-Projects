@@ -2,6 +2,7 @@
 
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { markInvitationAccepted } from '@/lib/invitations/invite'
 
 export type ActivateResult = { ok: true } | { ok: false; error: string }
 
@@ -57,5 +58,32 @@ export async function activateWithPasswordAction(args: {
     return { ok: false, error: updateErr.message }
   }
 
+  // Resolve the email from the freshly-established session so we
+  // mark the right invitation row even if the link's `email` query
+  // param was missing. Best-effort - never blocks the activation.
+  try {
+    const { data } = await supabase.auth.getUser()
+    if (data.user?.email) {
+      await markInvitationAccepted(data.user.email)
+    }
+  } catch (err) {
+    console.log('[v0] post-activate accept marking failed', err)
+  }
+
+  return { ok: true }
+}
+
+/**
+ * Server-action shim used by the login page after a successful
+ * verify-OTP on the invite-code path. The OTP is already verified
+ * client-side; this just updates the audit row so the admin sees
+ * "Activated" instead of "Invited".
+ */
+export async function completeInviteCodeActivationAction(
+  rawEmail: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const email = String(rawEmail ?? '').trim().toLowerCase()
+  if (!email) return { ok: false, error: 'Missing email' }
+  await markInvitationAccepted(email)
   return { ok: true }
 }

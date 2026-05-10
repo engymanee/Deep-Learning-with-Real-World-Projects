@@ -16,6 +16,7 @@ import { Suspense, useState } from 'react'
 import { KeyRound, Mail } from 'lucide-react'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { requestSignInCodeAction } from './actions'
+import { completeInviteCodeActivationAction } from '../activate/actions'
 
 type Method = 'password' | 'code'
 type CodeStep = 'request' | 'verify'
@@ -155,6 +156,19 @@ function LoginForm() {
         type: otpType,
       })
       if (error) throw error
+
+      // The user came in from the invitation email and just finished
+      // the code path - flip the invitations row to accepted so admins
+      // see "Activated" instead of a stale "Invited". Best-effort: a
+      // failure here must not block the navigation.
+      if (fromInvite) {
+        try {
+          await completeInviteCodeActivationAction(email)
+        } catch {
+          // ignore - admin status is non-blocking
+        }
+      }
+
       router.replace(next.startsWith('/') ? next : '/')
     } catch (err: unknown) {
       setError(

@@ -22,6 +22,22 @@ type UserRowData = {
   last_sign_in_at: string | null
   invited_at: string | null
   email_confirmed_at: string | null
+  /**
+   * Status of the most recent invitation row for this user's email,
+   * if any. Drives the activation status badge so admins can tell
+   * "we sent an invite, they haven't activated yet" apart from
+   * "they're a fully active user" without relying solely on
+   * `last_sign_in_at`.
+   */
+  invitation_status:
+    | 'pending'
+    | 'sent'
+    | 'accepted'
+    | 'failed'
+    | 'expired'
+    | 'cancelled'
+    | null
+  invitation_last_sent_at: string | null
 }
 
 export default async function AdminUsersPage() {
@@ -49,10 +65,39 @@ export default async function AdminUsersPage() {
   const { data: authList } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
   const authById = new Map(authList?.users.map((u) => [u.id, u]))
 
+  // Pull the most recent invitation per email so the status column
+  // can show real activation state (Invited / Activated / etc.)
+  // independently of the auth `last_sign_in_at` heuristic. We pick
+  // the latest row by `last_sent_at` to handle resends cleanly.
+  const { data: invitationRows } = await admin
+    .from('invitations')
+    .select('email, status, last_sent_at')
+    .order('last_sent_at', { ascending: false, nullsFirst: false })
+  const invitationByEmail = new Map<
+    string,
+    { status: UserRowData['invitation_status']; last_sent_at: string | null }
+  >()
+  for (const row of (invitationRows ?? []) as Array<{
+    email: string | null
+    status: string | null
+    last_sent_at: string | null
+  }>) {
+    if (!row.email) continue
+    const key = row.email.toLowerCase()
+    if (invitationByEmail.has(key)) continue // first wins because pre-sorted
+    invitationByEmail.set(key, {
+      status: (row.status as UserRowData['invitation_status']) ?? null,
+      last_sent_at: row.last_sent_at,
+    })
+  }
+
   const users: UserRowData[] = (profiles ?? []).map((p: any) => {
     const member = Array.isArray(p.cohort_members) ? p.cohort_members[0] : p.cohort_members
     const cohort = member?.cohorts ?? null
     const authUser = authById.get(p.id)
+    const invitation = p.email
+      ? invitationByEmail.get(String(p.email).toLowerCase())
+      : undefined
     return {
       id: p.id,
       full_name: p.full_name,
@@ -66,6 +111,8 @@ export default async function AdminUsersPage() {
       last_sign_in_at: authUser?.last_sign_in_at ?? null,
       invited_at: authUser?.invited_at ?? null,
       email_confirmed_at: authUser?.email_confirmed_at ?? null,
+      invitation_status: invitation?.status ?? null,
+      invitation_last_sent_at: invitation?.last_sent_at ?? null,
     }
   })
 
