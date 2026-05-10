@@ -26,9 +26,15 @@ export interface CommunityPostListItem {
     title: string
     resource_url: string | null
   } | null
+  framework_resource?: {
+    id: string
+    title: string
+  } | null
   /** Ask metadata (only set on kind==='ask'). */
   ask_category?: string | null
   ask_status?: string | null
+  /** Star rating for wins (only set on kind==='win'). */
+  star_rating?: number | null
   author: {
     id: string
     full_name: string | null
