@@ -129,16 +129,11 @@ function TeammateRow({
       </Avatar>
 
       <div className="min-w-0 flex-1 space-y-1">
-        {/* Teammate row mirrors the "You" meter: name + bar + count,
-            no raw percentage. The bar fill itself still uses the
-            percent value to draw the meter. */}
+        {/* Teammate row mirrors the "You" meter: name + bar,
+            no raw percentage or "X of Y" counter. The bar fill
+            itself still uses the percent value to draw the meter. */}
         <p className="truncate text-sm text-foreground">{teammate.name}</p>
         <Progress value={teammate.percent} className="h-1" />
-        {totalItems > 0 && (
-          <p className="text-[11px] text-muted-foreground">
-            {teammate.completed} of {totalItems}
-          </p>
-        )}
       </div>
     </li>
   )
