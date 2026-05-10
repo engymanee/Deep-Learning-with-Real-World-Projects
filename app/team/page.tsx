@@ -82,7 +82,7 @@ export default async function TeamPage() {
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-kCoiFTogFnqrrOloeNsvOSi9SOMEDN.png"
               alt="John Templeton Foundation"
               className="h-32 w-auto inline-block"
-              style={{ fontSize: '18px' }}
+              style={{ fontSize: '20px' }}
             />
           </div>
         </section>
