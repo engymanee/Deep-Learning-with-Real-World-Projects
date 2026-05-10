@@ -3,8 +3,10 @@ import type { CommunityPostListItem } from '@/components/community/post-feed'
 
 export interface WinsStats {
   total: number
-  avgRating: number
-  mostUsedFramework: { name: string; count: number } | null
+  userWins: number
+  avgRatingAll: number
+  avgRatingUser: number
+  frameworkCount: number
   winsThisMonth: number
 }
 
@@ -24,23 +26,28 @@ export interface WinsOverTime {
 /** Load aggregate wins statistics. */
 export async function loadWinsStats(): Promise<WinsStats> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: stats } = await supabase
+  // Get all wins
+  const { data: allWins } = await supabase
     .from('community_posts')
-    .select('id, star_rating')
+    .select('id, star_rating, created_by, framework_resource_id')
     .eq('kind', 'win')
     .eq('is_archived', false)
     .not('published_at', 'is', null)
 
-  if (!stats || stats.length === 0) {
+  if (!allWins || allWins.length === 0) {
     return {
       total: 0,
-      avgRating: 0,
-      mostUsedFramework: null,
+      userWins: 0,
+      avgRatingAll: 0,
+      avgRatingUser: 0,
+      frameworkCount: 0,
       winsThisMonth: 0,
     }
   }
 
+  // Get this month's wins
   const monthAgo = new Date()
   monthAgo.setMonth(monthAgo.getMonth() - 1)
 
@@ -52,13 +59,28 @@ export async function loadWinsStats(): Promise<WinsStats> {
     .not('published_at', 'is', null)
     .gte('published_at', monthAgo.toISOString())
 
-  const ratings = stats.filter((w) => w.star_rating).map((w) => w.star_rating!)
-  const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0
+  // Calculate average ratings
+  const allRatings = allWins.filter((w) => w.star_rating).map((w) => w.star_rating!)
+  const avgRatingAll = allRatings.length > 0 ? allRatings.reduce((a, b) => a + b, 0) / allRatings.length : 0
+
+  // Get user's wins and ratings
+  const userWins = allWins.filter((w) => w.created_by === user?.id) ?? []
+  const userRatings = userWins.filter((w) => w.star_rating).map((w) => w.star_rating!)
+  const avgRatingUser = userRatings.length > 0 ? userRatings.reduce((a, b) => a + b, 0) / userRatings.length : 0
+
+  // Count unique frameworks
+  const frameworks = new Set(
+    allWins
+      .filter((w) => w.framework_resource_id)
+      .map((w) => w.framework_resource_id)
+  )
 
   return {
-    total: stats.length,
-    avgRating: Math.round(avgRating * 10) / 10,
-    mostUsedFramework: null, // Will populate if frameworks are tracked
+    total: allWins.length,
+    userWins: userWins.length,
+    avgRatingAll: Math.round(avgRatingAll * 10) / 10,
+    avgRatingUser: Math.round(avgRatingUser * 10) / 10,
+    frameworkCount: frameworks.size,
     winsThisMonth: thisMonth?.length ?? 0,
   }
 }
@@ -70,7 +92,7 @@ export async function loadWinsByFramework(): Promise<FrameworkStats[]> {
   const { data: wins } = await supabase
     .from('community_posts')
     .select(
-      `id, title, excerpt, cover_url, published_at, framework, star_rating,
+      `id, title, excerpt, body, cover_url, published_at, framework, star_rating,
        author:created_by(id, full_name, email, avatar_url)`
     )
     .eq('kind', 'win')
@@ -99,11 +121,13 @@ export async function loadWinsByFramework(): Promise<FrameworkStats[]> {
       id: w.id,
       title: w.title,
       excerpt: w.excerpt,
+      body: w.body,
       cover_url: w.cover_url,
       published_at: w.published_at,
       kind: 'win',
       featured_at: null,
       is_archived: false,
+      star_rating: w.star_rating,
       framework: w.framework,
       ask_category: null,
       ask_status: null,
@@ -185,7 +209,7 @@ export async function loadRecentWins(limit = 10): Promise<CommunityPostListItem[
   const { data: wins } = await supabase
     .from('community_posts')
     .select(
-      `id, title, excerpt, cover_url, published_at, framework, featured_at, is_archived,
+      `id, title, excerpt, body, cover_url, published_at, framework, featured_at, is_archived, star_rating,
        author:created_by(id, full_name, email, avatar_url)`
     )
     .eq('kind', 'win')
@@ -200,11 +224,13 @@ export async function loadRecentWins(limit = 10): Promise<CommunityPostListItem[
     id: w.id,
     title: w.title,
     excerpt: w.excerpt,
+    body: w.body,
     cover_url: w.cover_url,
     published_at: w.published_at,
     kind: 'win',
     featured_at: w.featured_at,
     is_archived: w.is_archived,
+    star_rating: w.star_rating,
     framework: w.framework,
     ask_category: null,
     ask_status: null,

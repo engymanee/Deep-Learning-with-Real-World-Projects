@@ -25,27 +25,33 @@ export function WinsDashboard({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={Award}
-          label="Total Wins"
-          value={stats.total.toString()}
-          description="Celebrations shared"
+          label="You Shared"
+          value={stats.userWins.toString()}
+          description="Wins you've posted"
         />
         <StatCard
           icon={Star}
-          label="Avg Rating"
-          value={`${stats.avgRating.toFixed(1)} / 5`}
+          label="All Fellows Avg"
+          value={`${stats.avgRatingAll.toFixed(1)} / 5`}
           description="Community rating"
+        />
+        <StatCard
+          icon={Star}
+          label="Your Avg"
+          value={`${stats.avgRatingUser.toFixed(1)} / 5`}
+          description="Your wins rating"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Frameworks"
+          value={stats.frameworkCount.toString()}
+          description="Protocols being used"
         />
         <StatCard
           icon={Calendar}
           label="This Month"
           value={stats.winsThisMonth.toString()}
           description="Wins in 30 days"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Frameworks"
-          value={frameworkStats.length.toString()}
-          description="Practices being used"
         />
       </div>
 

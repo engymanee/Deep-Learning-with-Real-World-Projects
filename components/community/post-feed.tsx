@@ -9,6 +9,7 @@ export interface CommunityPostListItem {
   id: string
   title: string
   excerpt: string | null
+  body?: string | null
   cover_url: string | null
   published_at: string | null
   kind: string
@@ -210,11 +211,15 @@ function PostFeedItem({
             {post.title}
           </h3>
 
-          {post.excerpt && (
+          {post.kind === 'win' && post.body ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {post.body}
+            </p>
+          ) : post.excerpt ? (
             <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
               {post.excerpt}
             </p>
-          )}
+          ) : null}
 
           {/*
             Framework chip ("Used: Reading Reset Protocol"). Linked
