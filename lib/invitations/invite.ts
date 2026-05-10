@@ -38,27 +38,29 @@ export interface InviteResult {
 
 /**
  * Builds the URL we put in the invitation email's CTA button. The
- * recipient lands on the regular login page with their email pre-
- * filled and the verify-code step active, where they type the 6-digit
- * code from the same email. We do NOT auto-authenticate from the
- * link - the project requires every login (including the first one
- * post-invite) to go through the verify-code step.
+ * recipient lands on /auth/activate where they pick how to finish
+ * setting up their account. The token_hash + type pair lets the
+ * activation page consume the invitation server-side via verifyOtp
+ * if the user opts to set a password. The email is included so the
+ * code-fallback path (which doesn't need the token) can issue a
+ * fresh OTP for the same address.
  *
- * `otp_type` is captured here because the OTP issued by `generateLink`
- * needs to be verified with the matching `verifyOtp` type:
- *   - new user (type=invite)        -> verifyOtp({ type: 'invite' })
- *   - existing user (type=magiclink) -> verifyOtp({ type: 'email' })
- * Encoding it in the URL lets the login page do the right thing
- * without a second round-trip to the server.
+ * Note: this URL alone does NOT grant access. The recipient still has
+ * to complete password creation OR enter a fresh 6-digit code on the
+ * activation page.
  */
-async function buildLoginUrl(email: string, otpType: 'invite' | 'email'): Promise<string> {
+async function buildActivationUrl(args: {
+  email: string
+  tokenHash: string
+  verificationType: 'invite' | 'magiclink'
+}): Promise<string> {
   const params = new URLSearchParams({
-    email,
-    from: 'invite',
-    otp_type: otpType,
-    next: '/auth/set-password',
+    token_hash: args.tokenHash,
+    type: args.verificationType,
+    email: args.email,
+    next: '/',
   })
-  const url = await siteUrl(`/auth/login?${params.toString()}`)
+  const url = await siteUrl(`/auth/activate?${params.toString()}`)
   if (!url) {
     throw new Error(
       'Cannot determine site URL for invitation link. Set NEXT_PUBLIC_SITE_URL.',
@@ -68,17 +70,18 @@ async function buildLoginUrl(email: string, otpType: 'invite' | 'email'): Promis
 }
 
 /**
- * Generates a one-time 6-digit sign-in code for the recipient. Tries
+ * Generates a one-time activation token for the recipient. Tries
  * `invite` first (creates the auth user), falling back to `magiclink`
- * for the resend-an-existing-user case. Returns the code plus the
- * verifyOtp type the login page should use to redeem it.
+ * for the resend-an-existing-user case. Returns the opaque token_hash
+ * plus the verification_type, which the activation page passes to
+ * verifyOtp if the user picks the password path.
  */
-async function generateInviteCode(
+async function generateActivationToken(
   email: string,
   metadata: Record<string, unknown>,
 ): Promise<{
-  code: string
-  otpType: 'invite' | 'email'
+  tokenHash: string
+  verificationType: 'invite' | 'magiclink'
   userId: string | undefined
   isNewUser: boolean
 }> {
@@ -90,35 +93,37 @@ async function generateInviteCode(
     options: { data: metadata },
   })
 
-  const inviteOtp = inviteRes.data?.properties?.email_otp
-  if (!inviteRes.error && inviteOtp) {
+  const inviteHash = inviteRes.data?.properties?.hashed_token
+  const inviteType = inviteRes.data?.properties?.verification_type
+  if (!inviteRes.error && inviteHash && inviteType) {
     return {
-      code: inviteOtp,
-      otpType: 'invite',
+      tokenHash: inviteHash,
+      verificationType: inviteType as 'invite' | 'magiclink',
       userId: inviteRes.data?.user?.id,
       isNewUser: true,
     }
   }
 
-  // User most likely exists - reissue a magic-link OTP. This is the
-  // resend-invite path. Magic-link OTPs verify with type 'email'.
+  // User most likely exists - reissue a magic-link token. This is the
+  // resend-invite path. Magic-link tokens verify with type 'magiclink'.
   const magicRes = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email,
   })
 
-  const magicOtp = magicRes.data?.properties?.email_otp
-  if (magicRes.error || !magicOtp) {
+  const magicHash = magicRes.data?.properties?.hashed_token
+  const magicType = magicRes.data?.properties?.verification_type
+  if (magicRes.error || !magicHash || !magicType) {
     throw new Error(
       magicRes.error?.message ??
         inviteRes.error?.message ??
-        'Could not generate invitation code',
+        'Could not generate activation token',
     )
   }
 
   return {
-    code: magicOtp,
-    otpType: 'email',
+    tokenHash: magicHash,
+    verificationType: magicType as 'invite' | 'magiclink',
     userId: magicRes.data?.user?.id,
     isNewUser: false,
   }
@@ -261,11 +266,16 @@ export async function sendBrandedInvite(
       invitedBy: invitedByProfileId,
     })
 
-    const { code, otpType, userId, isNewUser } = await generateInviteCode(email, {
-      full_name: payload.fullName,
-      role: payload.role,
+    const { tokenHash, verificationType, userId, isNewUser } =
+      await generateActivationToken(email, {
+        full_name: payload.fullName,
+        role: payload.role,
+      })
+    const activationUrl = await buildActivationUrl({
+      email,
+      tokenHash,
+      verificationType,
     })
-    const loginUrl = await buildLoginUrl(email, otpType)
 
     if (userId) {
       if (invitationId) await attachUserId(invitationId, userId)
@@ -273,13 +283,13 @@ export async function sendBrandedInvite(
     }
 
     if (!isEmailConfigured()) {
-      // We have a code but cannot email it. Mark the invitation as
-      // failed (so the admin sees why) and surface the URL in the
-      // result so it can be passed along manually.
+      // We have a working activation URL but cannot email it. Mark
+      // the invitation as failed (so the admin sees why) and surface
+      // the link in the result so it can be passed along manually.
       if (invitationId) {
         await markInvitationFailed(
           invitationId,
-          'RESEND_API_KEY is not set; invite code generated but email not sent',
+          'RESEND_API_KEY is not set; activation link generated but email not sent',
         )
       }
       return {
@@ -287,21 +297,20 @@ export async function sendBrandedInvite(
         email,
         invitationId,
         userId,
-        actionLink: loginUrl,
+        actionLink: activationUrl,
         isNewUser,
         error:
-          'Email is not configured (RESEND_API_KEY missing). Copy the login link manually.',
+          'Email is not configured (RESEND_API_KEY missing). Copy the activation link manually.',
       }
     }
 
     const sendResult = await sendInvitationEmail(email, {
       recipientName: payload.fullName,
-      code,
-      loginUrl,
+      activationUrl,
       invitedByName: payload.invitedByName,
       cohortLabel: payload.cohortLabel,
-      // Supabase OTP TTL defaults to 1 hour. Match it in the copy
-      // unless the project later overrides it in the Supabase
+      // Supabase OTP/link TTL defaults to 1 hour. Match it in the
+      // copy unless the project later overrides it in the Supabase
       // dashboard.
       expiresAtLabel: '1 hour',
     })
@@ -313,7 +322,7 @@ export async function sendBrandedInvite(
         email,
         invitationId,
         userId,
-        actionLink: loginUrl,
+        actionLink: activationUrl,
         isNewUser,
         error: sendResult.error,
       }
@@ -326,7 +335,7 @@ export async function sendBrandedInvite(
       email,
       invitationId,
       userId,
-      actionLink: loginUrl,
+      actionLink: activationUrl,
       emailProviderId: sendResult.id,
       isNewUser,
       message: isNewUser ? `Invite sent to ${email}` : `Invite resent to ${email}`,
