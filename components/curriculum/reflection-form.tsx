@@ -10,7 +10,6 @@ import {
   deleteReflection,
   submitReflection,
 } from '@/app/(curriculum)/phases/actions'
-import { countWords } from '@/lib/reflections'
 
 interface Props {
   contentId: string
@@ -46,7 +45,6 @@ export function ReflectionForm({
   const [pending, startTransition] = useTransition()
 
   // Live word count is only for feedback - no minimum enforced
-  const wordCount = countWords(response)
 
   // When the fellow blurs the textarea while it's empty AND a
   // reflection had been saved before, wipe the saved row from the
@@ -152,12 +150,6 @@ export function ReflectionForm({
             placeholder=""
             disabled={pending}
           />
-          {/* Word count feedback only - no minimum requirement. */}
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span className="text-muted-foreground" aria-live="polite">
-              {wordCount} {wordCount === 1 ? 'word' : 'words'}
-            </span>
-          </div>
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}
