@@ -11,13 +11,6 @@ export interface FrameworkOption {
   id: string
   /** Display label for the dropdown and the "Used:" chip on the feed card. */
   title: string
-  /**
-   * Optional href to the resource so the chip can deep-link back to
-   * the library entry. Some library rows are unpublished or have no
-   * external URL; we fall back to the in-app library page in that
-   * case (handled at render time).
-   */
-  resource_url: string | null
 }
 
 /**
@@ -31,13 +24,17 @@ export interface FrameworkOption {
  */
 export async function loadPwfProtocols(): Promise<FrameworkOption[]> {
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('community_resources')
-    .select('id, title, resource_url')
+    .select('id, title')
     .eq('is_pwf_protocol', true)
     .order('title', { ascending: true })
     .limit(200)
-    .returns<FrameworkOption[]>()
+
+  if (error) {
+    console.error('[v0] loadPwfProtocols error:', error.message)
+    return []
+  }
 
   return data ?? []
 }
