@@ -6,6 +6,8 @@ import {
   type ContentCategory,
 } from '@/lib/curriculum'
 import type { CurrentUser } from '@/lib/user-context'
+import type { FeedItemView } from '@/components/notifications/notifications-feed'
+import type { NotificationKind } from '@/lib/notifications/types'
 
 // ============================================================================
 // Types
@@ -34,31 +36,17 @@ export interface DashboardSession {
   facilitators: DashboardSessionFacilitator[]
 }
 
-export interface DashboardAnnouncement {
-  id: string
-  title: string
-  body: string
-  pinned: boolean
-  publishedAt: string
-  author: { name: string; initials: string } | null
-  /**
-   * If the curator pinned the announcement to a curriculum item,
-   * we materialise everything the feed needs to render a one-tap
-   * deep-link without a second round trip.
-   */
-  content: {
-    id: string
-    title: string
-    /** Pre-built URL for the lab page (matches /phases/.../items/...). */
-    href: string
-  } | null
-}
+/**
+ * Backwards-compat alias - the dashboard now renders the unified
+ * notifications feed but other callers still import this type name.
+ */
+export type DashboardAnnouncement = FeedItemView
 
 export interface DashboardData {
   user: CurrentUser
   phases: DashboardPhase[]
   upcomingSession: DashboardSession | null
-  announcements: DashboardAnnouncement[]
+  notifications: FeedItemView[]
 }
 
 // ============================================================================
@@ -224,50 +212,69 @@ export async function getDashboardData(): Promise<DashboardData> {
   }
 
   // ---------------------------------------------------------------------------
-  // Announcements (RLS already scopes audience)
+  // Notifications (RLS already scopes audience)
   // ---------------------------------------------------------------------------
-  const { data: announcementRows } = await supabase
-    .from('announcements')
+  const { data: notificationRows } = await supabase
+    .from('notifications')
     .select(
-      'id, title, body, pinned, published_at, author:profiles!author_id(full_name), content:labs!content_id(id, title, year_id, module_id)',
+      'id, kind, title, body, pinned, sent_at, published_at, cta_label, cta_url, author:profiles!author_id(full_name), content:labs!content_id(id, title, year_id, module_id)',
     )
+    .eq('status', 'sent')
     .order('pinned', { ascending: false })
-    .order('published_at', { ascending: false })
+    .order('sent_at', { ascending: false, nullsFirst: false })
+    .order('published_at', { ascending: false, nullsFirst: false })
     .limit(5)
 
-  const announcements: DashboardAnnouncement[] = (announcementRows ?? []).map(
-    (row) => {
-      const authorRecord = Array.isArray(row.author) ? row.author[0] : row.author
-      // Supabase returns embedded relations as either a single object
-      // or a one-element array depending on the query shape; normalise.
-      const contentRecord = Array.isArray(row.content)
-        ? row.content[0] ?? null
-        : (row.content as
-            | { id: string; title: string; year_id: string; module_id: string }
-            | null) ?? null
-      return {
-        id: row.id,
-        title: row.title,
-        body: row.body,
-        pinned: row.pinned,
-        publishedAt: row.published_at,
-        author: authorRecord
-          ? {
-              name: authorRecord.full_name ?? 'Team',
-              initials: initialsFor(authorRecord.full_name),
-            }
-          : null,
-        content: contentRecord
-          ? {
-              id: contentRecord.id,
-              title: contentRecord.title,
-              // Mirrors app/(curriculum)/phases/[phaseId]/modules/[moduleId]/items/[itemId]
-              href: `/phases/${contentRecord.year_id}/modules/${contentRecord.module_id}/items/${contentRecord.id}`,
-            }
-          : null,
-      }
-    },
-  )
+  // Read state for the dashboard preview - we left-join recipient
+  // rows so each item knows whether the user has already read it.
+  const ids = (notificationRows ?? []).map((r) => r.id)
+  const recipientByNotification = new Map<string, string | null>()
+  if (ids.length > 0) {
+    const { data: recipients } = await supabase
+      .from('notification_recipients')
+      .select('notification_id, read_at')
+      .eq('profile_id', user.id)
+      .in('notification_id', ids)
+    for (const r of recipients ?? []) {
+      recipientByNotification.set(r.notification_id, r.read_at)
+    }
+  }
 
-  return { user, phases, upcomingSession, announcements }
+  const notifications: FeedItemView[] = (notificationRows ?? []).map((row: any) => {
+    const authorRecord = Array.isArray(row.author) ? row.author[0] : row.author
+    // Supabase returns embedded relations as either a single object
+    // or a one-element array depending on the query shape; normalise.
+    const contentRecord = Array.isArray(row.content)
+      ? row.content[0] ?? null
+      : (row.content as
+          | { id: string; title: string; year_id: string; module_id: string }
+          | null) ?? null
+    return {
+      id: row.id,
+      kind: (row.kind ?? 'announcement') as NotificationKind,
+      title: row.title,
+      body: row.body,
+      pinned: row.pinned,
+      publishedAt: row.sent_at ?? row.published_at,
+      readAt: recipientByNotification.get(row.id) ?? null,
+      author: authorRecord
+        ? {
+            name: authorRecord.full_name ?? 'Team',
+            initials: initialsFor(authorRecord.full_name),
+          }
+        : null,
+      ctaLabel: row.cta_label ?? null,
+      ctaUrl: row.cta_url ?? null,
+      content: contentRecord
+        ? {
+            id: contentRecord.id,
+            title: contentRecord.title,
+            // Mirrors app/(curriculum)/phases/[phaseId]/modules/[moduleId]/items/[itemId]
+            href: `/phases/${contentRecord.year_id}/modules/${contentRecord.module_id}/items/${contentRecord.id}`,
+          }
+        : null,
+    }
+  })
+
+  return { user, phases, upcomingSession, notifications }
 }

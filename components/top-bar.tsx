@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useMaybeUser } from '@/lib/user-context'
 import { createClient } from '@/lib/supabase/client'
 import { roleLabels } from '@/lib/roles'
+import { NotificationsBell } from '@/components/notifications/notifications-bell'
 
 export function TopBar() {
   const { user } = useMaybeUser()
@@ -81,11 +82,11 @@ export function TopBar() {
         )}
       </nav>
 
-      {/* Right: User Menu. The notification bell was removed - it
-          had a "you have a message" warning dot but no underlying
-          notifications system, which made it look broken. We can
-          add it back when the data layer is wired up. */}
-      <div className="flex items-center gap-4">
+      {/* Right: notifications bell + user menu. The bell shows an
+          unread badge driven by /api/notifications/unread-count and
+          links to the full /notifications inbox. */}
+      <div className="flex items-center gap-2">
+        {user ? <NotificationsBell /> : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
