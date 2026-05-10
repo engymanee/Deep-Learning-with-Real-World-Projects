@@ -92,12 +92,18 @@ export function InviteUserDialog({ cohorts }: Props) {
 
         <form action={onSubmit}>
           <FieldGroup>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="firstName">First Name</FieldLabel>
+                <Input id="firstName" name="firstName" required autoComplete="off" />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="lastName">Last Name</FieldLabel>
+                <Input id="lastName" name="lastName" required autoComplete="off" />
+              </Field>
+            </div>
             <Field>
-              <FieldLabel htmlFor="fullName">Full name</FieldLabel>
-              <Input id="fullName" name="fullName" required autoComplete="off" />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <FieldLabel htmlFor="email">Email Address</FieldLabel>
               <Input id="email" name="email" type="email" required autoComplete="off" />
             </Field>
             <Field>
@@ -129,13 +135,13 @@ export function InviteUserDialog({ cohorts }: Props) {
               </FieldDescription>
             </Field>
             <Field>
-              <FieldLabel>School Team (optional)</FieldLabel>
+              <FieldLabel>School Name (optional)</FieldLabel>
               <Select value={schoolTeamId} onValueChange={setSchoolTeamId}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE_TEAM}>No team</SelectItem>
+                  <SelectItem value={NONE_TEAM}>No school</SelectItem>
                   {cohorts.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
@@ -144,7 +150,7 @@ export function InviteUserDialog({ cohorts }: Props) {
                 </SelectContent>
               </Select>
               <FieldDescription>
-                The school the fellow is part of. Used for grouping and team-level reporting.
+                The school team the fellow is part of. Used for grouping and team-level reporting.
               </FieldDescription>
             </Field>
             {isFellow ? (

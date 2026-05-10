@@ -40,18 +40,25 @@ export async function inviteUserAction(formData: FormData): Promise<ActionResult
     const me = await requireAdmin()
 
     const email = String(formData.get('email') ?? '').trim().toLowerCase()
-    const fullName = String(formData.get('fullName') ?? '').trim()
+    const firstName = String(formData.get('firstName') ?? '').trim()
+    const lastName = String(formData.get('lastName') ?? '').trim()
     const title = String(formData.get('title') ?? '').trim()
     const role = String(formData.get('role') ?? 'fellow')
     // schoolTeamId comes from the existing "cohorts" table, surfaced
-    // in the UI as "School Team". cohortLetter is the A/B/C label
+    // in the UI as "School Name". cohortLetter is the A/B/C label
     // stored on profiles.cohort - only valid for fellows.
     const schoolTeamId = String(formData.get('cohortId') ?? '')
     const cohortLetterRaw = String(formData.get('cohortLetter') ?? '')
 
-    if (!email) return fail('Email is required')
-    if (!fullName) return fail('Full name is required')
+    if (!firstName) return fail('First Name is required')
+    if (!lastName) return fail('Last Name is required')
+    if (!email) return fail('Email Address is required')
     assertRole(role)
+
+    // The downstream invite + profile pipeline still uses a single
+    // `fullName` string. Build it from the split inputs so we don't
+    // have to touch profiles.full_name or the email template.
+    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim()
 
     // Cohorts are exclusively a program-fellow concept. Admins and
     // facilitators have unrestricted access to all curriculum and are
@@ -108,18 +115,39 @@ export async function bulkInviteAction(formData: FormData): Promise<BulkInviteRe
     const source = String(formData.get('source') ?? 'paste') as 'paste' | 'csv'
     const text = String(formData.get('text') ?? '')
     const role = String(formData.get('role') ?? 'fellow')
-    const schoolTeamId = String(formData.get('cohortId') ?? '')
+    const defaultSchoolTeamId = String(formData.get('cohortId') ?? '')
     const cohortLetterRaw = String(formData.get('cohortLetter') ?? '')
 
-    if (!text.trim()) return fail('Paste or upload at least one email')
+    if (!text.trim()) return fail('Paste or upload at least one row')
     assertRole(role)
     const defaultCohort: Cohort | null =
       role === 'fellow' && isCohort(cohortLetterRaw) ? cohortLetterRaw : null
 
-    const rows: ParsedInviteRow[] =
-      source === 'csv' ? parseCsv(text) : parsePastedList(text)
+    let rows: ParsedInviteRow[]
+    if (source === 'csv') {
+      const parsed = parseCsv(text)
+      if (parsed.headerError) return fail(parsed.headerError)
+      rows = parsed.rows
+    } else {
+      rows = parsePastedList(text)
+    }
 
     if (rows.length === 0) return fail('No rows found in input')
+
+    // Resolve any per-row "School Name" string to an existing school
+    // team (cohorts.id) by case-insensitive name match. We deliberately
+    // do NOT auto-create a new team for unknown names: the spec says
+    // to preserve the existing School Team workflow, so unmatched names
+    // fall back to the bulk-default team and we surface it in the
+    // per-row note so the admin can fix it after the fact.
+    const admin = createAdminClient()
+    const { data: cohortRows } = await admin
+      .from('cohorts')
+      .select('id, name')
+    const schoolByName = new Map<string, { id: string; name: string }>()
+    for (const c of (cohortRows ?? []) as Array<{ id: string; name: string | null }>) {
+      if (c.name) schoolByName.set(c.name.trim().toLowerCase(), { id: c.id, name: c.name })
+    }
 
     const invitedByName = await profileDisplayName(me.id)
     const results: BulkInviteSummary['results'] = []
@@ -137,27 +165,42 @@ export async function bulkInviteAction(formData: FormData): Promise<BulkInviteRe
         continue
       }
 
-      // Per-row cohort overrides the bulk default if present.
-      const rowCohort: Cohort | null =
-        role === 'fellow' && row.data.cohort && isCohort(row.data.cohort)
-          ? (row.data.cohort as Cohort)
-          : defaultCohort
+      // School Name resolution: explicit name > bulk default > unset.
+      let resolvedSchoolTeamId: string | null = defaultSchoolTeamId || null
+      let schoolNote: string | null = null
+      const rawSchool = row.data.school_name?.trim()
+      if (rawSchool) {
+        const match = schoolByName.get(rawSchool.toLowerCase())
+        if (match) {
+          resolvedSchoolTeamId = match.id
+        } else {
+          // Don't fail the row over a mismatched school - the email
+          // still goes out. The admin can attach the team later.
+          schoolNote = `school "${rawSchool}" not found, left unassigned`
+          resolvedSchoolTeamId = null
+        }
+      }
 
       const payload: InvitePayload = {
         email: row.data.email,
-        fullName: row.data.full_name ?? row.data.email,
+        fullName: row.data.full_name || row.data.email,
         title: row.data.title ?? null,
         role: role as Role,
-        schoolTeamId: schoolTeamId || null,
-        cohortLetter: rowCohort,
+        schoolTeamId: resolvedSchoolTeamId,
+        cohortLetter: defaultCohort,
         invitedByName,
-        cohortLabel: rowCohort ? `Cohort ${rowCohort}` : null,
+        cohortLabel: defaultCohort ? `Cohort ${defaultCohort}` : null,
       }
 
       const result = await sendBrandedInvite(payload, me.id)
       if (result.ok) {
         invited++
-        results.push({ email: result.email, status: 'invited', message: result.message })
+        const baseMessage = result.message ?? `Invited ${result.email}`
+        results.push({
+          email: result.email,
+          status: 'invited',
+          message: schoolNote ? `${baseMessage} (${schoolNote})` : baseMessage,
+        })
       } else {
         failed++
         results.push({
