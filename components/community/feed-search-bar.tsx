@@ -14,6 +14,8 @@ interface Props {
    * keys if they ever conflict (e.g. with category filters).
    */
   paramKey?: string
+  /** Optional wrapper class for layout integration. */
+  className?: string
 }
 
 /**
@@ -25,6 +27,7 @@ interface Props {
 export function FeedSearchBar({
   placeholder = 'Search posts',
   paramKey = 'q',
+  className,
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
@@ -57,7 +60,10 @@ export function FeedSearchBar({
         e.preventDefault()
         commit(value)
       }}
-      className="flex w-full max-w-md items-center gap-2"
+      className={[
+        'flex w-full max-w-md items-center gap-2',
+        className ?? '',
+      ].join(' ').trim()}
     >
       <div className="relative flex-1">
         <Search
