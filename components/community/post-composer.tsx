@@ -129,9 +129,9 @@ export function PostComposer({
     e.preventDefault()
     setError(null)
     
-    // For wins, the framework is the "title" - validate it's selected
+    // For wins, the framework is required (not using NO_FRAMEWORK sentinel)
     if (requireStarRating) {
-      if (framework === NO_FRAMEWORK) {
+      if (!framework) {
         return setError('Select a PWF Protocol.')
       }
     } else {
@@ -207,7 +207,6 @@ export function PostComposer({
                   <SelectValue placeholder="Select a PWF Protocol" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_FRAMEWORK}>None</SelectItem>
                   {frameworks!.map((fw) => (
                     <SelectItem key={fw.id} value={fw.id}>
                       {fw.title}
