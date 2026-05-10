@@ -7,7 +7,6 @@ export interface WinsStats {
   avgRatingAll: number
   avgRatingUser: number
   frameworkCount: number
-  winsThisMonth: number
 }
 
 export interface FrameworkStats {
@@ -43,21 +42,8 @@ export async function loadWinsStats(): Promise<WinsStats> {
       avgRatingAll: 0,
       avgRatingUser: 0,
       frameworkCount: 0,
-      winsThisMonth: 0,
     }
   }
-
-  // Get this month's wins
-  const monthAgo = new Date()
-  monthAgo.setMonth(monthAgo.getMonth() - 1)
-
-  const { data: thisMonth } = await supabase
-    .from('community_posts')
-    .select('id', { count: 'exact', head: true })
-    .eq('kind', 'win')
-    .eq('is_archived', false)
-    .not('published_at', 'is', null)
-    .gte('published_at', monthAgo.toISOString())
 
   // Calculate average ratings
   const allRatings = allWins.filter((w) => w.star_rating).map((w) => w.star_rating!)
@@ -81,7 +67,6 @@ export async function loadWinsStats(): Promise<WinsStats> {
     avgRatingAll: Math.round(avgRatingAll * 10) / 10,
     avgRatingUser: Math.round(avgRatingUser * 10) / 10,
     frameworkCount: frameworks.size,
-    winsThisMonth: thisMonth?.length ?? 0,
   }
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { Star, TrendingUp, Award, Calendar } from 'lucide-react'
+import { Star, TrendingUp, Award } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { WinsStats, FrameworkStats, WinsOverTime } from '@/lib/community/load-wins'
@@ -22,7 +22,7 @@ export function WinsDashboard({
   return (
     <div className="flex flex-col gap-6">
       {/* Stat Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           icon={Award}
           label="You Shared"
@@ -46,12 +46,6 @@ export function WinsDashboard({
           label="Frameworks"
           value={stats.frameworkCount.toString()}
           description="Protocols being used"
-        />
-        <StatCard
-          icon={Calendar}
-          label="This Month"
-          value={stats.winsThisMonth.toString()}
-          description="Wins in 30 days"
         />
       </div>
 
