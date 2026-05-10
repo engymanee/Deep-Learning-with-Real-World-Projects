@@ -79,7 +79,7 @@ export async function loadReflectionFeed(options?: {
     .from('user_content_reflections')
     .select(
       `
-      id, body, visibility, created_at, updated_at,
+      id, response as body, visibility, created_at, updated_at,
       content:content_id ( id, title, year_id, reflection_prompt ),
       author:profile_id ( id, full_name, email, avatar_url )
       `,
