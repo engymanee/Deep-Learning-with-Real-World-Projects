@@ -9,51 +9,88 @@ async function clearTestData() {
   try {
     console.log('Starting to clear test data...')
 
-    // Clear all curriculum progress (year progress)
-    const { error: yearProgressError, count: yearProgressCount } = await supabase
-      .from('user_year_progress')
-      .delete()
-      .neq('id', '')
-    if (yearProgressError) {
-      console.log('Note: user_year_progress error:', yearProgressError.message)
-    } else {
-      console.log(`✓ Deleted ${yearProgressCount} year progress records`)
-    }
-
-    // Clear all reflections (this will also cascade delete comments via trigger)
-    const { error: reflectionError, count: reflectionCount } = await supabase
+    // Clear all reflections first (they may have comments that cascade)
+    console.log('Clearing reflections...')
+    const { data: reflections, error: refetchError } = await supabase
       .from('user_content_reflections')
-      .delete()
-      .neq('id', '')
-    if (reflectionError) {
-      console.log('Error clearing reflections:', reflectionError.message)
+      .select('id')
+    if (!refetchError && reflections && reflections.length > 0) {
+      const ids = reflections.map(r => r.id)
+      const { error: reflectionError, count: reflectionCount } = await supabase
+        .from('user_content_reflections')
+        .delete()
+        .in('id', ids)
+      if (reflectionError) {
+        console.log('Error clearing reflections:', reflectionError.message)
+      } else {
+        console.log(`✓ Deleted ${reflectionCount} reflection records`)
+      }
     } else {
-      console.log(`✓ Deleted ${reflectionCount} reflection records`)
+      console.log('No reflections to clear')
     }
 
     // Clear all community comments
-    const { error: commentsError, count: commentsCount } = await supabase
+    console.log('Clearing comments...')
+    const { data: comments, error: comfetchError } = await supabase
       .from('community_comments')
-      .delete()
-      .neq('id', '')
-    if (commentsError) {
-      console.log('Note: community_comments error:', commentsError.message)
+      .select('id')
+    if (!comfetchError && comments && comments.length > 0) {
+      const ids = comments.map(c => c.id)
+      const { error: commentsError, count: commentsCount } = await supabase
+        .from('community_comments')
+        .delete()
+        .in('id', ids)
+      if (commentsError) {
+        console.log('Error clearing comments:', commentsError.message)
+      } else {
+        console.log(`✓ Deleted ${commentsCount} community comment records`)
+      }
     } else {
-      console.log(`✓ Deleted ${commentsCount} community comment records`)
+      console.log('No comments to clear')
     }
 
-    // Clear all wins and announcements (community posts)
-    const { error: postsError, count: postsCount } = await supabase
+    // Clear all community posts (wins, announcements, etc)
+    console.log('Clearing posts...')
+    const { data: posts, error: postfetchError } = await supabase
       .from('community_posts')
-      .delete()
-      .neq('id', '')
-    if (postsError) {
-      console.log('Error clearing posts:', postsError.message)
+      .select('id')
+    if (!postfetchError && posts && posts.length > 0) {
+      const ids = posts.map(p => p.id)
+      const { error: postsError, count: postsCount } = await supabase
+        .from('community_posts')
+        .delete()
+        .in('id', ids)
+      if (postsError) {
+        console.log('Error clearing posts:', postsError.message)
+      } else {
+        console.log(`✓ Deleted ${postsCount} community post records`)
+      }
     } else {
-      console.log(`✓ Deleted ${postsCount} community post records`)
+      console.log('No posts to clear')
     }
 
-    console.log('✓ All test data cleared successfully!')
+    // Clear all curriculum progress
+    console.log('Clearing progress...')
+    const { data: progress, error: profetchError } = await supabase
+      .from('progress')
+      .select('id')
+    if (!profetchError && progress && progress.length > 0) {
+      const ids = progress.map(p => p.id)
+      const { error: progressError, count: progressCount } = await supabase
+        .from('progress')
+        .delete()
+        .in('id', ids)
+      if (progressError) {
+        console.log('Error clearing progress:', progressError.message)
+      } else {
+        console.log(`✓ Deleted ${progressCount} progress records`)
+      }
+    } else {
+      console.log('No progress records to clear (table may not exist)')
+    }
+
+    console.log('\n✓ All test data cleared successfully!')
+    process.exit(0)
   } catch (error) {
     console.error('Error clearing test data:', error)
     process.exit(1)
