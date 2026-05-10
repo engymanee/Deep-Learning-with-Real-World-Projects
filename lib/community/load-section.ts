@@ -11,14 +11,11 @@ interface RawPostRow {
   body: string | null
   cover_url: string | null
   published_at: string | null
-  // Admin moderation fields (migration 049). featured_at floats a
-  // post above the rest of the feed; is_archived hides it from
-  // fellows but keeps it readable by admins.
   featured_at: string | null
   is_archived: boolean | null
+  visibility: string | null
+  visibility_scope_id: string | null
   framework_resource_id: string | null
-  // Embedded framework row, populated only when framework_resource_id
-  // is set. We pull just the fields the chip needs.
   framework: {
     id: string
     title: string
@@ -81,12 +78,26 @@ export async function loadSectionPosts(
 
   const supabase = await createClient()
 
+  // Get current user for visibility filtering
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  // Get user's cohort for visibility filtering (if applicable)
+  let userCohortId: string | null = null
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('cohort_id')
+      .eq('id', user.id)
+      .single()
+    userCohortId = profile?.cohort_id ?? null
+  }
+
   let q = supabase
     .from('community_posts')
     .select(
       `
       id, kind, title, excerpt, body, cover_url, published_at,
-      featured_at, is_archived,
+      featured_at, is_archived, visibility, visibility_scope_id,
       framework_resource_id, ask_category, ask_status, star_rating,
       framework:framework_resource_id ( id, title, resource_url ),
       author:created_by ( id, full_name, email, avatar_url )
@@ -100,6 +111,15 @@ export async function loadSectionPosts(
   if (!options.includeArchived) {
     q = q.eq('is_archived', false)
   }
+
+  // Visibility filtering: users can see:
+  // - All posts with visibility='public'
+  // - Posts with visibility='cohort' if in same cohort
+  // - Posts with visibility='school_team' if in same school team (posts owned by user or same team)
+  // For now, we'll use a simple approach: filter by visibility field
+  q = q.or(
+    `visibility.eq.public,and(visibility.eq.cohort,visibility_scope_id.eq.${userCohortId})`,
+  )
 
   // Free-text search: match the term anywhere in title/excerpt/body.
   // Using `.or()` with three ILIKE filters keeps it index-free but
