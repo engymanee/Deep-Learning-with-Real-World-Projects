@@ -70,7 +70,7 @@ export default async function TeamPage() {
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-Q4wysyC8JWLi02dGNyrSqptIHF6gYQ.png"
               alt="Wisdom at Work Three-Year Curriculum Structure"
-              className="w-full rounded-lg shadow-md"
+              className="w-2/3 rounded-lg shadow-md mx-auto"
             />
           </div>
         </section>
