@@ -53,6 +53,16 @@ const TYPE_OPTIONS: ReadonlyArray<{
   { value: 'reading',  label: 'Readings' },
 ]
 
+// Recommended Resources type options: only Reading, Video, and Audio
+// (document is PWF Protocols, link is Field Guides - both cohort-gated only)
+const RECOMMENDED_TYPE_OPTIONS: ReadonlyArray<{
+  value: 'document' | 'link' | 'video' | 'reading'
+  label: ReactNode
+}> = [
+  { value: 'video',    label: 'Video' },
+  { value: 'reading',  label: 'Reading' },
+]
+
 type ResourceType = (typeof TYPE_OPTIONS)[number]['value']
 type Visibility = 'cohort' | 'universal'
 
@@ -429,7 +439,7 @@ export function AddResourceDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TYPE_OPTIONS.map((o) => (
+                  {(visibility === 'universal' ? RECOMMENDED_TYPE_OPTIONS : TYPE_OPTIONS).map((o) => (
                     <SelectItem key={o.value} value={o.value}>
                       {o.label}
                     </SelectItem>

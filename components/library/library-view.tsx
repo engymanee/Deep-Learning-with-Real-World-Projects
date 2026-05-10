@@ -98,8 +98,16 @@ const TYPE_META: Record<
   document: { label: PWF_PROTOCOLS_LABEL, Icon: FileText,   cta: 'Open' },
   link:     { label: 'Field Guides',      Icon: Link2,      cta: 'Open' },
   video:    { label: 'Video',             Icon: PlayCircle, cta: 'Watch' },
-  reading:  { label: 'Readings',          Icon: BookOpen,   cta: 'Read' },
+  reading:  { label: 'Reading',           Icon: BookOpen,   cta: 'Read' },
 }
+
+// Filter pills for Recommended Resources (Further Reading):
+// Only show Reading, Video, and Audio options
+const RECOMMENDED_TYPE_FILTERS: Array<{ id: TypeFilter; label: ReactNode }> = [
+  { id: 'all',     label: 'All' },
+  { id: 'video',   label: 'Video' },
+  { id: 'reading', label: 'Reading' },
+]
 
 // Filter pill order matches the user's preferred reading order:
 // All, PWF Protocols, Field Guides, Video, Readings.
@@ -108,7 +116,7 @@ const TYPE_FILTERS: Array<{ id: TypeFilter; label: ReactNode }> = [
   { id: 'document', label: PWF_PROTOCOLS_LABEL },
   { id: 'link',     label: 'Field Guides' },
   { id: 'video',    label: 'Video' },
-  { id: 'reading',  label: 'Readings' },
+  { id: 'reading',  label: 'Reading' },
 ]
 
 export function LibraryView({
@@ -259,7 +267,7 @@ export function LibraryView({
               aria-label="Filter by type"
               className="flex flex-wrap items-center gap-2"
             >
-              {TYPE_FILTERS.map((f) => {
+              {(tab === 'further' ? RECOMMENDED_TYPE_FILTERS : TYPE_FILTERS).map((f) => {
                 const active = typeFilter === f.id
                 return (
                   <button
