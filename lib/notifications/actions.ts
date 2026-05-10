@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth-server'
 import {
+  dismissAllNotifications,
+  dismissNotification,
   markAllNotificationsRead,
   markNotificationRead,
 } from './feed'
@@ -40,6 +42,44 @@ export async function markAllNotificationsReadAction() {
     return {
       ok: false as const,
       error: e instanceof Error ? e.message : 'Could not mark all as read',
+    }
+  }
+}
+
+/**
+ * Clears a single notification from the user's feed. The notification
+ * row itself is untouched; only the user's per-recipient row gets a
+ * `dismissed_at` timestamp.
+ */
+export async function dismissNotificationAction(notificationId: string) {
+  try {
+    const user = await requireUser()
+    await dismissNotification(user.id, notificationId)
+    revalidatePath('/notifications')
+    revalidatePath('/dashboard')
+    return { ok: true as const }
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : 'Could not clear notification',
+    }
+  }
+}
+
+/**
+ * Clears every notification currently in the user's feed.
+ */
+export async function dismissAllNotificationsAction() {
+  try {
+    const user = await requireUser()
+    await dismissAllNotifications(user.id)
+    revalidatePath('/notifications')
+    revalidatePath('/dashboard')
+    return { ok: true as const }
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : 'Could not clear notifications',
     }
   }
 }
