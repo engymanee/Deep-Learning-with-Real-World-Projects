@@ -116,11 +116,13 @@ export function WinsDashboard({
                   </p>
                   <p className="text-xs text-muted-foreground">
                     By {win.author?.full_name || 'Anonymous'} •{' '}
-                    {new Date(win.published_at).toLocaleDateString()}
+                    {win.published_at
+                      ? new Date(win.published_at).toLocaleDateString()
+                      : 'Recently'}
                   </p>
-                  {win.framework && (
+                  {win.framework_resource && (
                     <Badge variant="secondary" className="w-fit text-xs">
-                      {win.framework}
+                      {win.framework_resource.title}
                     </Badge>
                   )}
                 </li>
