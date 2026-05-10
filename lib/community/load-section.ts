@@ -78,20 +78,6 @@ export async function loadSectionPosts(
 
   const supabase = await createClient()
 
-  // Get current user for visibility filtering
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  // Get user's cohort for visibility filtering (if applicable)
-  let userCohortId: string | null = null
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('cohort_id')
-      .eq('id', user.id)
-      .single()
-    userCohortId = profile?.cohort_id ?? null
-  }
-
   let q = supabase
     .from('community_posts')
     .select(
@@ -112,14 +98,9 @@ export async function loadSectionPosts(
     q = q.eq('is_archived', false)
   }
 
-  // Visibility filtering: users can see:
-  // - All posts with visibility='public'
-  // - Posts with visibility='cohort' if in same cohort
-  // - Posts with visibility='school_team' if in same school team (posts owned by user or same team)
-  // For now, we'll use a simple approach: filter by visibility field
-  q = q.or(
-    `visibility.eq.public,and(visibility.eq.cohort,visibility_scope_id.eq.${userCohortId})`,
-  )
+  // Visibility filtering: for now, show all visibility.eq.public posts
+  // TODO: implement cohort/school_team filtering with user context
+  q = q.eq('visibility', 'public')
 
   // Free-text search: match the term anywhere in title/excerpt/body.
   // Using `.or()` with three ILIKE filters keeps it index-free but
