@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ChevronRight, X } from 'lucide-react'
+import { ChevronRight, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface ReflectionDisplayProps {
@@ -13,9 +13,9 @@ interface ReflectionDisplayProps {
 }
 
 /**
- * Bottom panel that displays a submitted reflection in real-time.
- * Shows the reflection text with an option to clear it and a "Next Item"
- * navigation button when available.
+ * Bottom panel that displays a confirmation message after reflection submission.
+ * Shows a clean confirmation with a link to view the reflection in the
+ * Fellow Reflections community space and a button to proceed to next item.
  */
 export function ReflectionDisplay({
   reflection,
@@ -37,40 +37,28 @@ export function ReflectionDisplay({
     <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card shadow-lg animate-in slide-in-from-bottom-4">
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4">
-          {/* Header with close button */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Your reflection on {contentTitle}
+          {/* Confirmation message with icon */}
+          <div className="flex items-start gap-3">
+            <CheckCircle className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+            <div className="flex-1 space-y-1">
+              <p className="font-medium text-foreground">
+                Your reflection has been saved.
               </p>
               <p className="text-sm text-muted-foreground">
-                Successfully submitted to your community journal
+                You can now view it in{' '}
+                <Link
+                  href="/community/reflections"
+                  className="font-medium text-primary hover:underline"
+                >
+                  Fellow Reflections
+                </Link>
+                .
               </p>
             </div>
-            <button
-              onClick={() => {
-                setIsVisible(false)
-                onClear?.()
-              }}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Close reflection panel"
-            >
-              <X className="h-5 w-5" />
-            </button>
           </div>
 
-          {/* Reflection content */}
-          <div className="rounded-lg border border-border bg-muted/40 p-4">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-              {reflection}
-            </p>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Your reflection is now visible in the community reflections feed
-            </p>
+          {/* Navigation button */}
+          <div className="flex justify-end">
             {nextHref && (
               <Link href={nextHref}>
                 <Button
@@ -78,7 +66,7 @@ export function ReflectionDisplay({
                   size="sm"
                   className="gap-2"
                 >
-                  Next Item
+                  Go to next item
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </Link>
