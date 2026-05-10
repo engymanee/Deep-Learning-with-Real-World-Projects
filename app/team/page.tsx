@@ -77,21 +77,12 @@ export default async function TeamPage() {
 
         {/* Foundation attribution section */}
         <section className="border-t border-border bg-card">
-          <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8">
-              <div className="flex-1">
-                <p className="italic text-foreground leading-relaxed mb-4 text-xs">
-                  This project was made possible through the support of Grant 63617 from the John Templeton Foundation. The opinions expressed in this project are those of the grantee and do not necessarily reflect the views of the John Templeton Foundation.
-                </p>
-              </div>
-              <div className="flex-shrink-0 lg:text-right">
-                <img
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-kCoiFTogFnqrrOloeNsvOSi9SOMEDN.png"
-                  alt="John Templeton Foundation"
-                  className="h-32 w-auto"
-                />
-              </div>
-            </div>
+          <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16 text-center">
+            <img
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-kCoiFTogFnqrrOloeNsvOSi9SOMEDN.png"
+              alt="John Templeton Foundation"
+              className="h-32 w-auto inline-block"
+            />
           </div>
         </section>
 
