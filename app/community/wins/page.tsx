@@ -5,7 +5,7 @@ import { PostFeed } from '@/components/community/post-feed'
 import { SectionHeader } from '@/components/community/section-header'
 import { getSectionBySlug } from '@/lib/community/sections'
 import { loadSectionPosts } from '@/lib/community/load-section'
-import { loadPwfProtocols } from '@/lib/community/load-frameworks'
+import { loadMyResourcesPwfProtocols } from '@/lib/community/load-my-pwf-protocols'
 import {
   loadWinsStats,
   loadWinsByFramework,
@@ -44,7 +44,7 @@ export default async function WinsPage({ searchParams }: PageProps) {
     recentWins,
   ] = await Promise.all([
     loadSectionPosts('wins', { query: query || undefined }),
-    loadPwfProtocols(),
+    loadMyResourcesPwfProtocols(),
     loadWinsStats(),
     loadWinsByFramework(),
     loadWinsOverTime(6),

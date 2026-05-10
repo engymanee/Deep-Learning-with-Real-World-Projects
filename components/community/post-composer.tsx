@@ -276,15 +276,13 @@ export function PostComposer({
               maxLength={10_000}
               disabled={pending}
             />
-            <p className="text-xs text-muted-foreground">
-              {body.length.toLocaleString()}/10,000 characters
-              {!requireStarRating && (
-                <>
-                  {' · '}
-                  Tip: use #hashtags to make your post easier to find.
-                </>
-              )}
-            </p>
+            {!requireStarRating && (
+              <p className="text-xs text-muted-foreground">
+                {body.length.toLocaleString()}/10,000 characters
+                {' · '}
+                Tip: use #hashtags to make your post easier to find.
+              </p>
+            )}
           </div>
 
           {offerFrameworks && !requireStarRating && (
