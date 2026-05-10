@@ -207,6 +207,43 @@ async function attachUserId(invitationId: string, userId: string) {
 }
 
 /**
+ * Mark every still-open invitation for this email address as
+ * accepted. Called from both activation paths once the recipient
+ * finishes setup (password set, or 6-digit code verified). Only
+ * touches rows in `pending` or `sent` so we never accidentally
+ * downgrade a row that admin tooling has already moved out (e.g.
+ * cancelled / expired).
+ *
+ * Best-effort: failures are swallowed because the user has already
+ * been signed in by the time we call this; we don't want a stale
+ * audit row to block their access. Errors are surfaced to logs.
+ */
+export async function markInvitationAccepted(rawEmail: string): Promise<void> {
+  const email = String(rawEmail ?? '')
+    .trim()
+    .toLowerCase()
+  if (!email) return
+
+  const admin = createAdminClient()
+  const now = new Date().toISOString()
+
+  try {
+    await admin
+      .from('invitations')
+      .update({
+        status: 'accepted',
+        accepted_at: now,
+        last_error: null,
+        updated_at: now,
+      })
+      .eq('email', email)
+      .in('status', ['pending', 'sent'])
+  } catch (err) {
+    console.log('[v0] markInvitationAccepted failed', email, err)
+  }
+}
+
+/**
  * Apply the invite-time profile metadata. The handle_new_user trigger
  * has already created the profiles row; we enrich it with title / role
  * / cohort, and (optionally) attach the user to a school team.

@@ -45,6 +45,14 @@ import {
 
 type SchoolTeam = { id: string; name: string }
 
+type InvitationStatus =
+  | 'pending'
+  | 'sent'
+  | 'accepted'
+  | 'failed'
+  | 'expired'
+  | 'cancelled'
+
 type UserRowData = {
   id: string
   full_name: string | null
@@ -58,6 +66,8 @@ type UserRowData = {
   last_sign_in_at: string | null
   invited_at: string | null
   email_confirmed_at: string | null
+  invitation_status: InvitationStatus | null
+  invitation_last_sent_at: string | null
 }
 
 const NONE_TEAM = '__none__'
@@ -257,6 +267,7 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: SchoolT
           isDeactivated={isDeactivated}
           isPending={isPending}
           lastSignInAt={user.last_sign_in_at}
+          invitationStatus={user.invitation_status}
         />
         {toast && <p className="mt-1 text-xs text-muted-foreground">{toast}</p>}
       </div>
@@ -373,14 +384,30 @@ export function UserRow({ user, cohorts }: { user: UserRowData; cohorts: SchoolT
   )
 }
 
+/**
+ * Invitation-aware status. Order of precedence:
+ *   1. Deactivated wins everything (the user is locked out).
+ *   2. The invitations row, if any, drives the activation states:
+ *      - sent / pending  -> "Invited"   (waiting for activation)
+ *      - failed          -> "Send failed"
+ *      - expired         -> "Expired"
+ *      - cancelled       -> "Cancelled"
+ *      - accepted        -> fall through to the auth-based label
+ *        below (so we show "Last seen ..." for active users instead
+ *        of a stale "Accepted" forever).
+ *   3. Auth-derived fallback: "Invited" if email never confirmed +
+ *      never signed in, otherwise last-seen / Active.
+ */
 function StatusBadge({
   isDeactivated,
   isPending,
   lastSignInAt,
+  invitationStatus,
 }: {
   isDeactivated: boolean
   isPending: boolean
   lastSignInAt: string | null
+  invitationStatus: InvitationStatus | null
 }) {
   if (isDeactivated) {
     return (
@@ -389,6 +416,36 @@ function StatusBadge({
       </Badge>
     )
   }
+
+  if (invitationStatus === 'sent' || invitationStatus === 'pending') {
+    return (
+      <Badge variant="secondary" className="text-xs">
+        Invited
+      </Badge>
+    )
+  }
+  if (invitationStatus === 'failed') {
+    return (
+      <Badge variant="outline" className="text-xs text-destructive border-destructive/40">
+        Send failed
+      </Badge>
+    )
+  }
+  if (invitationStatus === 'expired') {
+    return (
+      <Badge variant="outline" className="text-xs text-muted-foreground">
+        Expired
+      </Badge>
+    )
+  }
+  if (invitationStatus === 'cancelled') {
+    return (
+      <Badge variant="outline" className="text-xs text-muted-foreground">
+        Cancelled
+      </Badge>
+    )
+  }
+
   if (isPending) {
     return (
       <Badge variant="secondary" className="text-xs">
