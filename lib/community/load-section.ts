@@ -10,12 +10,52 @@ interface RawPostRow {
   excerpt: string | null
   cover_url: string | null
   published_at: string | null
+  // Admin moderation fields (migration 049). featured_at floats a
+  // post above the rest of the feed; is_archived hides it from
+  // fellows but keeps it readable by admins.
+  featured_at: string | null
+  is_archived: boolean | null
+  framework_resource_id: string | null
+  // Embedded framework row, populated only when framework_resource_id
+  // is set. We pull just the fields the chip needs.
+  framework: {
+    id: string
+    title: string
+    resource_url: string | null
+  } | null
+  ask_category: string | null
+  ask_status: string | null
   author: {
     id: string
     full_name: string | null
     email: string | null
     avatar_url: string | null
   } | null
+}
+
+/** Options for filtering / scoping the section feed. */
+export interface LoadSectionOptions {
+  /**
+   * Free-text search term. Matched against title + excerpt + body
+   * via Postgres ILIKE so it picks up hashtags ("#literacy") and
+   * keywords without needing a separate tags table.
+   */
+  query?: string
+  /**
+   * Optional ask category filter. Only meaningful for the Ask
+   * section. Ignored for sections that don't track categories.
+   */
+  askCategory?: string
+  /**
+   * Optional ask status filter (open / answered / closed). Only
+   * meaningful for the Ask section.
+   */
+  askStatus?: string
+  /**
+   * When true, archived posts are included (admin moderation views).
+   * Defaults to false so fellows never see archived posts.
+   */
+  includeArchived?: boolean
 }
 
 /**
@@ -29,6 +69,7 @@ interface RawPostRow {
  */
 export async function loadSectionPosts(
   slug: string,
+  options: LoadSectionOptions = {},
 ): Promise<CommunityPostListItem[]> {
   const section = getSectionBySlug(slug)
   if (!section) throw new Error(`Unknown community section: ${slug}`)
@@ -37,16 +78,50 @@ export async function loadSectionPosts(
   }
 
   const supabase = await createClient()
-  const { data } = await supabase
+
+  let q = supabase
     .from('community_posts')
     .select(
       `
       id, kind, title, excerpt, cover_url, published_at,
+      featured_at, is_archived,
+      framework_resource_id, ask_category, ask_status,
+      framework:framework_resource_id ( id, title, resource_url ),
       author:created_by ( id, full_name, email, avatar_url )
       `,
     )
     .in('kind', section.postKinds)
     .not('published_at', 'is', null)
+
+  // Hide archived rows from non-admin views by default. Admin pages
+  // pass includeArchived=true explicitly so they can moderate.
+  if (!options.includeArchived) {
+    q = q.eq('is_archived', false)
+  }
+
+  // Free-text search: match the term anywhere in title/excerpt/body.
+  // Using `.or()` with three ILIKE filters keeps it index-free but
+  // simple - if/when the corpus grows we can swap in a tsvector.
+  const term = options.query?.trim()
+  if (term) {
+    const escaped = term.replace(/[%_]/g, (c) => `\\${c}`)
+    const pattern = `%${escaped}%`
+    q = q.or(
+      `title.ilike.${pattern},excerpt.ilike.${pattern},body.ilike.${pattern}`,
+    )
+  }
+
+  if (options.askCategory) {
+    q = q.eq('ask_category', options.askCategory)
+  }
+  if (options.askStatus) {
+    q = q.eq('ask_status', options.askStatus)
+  }
+
+  // Featured posts float to the top, then everything by published
+  // date. NULLS LAST keeps un-featured below featured deterministically.
+  const { data } = await q
+    .order('featured_at', { ascending: false, nullsFirst: false })
     .order('published_at', { ascending: false })
     .limit(100)
     .returns<RawPostRow[]>()
@@ -58,6 +133,11 @@ export async function loadSectionPosts(
     cover_url: p.cover_url,
     published_at: p.published_at,
     kind: p.kind,
+    featured_at: p.featured_at,
+    is_archived: p.is_archived ?? false,
+    framework: p.framework,
+    ask_category: p.ask_category,
+    ask_status: p.ask_status,
     author: p.author,
   }))
 }
