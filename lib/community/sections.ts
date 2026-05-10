@@ -117,7 +117,7 @@ export const COMMUNITY_SECTIONS: CommunitySection[] = [
     slug: 'wins',
     label: 'Wins & Progress',
     description:
-      'Celebrate how schools are applying the framework - small wins count.',
+      'Share a win about applying one of the Practical Wisdom Framework protocols.',
     icon: Trophy,
     postKinds: ['win'],
     writeKind: 'win',
@@ -125,8 +125,8 @@ export const COMMUNITY_SECTIONS: CommunitySection[] = [
     emptyTitle: 'No wins shared yet',
     emptyCopy:
       'Be the first to share a moment of progress - momentum starts here.',
-    composerTitlePlaceholder: 'A win worth sharing…',
-    composerBodyPlaceholder: 'What worked? Who was it for? What changed?',
+    composerTitlePlaceholder: '',
+    composerBodyPlaceholder: '',
     composerCta: 'Share a win',
   },
   {

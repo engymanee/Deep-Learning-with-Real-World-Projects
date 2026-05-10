@@ -128,9 +128,19 @@ export function PostComposer({
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
-    const t = title.trim()
+    
+    // For wins, the framework is the "title" - validate it's selected
+    if (requireStarRating) {
+      if (framework === NO_FRAMEWORK) {
+        return setError('Select a PWF Protocol.')
+      }
+    } else {
+      // For non-wins, validate the title
+      const t = title.trim()
+      if (!t) return setError('Add a title.')
+    }
+    
     const b = body.trim()
-    if (!t) return setError('Add a title.')
     if (!b) return setError('Add some content.')
     if (requireAskCategory && askCategory === NO_CATEGORY) {
       return setError('Pick a category for your question.')
@@ -142,7 +152,7 @@ export function PostComposer({
     startTransition(async () => {
       const result = await createCommunityPost({
         kind: writeKind,
-        title: t,
+        title: requireStarRating ? framework : title.trim(),
         body: b,
         frameworkResourceId:
           framework === NO_FRAMEWORK ? null : framework,
@@ -182,18 +192,45 @@ export function PostComposer({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="composer-title">Title</Label>
-            <Input
-              id="composer-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={titlePlaceholder}
-              maxLength={200}
-              autoFocus
-              disabled={pending}
-            />
-          </div>
+          {requireStarRating ? (
+            // Wins composer: framework dropdown instead of title input
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="composer-framework">
+                Which of the Practical Wisdom Framework (PWF)™ would you like to share a win about?
+              </Label>
+              <Select
+                value={framework}
+                onValueChange={setFramework}
+                disabled={pending}
+              >
+                <SelectTrigger id="composer-framework">
+                  <SelectValue placeholder="Select a PWF Protocol" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_FRAMEWORK}>None</SelectItem>
+                  {frameworks!.map((fw) => (
+                    <SelectItem key={fw.id} value={fw.id}>
+                      {fw.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            // Standard title input for non-wins
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="composer-title">Title</Label>
+              <Input
+                id="composer-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={titlePlaceholder}
+                maxLength={200}
+                autoFocus
+                disabled={pending}
+              />
+            </div>
+          )}
 
           {requireAskCategory && (
             <div className="flex flex-col gap-1.5">
@@ -222,27 +259,30 @@ export function PostComposer({
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="composer-body">Content</Label>
+            <Label htmlFor="composer-body">
+              {requireStarRating ? 'Tell us more:' : 'Content'}
+            </Label>
             <Textarea
               id="composer-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder={bodyPlaceholder}
+              placeholder={requireStarRating ? '' : bodyPlaceholder}
               rows={7}
               maxLength={10_000}
               disabled={pending}
             />
             <p className="text-xs text-muted-foreground">
               {body.length.toLocaleString()}/10,000 characters
-              {/* Tip about hashtags - they're rendered live on the
-                  post detail page and the search bar treats them like
-                  any other word. */}
-              {' · '}
-              Tip: use #hashtags to make your post easier to find.
+              {!requireStarRating && (
+                <>
+                  {' · '}
+                  Tip: use #hashtags to make your post easier to find.
+                </>
+              )}
             </p>
           </div>
 
-          {offerFrameworks && (
+          {offerFrameworks && !requireStarRating && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="composer-framework">
                 PWF Protocol used (optional)
@@ -273,7 +313,7 @@ export function PostComposer({
 
           {requireStarRating && (
             <div className="flex flex-col gap-1.5">
-              <Label>How valuable was this win?</Label>
+              <Label>What's your star rating for this protocol?</Label>
               <div className="flex items-center gap-2">
                 {[1, 2, 3, 4, 5].map((rating) => (
                   <button
@@ -295,9 +335,6 @@ export function PostComposer({
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Rate the impact and applicability of this win.
-              </p>
             </div>
           )}
 
