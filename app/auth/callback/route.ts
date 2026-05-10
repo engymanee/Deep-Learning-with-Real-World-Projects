@@ -1,22 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { EmailOtpType } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 
 /**
  * OAuth / invite / recovery landing endpoint.
  *
- * Supabase's email templates all point at `{SITE_URL}/auth/callback?code=...
- * &next=...` (with PKCE). Invite emails in particular follow the flow:
+ * Supports both link formats so older invitation emails keep working:
  *
- *   email link -> Supabase verify endpoint -> /auth/callback?code=...&next=/auth/set-password
+ * 1. PKCE code exchange (Supabase hosted email templates, OAuth):
+ *      /auth/callback?code=...&next=...
  *
- * We exchange the one-time code for a real session (which sets the auth
- * cookies on this response), then redirect to `next`. If the code is
- * missing, already used, or expired we bounce to `/auth/error` with a
- * short explanation so the admin can resend.
+ * 2. OTP token-hash verify (our Resend-sent invitation/magiclink/recovery
+ *    emails, before we moved them to /auth/confirm):
+ *      /auth/callback?token_hash=...&type=invite&next=...
+ *
+ * In both cases we set the session cookies on this response and redirect
+ * to `next`. Failures bounce to /auth/error with a short reason so the
+ * admin can resend.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const code = searchParams.get('code')
+  const tokenHash = searchParams.get('token_hash')
+  const type = searchParams.get('type') as EmailOtpType | null
   const errorDescription = searchParams.get('error_description')
   // Default to "/" so the root page's role-aware redirect picks the
   // right home (admins -> /admin, everyone else -> /dashboard).
@@ -25,26 +31,45 @@ export async function GET(request: NextRequest) {
   // Only allow relative redirects to prevent open-redirect abuse.
   const next = rawNext.startsWith('/') ? rawNext : '/'
 
+  console.log('[v0] /auth/callback hit', {
+    hasCode: !!code,
+    hasTokenHash: !!tokenHash,
+    type,
+    next,
+    errorDescription,
+  })
+
   if (errorDescription) {
     return NextResponse.redirect(
       `${origin}/auth/error?message=${encodeURIComponent(errorDescription)}`,
     )
   }
 
-  if (!code) {
-    return NextResponse.redirect(
-      `${origin}/auth/error?message=${encodeURIComponent('Missing sign-in code')}`,
-    )
-  }
-
   const supabase = await createClient()
-  const { error } = await supabase.auth.exchangeCodeForSession(code)
 
-  if (error) {
-    return NextResponse.redirect(
-      `${origin}/auth/error?message=${encodeURIComponent(error.message)}`,
-    )
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) {
+      console.log('[v0] exchangeCodeForSession failed', error.message)
+      return NextResponse.redirect(
+        `${origin}/auth/error?message=${encodeURIComponent(error.message)}`,
+      )
+    }
+    return NextResponse.redirect(`${origin}${next}`)
   }
 
-  return NextResponse.redirect(`${origin}${next}`)
+  if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash })
+    if (error) {
+      console.log('[v0] verifyOtp failed', error.message)
+      return NextResponse.redirect(
+        `${origin}/auth/error?message=${encodeURIComponent(error.message)}`,
+      )
+    }
+    return NextResponse.redirect(`${origin}${next}`)
+  }
+
+  return NextResponse.redirect(
+    `${origin}/auth/error?message=${encodeURIComponent('Missing sign-in code')}`,
+  )
 }
