@@ -22,7 +22,7 @@ export default async function TeamPage() {
           <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
             <div className="space-y-6">
               <div>
-                <h1 className="font-serif text-4xl sm:text-5xl text-foreground font-bold mb-4">
+                <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4">
                   Welcome to the Wisdom at Work Fellows&apos; Portal
                 </h1>
                 <p className="text-lg text-foreground font-medium mb-3 text-center">
