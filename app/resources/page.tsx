@@ -84,7 +84,16 @@ export default async function LibraryPage() {
   }
 
   const myResources: LibraryResource[] = cohortGatedRows.map(toResource)
-  const furtherReading: LibraryResource[] = universalRows.map(toResource)
+  // Further Reading (Recommended): filter to only include Readings,
+  // Videos, and Documents. Exclude Field Guides (link type).
+  const furtherReading: LibraryResource[] = universalRows
+    .filter((r) => {
+      const type = VALID_TYPES.has(r.resource_type)
+        ? r.resource_type
+        : 'reading'
+      return type !== 'link'
+    })
+    .map(toResource)
 
   const canManage = user.role === 'admin' || user.role === 'facilitator'
   // Cohort labels are program-internal staging metadata. Surface
