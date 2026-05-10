@@ -8,6 +8,7 @@ interface RawPostRow {
   kind: string
   title: string
   excerpt: string | null
+  body: string | null
   cover_url: string | null
   published_at: string | null
   // Admin moderation fields (migration 049). featured_at floats a
@@ -25,6 +26,7 @@ interface RawPostRow {
   } | null
   ask_category: string | null
   ask_status: string | null
+  star_rating: number | null
   author: {
     id: string
     full_name: string | null
@@ -83,9 +85,9 @@ export async function loadSectionPosts(
     .from('community_posts')
     .select(
       `
-      id, kind, title, excerpt, cover_url, published_at,
+      id, kind, title, excerpt, body, cover_url, published_at,
       featured_at, is_archived,
-      framework_resource_id, ask_category, ask_status,
+      framework_resource_id, ask_category, ask_status, star_rating,
       framework:framework_resource_id ( id, title, resource_url ),
       author:created_by ( id, full_name, email, avatar_url )
       `,
@@ -130,6 +132,7 @@ export async function loadSectionPosts(
     id: p.id,
     title: p.title,
     excerpt: p.excerpt,
+    body: p.body,
     cover_url: p.cover_url,
     published_at: p.published_at,
     kind: p.kind,
@@ -138,6 +141,7 @@ export async function loadSectionPosts(
     framework: p.framework,
     ask_category: p.ask_category,
     ask_status: p.ask_status,
+    star_rating: p.star_rating,
     author: p.author,
   }))
 }
