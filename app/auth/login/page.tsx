@@ -14,7 +14,11 @@ import { Label } from '@/components/ui/label'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { KeyRound, Mail } from 'lucide-react'
-import { requestSignInCodeAction, verifyEmailLoginCodeAction } from './actions'
+import {
+  requestSignInCodeAction,
+  verifyEmailLoginCodeAction,
+  requestPasswordSetupAction,
+} from './actions'
 
 type Method = 'password' | 'code'
 type CodeStep = 'request' | 'verify'
@@ -56,12 +60,66 @@ function LoginForm() {
   const [code, setCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
+  // "Set or reset password" inline panel. We render this in place of
+  // the password/code forms when the user clicks the entry link, so
+  // they never leave the login card. Outcomes: 'idle' (default form),
+  // 'form' (collecting email), 'sent' (confirmation message).
+  type SetupView = 'hidden' | 'form' | 'sent'
+  const [setupView, setSetupView] = useState<SetupView>('hidden')
+  const [setupEmail, setSetupEmail] = useState(presetEmail)
+  const [setupSentTo, setSetupSentTo] = useState<string | null>(null)
+  const [setupError, setSetupError] = useState<string | null>(null)
+  const [setupLoading, setSetupLoading] = useState(false)
+
   function switchMethod(next: Method) {
     setMethod(next)
     setError(null)
     setCodeSentTo(null)
     setCodeStep('request')
     setCode('')
+    // Switching method also collapses any open setup panel so the
+    // user gets a clean form for the new method.
+    setSetupView('hidden')
+    setSetupError(null)
+  }
+
+  function openSetup() {
+    setSetupView('form')
+    // Seed the setup field from whichever email the user already
+    // typed (password tab or code tab) so they don't have to re-type.
+    setSetupEmail((prev) => prev || email || presetEmail)
+    setSetupError(null)
+    setSetupSentTo(null)
+  }
+
+  async function handleSetupSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSetupError(null)
+
+    const trimmed = setupEmail.trim().toLowerCase()
+    if (!trimmed) {
+      setSetupError('Enter your program email to continue.')
+      return
+    }
+
+    setSetupLoading(true)
+    try {
+      // The server action returns ok=true even when the email isn't
+      // registered, so we never disclose account existence. Any
+      // non-ok response is a real (transient) error worth surfacing.
+      const result = await requestPasswordSetupAction(trimmed)
+      if (!result.ok) throw new Error(result.error)
+      setSetupSentTo(result.email)
+      setSetupView('sent')
+    } catch (err: unknown) {
+      setSetupError(
+        err instanceof Error
+          ? err.message
+          : 'Could not send the password setup email. Try again in a moment.',
+      )
+    } finally {
+      setSetupLoading(false)
+    }
   }
 
   async function handlePasswordLogin(e: React.FormEvent) {
@@ -160,6 +218,26 @@ function LoginForm() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
+        {setupView !== 'hidden' ? (
+          <PasswordSetupPanel
+            view={setupView}
+            email={setupEmail}
+            sentTo={setupSentTo}
+            error={setupError}
+            isLoading={setupLoading}
+            onEmailChange={setSetupEmail}
+            onSubmit={handleSetupSubmit}
+            onCancel={() => {
+              setSetupView('hidden')
+              setSetupError(null)
+            }}
+            onResend={() => {
+              setSetupView('form')
+              setSetupSentTo(null)
+            }}
+          />
+        ) : (
+          <>
         <MethodPicker method={method} onChange={switchMethod} disabled={isLoading} />
 
         {method === 'password' ? (
@@ -195,6 +273,16 @@ function LoginForm() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              <button
+                type="button"
+                onClick={openSetup}
+                className="underline underline-offset-2 hover:text-foreground"
+                disabled={isLoading}
+              >
+                Forgot or need to set a password?
+              </button>
+            </p>
           </form>
         ) : codeStep === 'request' ? (
           <form onSubmit={handleCodeSend} className="flex flex-col gap-4">
@@ -222,6 +310,16 @@ function LoginForm() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Sending code...' : 'Email me a sign-in code'}
             </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              <button
+                type="button"
+                onClick={openSetup}
+                className="underline underline-offset-2 hover:text-foreground"
+                disabled={isLoading}
+              >
+                Want a password instead? Set one up
+              </button>
+            </p>
           </form>
         ) : (
           <form onSubmit={handleCodeVerify} className="flex flex-col gap-4">
@@ -297,6 +395,8 @@ function LoginForm() {
               </button>
             </div>
           </form>
+        )}
+          </>
         )}
 
         <p className="text-center text-xs text-muted-foreground">
@@ -378,6 +478,116 @@ function MethodTab({
       {icon}
       {label}
     </button>
+  )
+}
+
+/**
+ * Inline panel rendered inside the login card when the user clicks
+ * "Forgot or need to set a password?". Two views:
+ *
+ *   - 'form' collects the email and dispatches the request.
+ *   - 'sent' shows a generic success message. The wording is
+ *     intentionally the same regardless of whether the email matched
+ *     a real account, so we never disclose account existence.
+ */
+function PasswordSetupPanel({
+  view,
+  email,
+  sentTo,
+  error,
+  isLoading,
+  onEmailChange,
+  onSubmit,
+  onCancel,
+  onResend,
+}: {
+  view: 'form' | 'sent'
+  email: string
+  sentTo: string | null
+  error: string | null
+  isLoading: boolean
+  onEmailChange: (next: string) => void
+  onSubmit: (e: React.FormEvent) => void
+  onCancel: () => void
+  onResend: () => void
+}) {
+  if (view === 'sent') {
+    return (
+      <div className="flex flex-col gap-4">
+        <div
+          role="status"
+          className="rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground"
+        >
+          <p className="font-medium text-foreground">Check your inbox</p>
+          <p className="mt-1 text-muted-foreground">
+            If an account exists for{' '}
+            <span className="font-medium text-foreground">{sentTo}</span>, we sent a
+            link to set or reset its password. The link expires in 1 hour.
+          </p>
+        </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Back to sign in
+          </button>
+          <button
+            type="button"
+            onClick={onResend}
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Use a different email
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        <p className="text-foreground">Set or reset your password</p>
+        <p className="mt-1">
+          Enter the email on your Wisdom At Work account and we&apos;ll send a link
+          to choose a new password. After that, you can sign in with either your
+          password or a one-time email code.
+        </p>
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="setup-email">Email</Label>
+        <Input
+          id="setup-email"
+          type="email"
+          autoComplete="email"
+          placeholder="name@school.edu"
+          required
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          disabled={isLoading}
+        />
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <div className="grid gap-2">
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading ? 'Sending link...' : 'Email me a setup link'}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full"
+          onClick={onCancel}
+          disabled={isLoading}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
   )
 }
 

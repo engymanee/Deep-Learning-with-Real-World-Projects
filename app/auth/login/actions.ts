@@ -2,9 +2,10 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { sendSignInCodeEmail } from '@/lib/email/send'
+import { sendSignInCodeEmail, sendPasswordSetupEmail } from '@/lib/email/send'
 import { issueLoginCode, verifyLoginCode } from '@/lib/auth/email-login-code'
 import { markInvitationAccepted } from '@/lib/invitations/invite'
+import { siteUrl } from '@/lib/site'
 
 export type SendCodeResult =
   | { ok: true; email: string }
@@ -150,4 +151,138 @@ export async function verifyEmailLoginCodeAction(
   }
 
   return { ok: true }
+}
+
+export type PasswordSetupRequestResult =
+  | { ok: true; email: string; isReset: boolean }
+  | { ok: false; error: string }
+
+/**
+ * Sends the "set or reset your password" email triggered from the
+ * login page. Two cases share this entry point:
+ *
+ *   1. A fellow who originally activated via email-code wants to add
+ *      a password so they can sign in without a one-time code.
+ *   2. Anyone (admin or fellow) has forgotten their password.
+ *
+ * In both cases we mint a one-time recovery link via
+ * `admin.generateLink({ type: 'recovery' })` and email a CTA that
+ * lands the recipient on /auth/activate in password-only mode. The
+ * activate page already handles `type=recovery` correctly via
+ * `verifyOtp` in `activateWithPasswordAction`.
+ *
+ * Security choices:
+ *   - The portal is invite-only, so we ALWAYS confirm the email
+ *     matches a known profile. Unknown emails get a generic friendly
+ *     "if an account exists..." message so we don't leak which
+ *     emails are registered.
+ *   - The recovery link itself never auto-signs the user in. The
+ *     activate page enforces that the user must set a password
+ *     before any session is minted.
+ */
+export async function requestPasswordSetupAction(
+  rawEmail: string,
+): Promise<PasswordSetupRequestResult> {
+  const email = String(rawEmail ?? '').trim().toLowerCase()
+  if (!email) {
+    return { ok: false, error: 'Enter your program email to continue.' }
+  }
+
+  try {
+    const admin = createAdminClient()
+
+    // Look up the profile. If we can't find one, return ok=true with
+    // a generic "check your inbox" framing so we don't disclose which
+    // emails are registered. The UI surfaces the same success message
+    // either way.
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('email, full_name')
+      .eq('email', email)
+      .maybeSingle<{ email: string | null; full_name: string | null }>()
+
+    if (!profile) {
+      // Generic success - do NOT reveal that the account doesn't
+      // exist. The recipient will simply not get an email.
+      return { ok: true, email, isReset: false }
+    }
+
+    // Determine whether the user already has a password so the email
+    // copy / subject can read "Reset" vs "Set up". This is just a UX
+    // hint - the underlying flow is identical.
+    let isReset = false
+    try {
+      const { data: list } = await admin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1,
+      })
+      // listUsers doesn't filter by email; fall back to searching
+      // across the small page. For larger projects this should call
+      // a dedicated `getUserByEmail`-style helper, but our directory
+      // is small enough that scanning the first page is fine.
+      const user = list?.users.find(
+        (u) => (u.email ?? '').toLowerCase() === email,
+      )
+      // Supabase doesn't expose "has password" directly, but
+      // `user.identities` containing one with provider 'email' is a
+      // reliable proxy: an email/password account always has it.
+      // Users that only signed in via OTP / magic-link will still
+      // have an 'email' identity created on first verifyOtp, so this
+      // isn't 100% accurate. We use `last_sign_in_at` + `created_at`
+      // as a softer signal: if they've EVER signed in we treat it as
+      // a reset. Worst-case the subject just says "Reset" instead of
+      // "Set up" - functionally identical.
+      if (user?.last_sign_in_at) isReset = true
+    } catch {
+      // Best-effort. Default to "set up" framing if listUsers fails.
+    }
+
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+    })
+    const tokenHash = linkData?.properties?.hashed_token
+    if (linkErr || !tokenHash) {
+      return {
+        ok: false,
+        error:
+          linkErr?.message ??
+          'Could not generate a password setup link. Try again in a moment.',
+      }
+    }
+
+    // Build the activate URL. `mode=password-only` tells the activate
+    // page to hide the "Email me a code" option since the recipient
+    // explicitly asked for a password.
+    const params = new URLSearchParams({
+      token_hash: tokenHash,
+      type: 'recovery',
+      email,
+      mode: 'password-only',
+      next: '/',
+    })
+    const passwordSetupUrl = await siteUrl(`/auth/activate?${params.toString()}`)
+    if (!passwordSetupUrl) {
+      return {
+        ok: false,
+        error:
+          'Site URL is not configured. Set NEXT_PUBLIC_SITE_URL on the deployment.',
+      }
+    }
+
+    const sendResult = await sendPasswordSetupEmail(email, {
+      recipientName: profile.full_name,
+      passwordSetupUrl,
+      expiresAtLabel: '1 hour',
+      isReset,
+    })
+    if (!sendResult.ok) return { ok: false, error: sendResult.error }
+
+    return { ok: true, email, isReset }
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    }
+  }
 }
