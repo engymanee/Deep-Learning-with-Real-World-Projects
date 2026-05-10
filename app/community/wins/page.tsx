@@ -1,7 +1,7 @@
 import { requireUser } from '@/lib/auth-server'
 import { Star, TrendingUp, Award, Calendar } from 'lucide-react'
 import { FeedSearchBar } from '@/components/community/feed-search-bar'
-import { PostFeed } from '@/components/community/post-feed'
+import { WinsDirectory } from '@/components/community/wins-directory'
 import { SectionHeader } from '@/components/community/section-header'
 import { getSectionBySlug } from '@/lib/community/sections'
 import { loadSectionPosts } from '@/lib/community/load-section'
@@ -51,8 +51,6 @@ export default async function WinsPage({ searchParams }: PageProps) {
     loadRecentWins(5),
   ])
 
-  const isStaff = user.role === 'admin' || user.role === 'facilitator'
-
   return (
     <div className="flex flex-col gap-8">
       <SectionHeader
@@ -72,30 +70,9 @@ export default async function WinsPage({ searchParams }: PageProps) {
         recentWins={recentWins}
       />
 
-      {/* Search and Feed */}
-      <div className="flex flex-col gap-4 border-t border-border pt-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <FeedSearchBar placeholder="Search wins, hashtags, frameworks…" />
-          {query && (
-            <p className="text-xs text-muted-foreground">
-              Showing wins matching{' '}
-              <span className="font-medium text-foreground">"{query}"</span>
-            </p>
-          )}
-        </div>
-
-        <PostFeed
-          posts={posts}
-          emptyTitle={
-            query ? 'No wins match that search' : section.emptyTitle
-          }
-          emptyCopy={
-            query
-              ? 'Try a different keyword or hashtag, or clear the search to see every win.'
-              : section.emptyCopy
-          }
-          isStaff={isStaff}
-        />
+      {/* Wins Directory with Filtering */}
+      <div className="border-t border-border pt-6">
+        <WinsDirectory wins={posts} />
       </div>
     </div>
   )
