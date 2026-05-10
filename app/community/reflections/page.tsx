@@ -7,6 +7,7 @@ import {
   loadReflectionFeed,
   type CommentItem,
 } from '@/lib/community/load-reflections'
+import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: 'Fellow Reflections | Community | Leadership Fellowship',
@@ -87,7 +88,8 @@ export default async function ReflectionsPage() {
   }
 
   return (
-    <div className="flex flex-col">
+    <>
+      <div className="flex flex-col">
       {/*
         canPost is hardwired to false because reflections are now
         produced exclusively from programme content. SectionHeader
@@ -108,5 +110,7 @@ export default async function ReflectionsPage() {
         emptyCopy={section.emptyCopy}
       />
     </div>
+    <Footer />
+    </>
   )
 }

@@ -3,6 +3,7 @@ import { loadTeamProgress } from '@/lib/team-progress'
 import { LiveSessionCard } from '@/components/dashboard/live-session-card'
 import { NotificationsFeed } from '@/components/notifications/notifications-feed'
 import { PhaseProgressSection } from '@/components/dashboard/phase-progress-section'
+import { Footer } from '@/components/footer'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,35 +30,38 @@ export default async function DashboardPage() {
   ])
 
   return (
-    <div className="space-y-10">
-      <header className="space-y-2">
-        <h1 className="font-serif text-3xl text-primary md:text-4xl">
-          Welcome back, {data.user.fullName}
-        </h1>
-        <p className="text-muted-foreground">
-          Pick up where you left off - choose a content item from the
-          curriculum on the left.
-        </p>
-      </header>
+    <>
+      <div className="space-y-10">
+        <header className="space-y-2">
+          <h1 className="font-serif text-3xl text-primary md:text-4xl">
+            Welcome back, {data.user.fullName}
+          </h1>
+          <p className="text-muted-foreground">
+            Pick up where you left off - choose a content item from the
+            curriculum on the left.
+          </p>
+        </header>
 
-      {/* Unified notifications (announcements, reminders, alerts)
-          pinned at the top of the page. Full inbox lives at
-          /notifications. */}
-      <NotificationsFeed
-        items={data.notifications}
-        collapsible
-        heading="Notifications"
-      />
+        {/* Unified notifications (announcements, reminders, alerts)
+            pinned at the top of the page. Full inbox lives at
+            /notifications. */}
+        <NotificationsFeed
+          items={data.notifications}
+          collapsible
+          heading="Notifications"
+        />
 
-      {/* Upcoming live session (only within 7 days). */}
-      {data.upcomingSession && <LiveSessionCard session={data.upcomingSession} />}
+        {/* Upcoming live session (only within 7 days). */}
+        {data.upcomingSession && <LiveSessionCard session={data.upcomingSession} />}
 
-      {/* Per-phase progress meters: you + your cohort teammates. */}
-      <PhaseProgressSection
-        phases={teamProgress.phases}
-        meName={data.user.fullName}
-        teammateCount={teamProgress.teammateCount}
-      />
-    </div>
+        {/* Per-phase progress meters: you + your cohort teammates. */}
+        <PhaseProgressSection
+          phases={teamProgress.phases}
+          meName={data.user.fullName}
+          teammateCount={teamProgress.teammateCount}
+        />
+      </div>
+      <Footer />
+    </>
   )
 }

@@ -22,6 +22,7 @@ import {
 import { initialsFor } from '@/lib/types/profile'
 import { loadCommunityDashboard } from '@/lib/community/load-dashboard'
 import { ASK_CATEGORY_BY_VALUE } from '@/lib/community/ask-categories'
+import { Footer } from '@/components/footer'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,8 @@ export default async function CommunityDashboardPage() {
   const data = await loadCommunityDashboard()
 
   return (
-    <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    <>
+      <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
@@ -430,6 +432,8 @@ function AuthorLine({
         </>
       )}
     </div>
+    <Footer />
+    </>
   )
 }
 

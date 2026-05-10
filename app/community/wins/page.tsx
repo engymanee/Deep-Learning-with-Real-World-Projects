@@ -13,6 +13,7 @@ import {
   loadRecentWins,
 } from '@/lib/community/load-wins'
 import { WinsDashboard } from '@/components/community/wins-dashboard'
+import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: 'Wins & Progress | Community | Leadership Fellowship',
@@ -54,7 +55,8 @@ export default async function WinsPage({ searchParams }: PageProps) {
   const isStaff = user.role === 'admin' || user.role === 'facilitator'
 
   return (
-    <div className="flex flex-col gap-8">
+    <>
+      <div className="flex flex-col gap-8">
       <SectionHeader
         section={section}
         count={posts.length}
@@ -98,5 +100,7 @@ export default async function WinsPage({ searchParams }: PageProps) {
         />
       </div>
     </div>
+    <Footer />
+    </>
   )
 }

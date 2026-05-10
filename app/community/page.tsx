@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
 import { COMMUNITY_SECTIONS } from '@/lib/community/sections'
 import { Badge } from '@/components/ui/badge'
+import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: 'Community | Leadership Fellowship',
@@ -58,7 +59,8 @@ export default async function CommunityOverviewPage() {
   )
 
   return (
-    <div className="flex flex-col gap-8">
+    <>
+      <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-2">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -165,5 +167,7 @@ export default async function CommunityOverviewPage() {
         </ul>
       </section>
     </div>
+    <Footer />
+    </>
   )
 }

@@ -9,6 +9,7 @@ import {
   ASK_CATEGORY_VALUES,
   type AskStatus,
 } from '@/lib/community/ask-categories'
+import { Footer } from '@/components/footer'
 
 export const metadata = {
   title: 'Ask the Community | Leadership Fellowship',
@@ -55,7 +56,8 @@ export default async function AskPage({ searchParams }: PageProps) {
   const isStaff = user.role === 'admin' || user.role === 'facilitator'
 
   return (
-    <div className="flex flex-col">
+    <>
+      <div className="flex flex-col">
       <SectionHeader
         section={section}
         count={posts.length}
@@ -76,5 +78,7 @@ export default async function AskPage({ searchParams }: PageProps) {
         isStaff={isStaff}
       />
     </div>
+    <Footer />
+    </>
   )
 }
