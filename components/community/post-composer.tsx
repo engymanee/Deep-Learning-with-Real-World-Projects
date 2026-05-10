@@ -207,11 +207,17 @@ export function PostComposer({
                   <SelectValue placeholder="Select a PWF Protocol" />
                 </SelectTrigger>
                 <SelectContent>
-                  {frameworks!.map((fw) => (
-                    <SelectItem key={fw.id} value={fw.id}>
-                      {fw.title}
+                  {frameworks && frameworks.length > 0 ? (
+                    frameworks.map((fw) => (
+                      <SelectItem key={fw.id} value={fw.id}>
+                        {fw.title}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="_empty" disabled>
+                      No PWF Protocols available
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
             </div>
