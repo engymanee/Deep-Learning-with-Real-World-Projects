@@ -38,20 +38,48 @@ export interface InviteResult {
 
 /**
  * Computes the absolute redirect URL Supabase should bounce the
- * invitee to after they click the magic link. Mirrors the existing
- * /auth/callback pattern that exchanges the code for a session and
- * forwards to /auth/set-password.
+ * invitee to after they click the magic link. Used as the post-OTP
+ * `next` step (set-password) on the verify route.
  */
 async function buildRedirectTo(): Promise<string | undefined> {
-  const origin = await siteUrl('/auth/callback?next=/auth/set-password')
+  const origin = await siteUrl('/auth/set-password')
   return origin ?? undefined
 }
 
 /**
- * Generates a one-time action link for the email. Tries `invite`
- * first - which both creates the auth user and returns the link
- * without sending any email. If the user already exists, falls back
- * to a `magiclink` so resending works idempotently.
+ * Builds the branded action link the recipient will click in their
+ * email. Instead of using Supabase's hosted `action_link` (which
+ * routes through `/auth/v1/verify` and does NOT bounce back with a
+ * PKCE `?code=` for generateLink-issued tokens, breaking sign-in for
+ * @supabase/ssr projects), we point the user at our own
+ * `/auth/confirm?token_hash=...&type=...&next=...` route, which calls
+ * `supabase.auth.verifyOtp` server-side. This is the documented
+ * server-side-PKCE pattern.
+ */
+async function buildConfirmLink(
+  tokenHash: string,
+  verificationType: string,
+  nextPath = '/auth/set-password',
+): Promise<string> {
+  const params = new URLSearchParams({
+    token_hash: tokenHash,
+    type: verificationType,
+    next: nextPath,
+  })
+  const url = await siteUrl(`/auth/confirm?${params.toString()}`)
+  if (!url) {
+    throw new Error(
+      'Cannot determine site URL for invitation link. Set NEXT_PUBLIC_SITE_URL.',
+    )
+  }
+  return url
+}
+
+/**
+ * Generates a one-time confirmation link for the email. Tries
+ * `invite` first - which both creates the auth user and returns the
+ * link without sending any email. If the user already exists, falls
+ * back to a `magiclink` so resending works idempotently.
  */
 async function generateActionLink(
   email: string,
@@ -70,10 +98,14 @@ async function generateActionLink(
     options: { redirectTo, data: metadata },
   })
 
-  if (!inviteRes.error && inviteRes.data?.properties?.action_link) {
+  const inviteProps = inviteRes.data?.properties
+  if (!inviteRes.error && inviteProps?.hashed_token && inviteProps?.verification_type) {
     return {
-      actionLink: inviteRes.data.properties.action_link,
-      userId: inviteRes.data.user?.id,
+      actionLink: await buildConfirmLink(
+        inviteProps.hashed_token,
+        inviteProps.verification_type,
+      ),
+      userId: inviteRes.data?.user?.id,
       isNewUser: true,
     }
   }
@@ -86,7 +118,8 @@ async function generateActionLink(
     options: { redirectTo },
   })
 
-  if (magicRes.error || !magicRes.data?.properties?.action_link) {
+  const magicProps = magicRes.data?.properties
+  if (magicRes.error || !magicProps?.hashed_token || !magicProps?.verification_type) {
     throw new Error(
       magicRes.error?.message ??
         inviteRes.error?.message ??
@@ -95,8 +128,11 @@ async function generateActionLink(
   }
 
   return {
-    actionLink: magicRes.data.properties.action_link,
-    userId: magicRes.data.user?.id,
+    actionLink: await buildConfirmLink(
+      magicProps.hashed_token,
+      magicProps.verification_type,
+    ),
+    userId: magicRes.data?.user?.id,
     isNewUser: false,
   }
 }
