@@ -18,7 +18,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { COHORTS, type Cohort } from '@/lib/cohorts'
 import { PreviewLauncher, type PreviewFellow } from '@/components/admin/preview-launcher'
-import { TestEmailButton } from '@/components/admin/test-email-button'
 
 type FellowProfileRow = {
   id: string
@@ -29,10 +28,12 @@ type FellowProfileRow = {
   created_at: string | null
 }
 
-type AnnouncementRow = {
+type NotificationRow = {
   id: string
   title: string
-  published_at: string
+  kind: string | null
+  sent_at: string | null
+  published_at: string | null
 }
 
 type ResourceRow = { id: string; cohorts: string[] | null }
@@ -90,11 +91,13 @@ export default async function AdminHomePage() {
     supabase.from('labs').select('id', { count: 'exact', head: true }),
     supabase.from('community_resources').select('id, cohorts').returns<ResourceRow[]>(),
     supabase
-      .from('announcements')
-      .select('id, title, published_at')
-      .order('published_at', { ascending: false })
+      .from('notifications')
+      .select('id, title, kind, sent_at, published_at')
+      .eq('status', 'sent')
+      .order('sent_at', { ascending: false, nullsFirst: false })
+      .order('published_at', { ascending: false, nullsFirst: false })
       .limit(4)
-      .returns<AnnouncementRow[]>(),
+      .returns<NotificationRow[]>(),
     supabase
       .from('profiles')
       .select('id, full_name, email, cohort, created_at, schools(name)')
@@ -345,11 +348,13 @@ export default async function AdminHomePage() {
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
             <div>
-              <CardTitle className="font-serif text-lg">Recent announcements</CardTitle>
-              <CardDescription>Latest broadcasts to the community.</CardDescription>
+              <CardTitle className="font-serif text-lg">Recent notifications</CardTitle>
+              <CardDescription>
+                Latest announcements, reminders, and alerts.
+              </CardDescription>
             </div>
             <Link
-              href="/admin/announcements"
+              href="/admin/notifications"
               className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
             >
               Manage <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
@@ -357,7 +362,7 @@ export default async function AdminHomePage() {
           </CardHeader>
           <CardContent>
             {announcements.length === 0 ? (
-              <EmptyState message="No announcements yet. Post one to keep fellows in the loop." />
+              <EmptyState message="No notifications yet. Send one to keep fellows in the loop." />
             ) : (
               <ul className="flex flex-col divide-y divide-border">
                 {announcements.map((a) => (
@@ -377,7 +382,10 @@ export default async function AdminHomePage() {
                           className="mr-1 inline h-3 w-3"
                           aria-hidden="true"
                         />
-                        {relativeTime(a.published_at)}
+                        {relativeTime(a.sent_at ?? a.published_at)}
+                        {a.kind && a.kind !== 'announcement' ? (
+                          <span className="ml-1.5 capitalize">· {a.kind}</span>
+                        ) : null}
                       </p>
                     </div>
                   </li>
@@ -394,7 +402,6 @@ export default async function AdminHomePage() {
           <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Manage
           </h3>
-          <TestEmailButton />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <ActionCard
@@ -428,10 +435,10 @@ export default async function AdminHomePage() {
             description="Moderate posts and events surfaced in the fellow community feed."
           />
           <ActionCard
-            href="/admin/announcements"
+            href="/admin/notifications"
             icon={<Megaphone className="h-5 w-5" />}
-            title="Announcements"
-            description="Broadcast updates to fellows. Targeted by cohort or program-wide."
+            title="Notifications"
+            description="Send announcements, reminders, and alerts. Targeted by cohort, school team, or specific fellows. Optionally email."
           />
           <ActionCard
             href="/community"

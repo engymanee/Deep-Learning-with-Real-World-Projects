@@ -1,0 +1,101 @@
+import { bodyToHtml, escapeHtml, renderBaseLayout, renderCtaButton } from './base'
+import type { RenderedEmail } from './invitation'
+
+export type NotificationKind = 'announcement' | 'reminder' | 'alert'
+
+export type NotificationEmailArgs = {
+  recipientName?: string | null
+  kind: NotificationKind
+  /** Notification title (also used as default subject). */
+  title: string
+  /** Plain-text body. Paragraph breaks are preserved. */
+  body: string
+  /** Optional CTA button. */
+  ctaLabel?: string | null
+  ctaUrl?: string | null
+  /** Absolute URL back to the portal feed (rendered as a secondary link). */
+  portalUrl?: string | null
+  /** Optional explicit subject override. Defaults to a kind-specific prefix. */
+  subjectOverride?: string | null
+  /** Optional footer note shown below the body, e.g. audience scope. */
+  footerNote?: string | null
+}
+
+const KIND_LABEL: Record<NotificationKind, string> = {
+  announcement: 'Announcement',
+  reminder: 'Reminder',
+  alert: 'Alert',
+}
+
+const KIND_BADGE_BG: Record<NotificationKind, string> = {
+  announcement: '#0f172a',
+  reminder: '#1e3a8a',
+  alert: '#b91c1c',
+}
+
+/**
+ * Renders the standard cohort/global notification email used by the
+ * dispatcher. Maps 1:1 with what the recipient sees in their in-app
+ * notifications feed so there is one consistent message surface.
+ */
+export function renderNotificationEmail(
+  args: NotificationEmailArgs,
+): RenderedEmail {
+  const kindLabel = KIND_LABEL[args.kind]
+  const subject =
+    args.subjectOverride?.trim() ||
+    (args.kind === 'announcement' ? args.title : `[${kindLabel}] ${args.title}`)
+
+  const greeting = args.recipientName?.trim() ? args.recipientName.trim() : 'there'
+
+  const textLines: string[] = [
+    `Hi ${greeting},`,
+    '',
+    args.body.trim(),
+  ]
+  if (args.ctaLabel && args.ctaUrl) {
+    textLines.push('', `${args.ctaLabel}: ${args.ctaUrl}`)
+  }
+  if (args.portalUrl) {
+    textLines.push('', `View in portal: ${args.portalUrl}`)
+  }
+  const text = textLines.join('\n')
+
+  const cta =
+    args.ctaLabel && args.ctaUrl ? renderCtaButton(args.ctaLabel, args.ctaUrl) : ''
+
+  const portalLink = args.portalUrl
+    ? `<p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#6b7280;">Or <a href="${escapeHtml(
+        args.portalUrl,
+      )}" style="color:#0f172a;text-decoration:underline;">view this in the portal</a>.</p>`
+    : ''
+
+  const inner = `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">
+      <tr>
+        <td bgcolor="${KIND_BADGE_BG[args.kind]}" style="border-radius:999px;padding:4px 12px;">
+          <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;font-weight:600;">${escapeHtml(
+            kindLabel,
+          )}</span>
+        </td>
+      </tr>
+    </table>
+    <h2 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#0f172a;font-weight:600;">${escapeHtml(
+      args.title,
+    )}</h2>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1f2937;">Hi ${escapeHtml(
+      greeting,
+    )},</p>
+    ${bodyToHtml(args.body)}
+    ${cta}
+    ${portalLink}
+  `
+
+  const html = renderBaseLayout(inner, {
+    heading: kindLabel,
+    previewText: args.title,
+    footerNote: args.footerNote ?? undefined,
+  })
+
+  return { subject, html, text }
+}

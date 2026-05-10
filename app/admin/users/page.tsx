@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { InviteUserDialog } from './invite-user-dialog'
+import { BulkInviteDialog } from './bulk-invite-dialog'
 import { UserRow } from './user-row'
 import { ROLE_LABELS, type Role } from '@/lib/roles'
 import { isCohort, type Cohort } from '@/lib/cohorts'
@@ -79,7 +80,10 @@ export default async function AdminUsersPage() {
             {users.length} total · Invite new people, adjust roles, and assign cohorts to fellows.
           </p>
         </div>
-        <InviteUserDialog cohorts={cohortList} />
+        <div className="flex flex-wrap items-center gap-2">
+          <BulkInviteDialog cohorts={cohortList} />
+          <InviteUserDialog cohorts={cohortList} />
+        </div>
       </div>
 
       <Card>

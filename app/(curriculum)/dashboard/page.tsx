@@ -1,7 +1,7 @@
 import { getDashboardData } from '@/lib/dashboard-data'
 import { loadTeamProgress } from '@/lib/team-progress'
 import { LiveSessionCard } from '@/components/dashboard/live-session-card'
-import { AnnouncementsFeed } from '@/components/dashboard/announcements-feed'
+import { NotificationsFeed } from '@/components/notifications/notifications-feed'
 import { PhaseProgressSection } from '@/components/dashboard/phase-progress-section'
 
 export const dynamic = 'force-dynamic'
@@ -40,8 +40,14 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      {/* Announcements pinned at the top of the page. */}
-      <AnnouncementsFeed announcements={data.announcements} />
+      {/* Unified notifications (announcements, reminders, alerts)
+          pinned at the top of the page. Full inbox lives at
+          /notifications. */}
+      <NotificationsFeed
+        items={data.notifications}
+        collapsible
+        heading="Notifications"
+      />
 
       {/* Upcoming live session (only within 7 days). */}
       {data.upcomingSession && <LiveSessionCard session={data.upcomingSession} />}

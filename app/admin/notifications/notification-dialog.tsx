@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition, useId } from 'react'
+import { useId, useMemo, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -26,16 +26,27 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
 import { Search, X } from 'lucide-react'
-import { createAnnouncement, updateAnnouncement } from './actions'
+import {
+  createNotification,
+  updateNotification,
+  type NotificationFormResult,
+} from './actions'
+import {
+  NOTIFICATION_KINDS,
+  NOTIFICATION_KIND_LABELS,
+  type NotificationKind,
+} from '@/lib/notifications/types'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export type AudienceScope = 'global' | 'cohort' | 'school_team' | 'users'
+export type ScheduleAction = 'send_now' | 'schedule' | 'draft'
 
-export interface AnnouncementFormInitial {
+export interface NotificationFormInitial {
   id: string | null
+  kind: NotificationKind
   audience_scope: AudienceScope
   cohort_codes: string[]
   school_team_ids: string[]
@@ -44,6 +55,11 @@ export interface AnnouncementFormInitial {
   body: string
   pinned: boolean
   content_id: string | null
+  cta_label: string | null
+  cta_url: string | null
+  email_enabled: boolean
+  email_subject: string | null
+  scheduled_for: string | null
 }
 
 export interface SchoolTeamOption {
@@ -55,14 +71,11 @@ export interface FellowOption {
   id: string
   fullName: string
   email: string | null
-  /** A/B/C cohort code surfaced as a small chip in search results so a
-   *  curator picking individual fellows can disambiguate quickly. */
   cohort: string | null
 }
 
 export interface ContentOption {
   id: string
-  /** Pretty path the option displays. Already includes phase + module. */
   label: string
   phaseId: string
   phaseTitle: string
@@ -70,25 +83,18 @@ export interface ContentOption {
 
 interface Props {
   mode: 'create' | 'edit'
-  initial?: Partial<AnnouncementFormInitial>
+  initial?: Partial<NotificationFormInitial>
   schoolTeams: SchoolTeamOption[]
   fellows: FellowOption[]
   contentOptions: ContentOption[]
-  /**
-   * Optional inline trigger (button, menu item, etc.). When omitted,
-   * the dialog is fully controlled by the parent via `open` /
-   * `onOpenChange` and renders no trigger of its own. We use this
-   * "no-trigger" mode from `<NewAnnouncementButton>`, so the button
-   * stays decoupled from the dialog's internals.
-   */
   trigger?: React.ReactNode
-  /** Externally-controlled open state. Pair with `onOpenChange`. */
   open?: boolean
   onOpenChange?: (next: boolean) => void
 }
 
-const DEFAULTS: AnnouncementFormInitial = {
+const DEFAULTS: NotificationFormInitial = {
   id: null,
+  kind: 'announcement',
   audience_scope: 'global',
   cohort_codes: [],
   school_team_ids: [],
@@ -97,16 +103,35 @@ const DEFAULTS: AnnouncementFormInitial = {
   body: '',
   pinned: false,
   content_id: null,
+  cta_label: null,
+  cta_url: null,
+  email_enabled: false,
+  email_subject: null,
+  scheduled_for: null,
 }
 
 const COHORT_CODES = ['A', 'B', 'C'] as const
 const NO_CONTENT = '__none__'
 
+/**
+ * Convert an ISO timestamp to the `YYYY-MM-DDTHH:mm` value an HTML
+ * `datetime-local` input expects (in the user's local timezone).
+ */
+function isoToLocalInputValue(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function AnnouncementDialog({
+export function NotificationDialog({
   mode,
   initial,
   schoolTeams,
@@ -116,8 +141,6 @@ export function AnnouncementDialog({
   open: controlledOpen,
   onOpenChange,
 }: Props) {
-  // Support both uncontrolled (legacy callsites that pass a `trigger`)
-  // and fully-controlled (new `<NewAnnouncementButton>` pattern) modes.
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const isControlled = controlledOpen !== undefined
   const open = isControlled ? controlledOpen : uncontrolledOpen
@@ -128,8 +151,9 @@ export function AnnouncementDialog({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const merged: AnnouncementFormInitial = { ...DEFAULTS, ...initial }
+  const merged: NotificationFormInitial = { ...DEFAULTS, ...initial }
 
+  const [kind, setKind] = useState<NotificationKind>(merged.kind)
   const [scope, setScope] = useState<AudienceScope>(merged.audience_scope)
   const [cohortCodes, setCohortCodes] = useState<string[]>(merged.cohort_codes)
   const [schoolTeamIds, setSchoolTeamIds] = useState<string[]>(
@@ -137,18 +161,25 @@ export function AnnouncementDialog({
   )
   const [userIds, setUserIds] = useState<string[]>(merged.user_ids)
   const [contentId, setContentId] = useState<string | null>(merged.content_id)
+  const [emailEnabled, setEmailEnabled] = useState<boolean>(merged.email_enabled)
+  const [scheduleAction, setScheduleAction] = useState<ScheduleAction>(
+    merged.scheduled_for ? 'schedule' : 'send_now',
+  )
+  const [scheduledFor, setScheduledFor] = useState<string>(
+    isoToLocalInputValue(merged.scheduled_for),
+  )
 
-  // Search inputs are local to each picker - they don't submit.
   const [schoolQuery, setSchoolQuery] = useState('')
   const [fellowQuery, setFellowQuery] = useState('')
 
   const titleId = useId()
   const bodyId = useId()
   const contentSelectId = useId()
-  const schoolSearchId = useId()
-  const fellowSearchId = useId()
+  const ctaLabelId = useId()
+  const ctaUrlId = useId()
+  const emailSubjectId = useId()
+  const scheduledForId = useId()
 
-  // Filtered + sorted lists for the two search-driven pickers.
   const filteredSchools = useMemo(() => {
     const q = schoolQuery.trim().toLowerCase()
     const list = q
@@ -169,7 +200,6 @@ export function AnnouncementDialog({
     return [...list].sort((a, b) => a.fullName.localeCompare(b.fullName))
   }, [fellows, fellowQuery])
 
-  // Quick lookup maps for chip rendering of currently-selected ids.
   const schoolById = useMemo(
     () => new Map(schoolTeams.map((s) => [s.id, s])),
     [schoolTeams],
@@ -184,18 +214,25 @@ export function AnnouncementDialog({
     setList: (next: string[]) => void,
     value: string,
   ) => {
-    setList(list.includes(value) ? list.filter((x) => x !== value) : [...list, value])
+    setList(
+      list.includes(value) ? list.filter((x) => x !== value) : [...list, value],
+    )
   }
 
   const handleSubmit = (fd: FormData) => {
     setError(null)
     startTransition(async () => {
       try {
+        let result: NotificationFormResult
         if (mode === 'edit' && merged.id) {
           fd.set('id', merged.id)
-          await updateAnnouncement(fd)
+          result = await updateNotification(fd)
         } else {
-          await createAnnouncement(fd)
+          result = await createNotification(fd)
+        }
+        if (!result.ok) {
+          setError(result.message)
+          return
         }
         setOpen(false)
       } catch (err) {
@@ -204,21 +241,28 @@ export function AnnouncementDialog({
     })
   }
 
-  // ---------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------
+  const submitLabel = (() => {
+    if (mode === 'edit') return 'Save changes'
+    if (scheduleAction === 'draft') return 'Save draft'
+    if (scheduleAction === 'schedule') return 'Schedule'
+    return 'Send now'
+  })()
+
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
         if (next) {
-          // Re-seed local state from props each time the dialog opens.
+          setKind(merged.kind)
           setScope(merged.audience_scope)
           setCohortCodes(merged.cohort_codes)
           setSchoolTeamIds(merged.school_team_ids)
           setUserIds(merged.user_ids)
           setContentId(merged.content_id)
+          setEmailEnabled(merged.email_enabled)
+          setScheduleAction(merged.scheduled_for ? 'schedule' : 'send_now')
+          setScheduledFor(isoToLocalInputValue(merged.scheduled_for))
           setSchoolQuery('')
           setFellowQuery('')
           setError(null)
@@ -229,18 +273,37 @@ export function AnnouncementDialog({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'New announcement' : 'Edit announcement'}
+            {mode === 'create' ? 'New notification' : 'Edit notification'}
           </DialogTitle>
           <DialogDescription>
-            Announcements appear on learners&apos; dashboards. The audience
-            decides who sees them.
+            Notifications appear in the in-portal feed and can optionally be
+            emailed to recipients.
           </DialogDescription>
         </DialogHeader>
 
         <form action={handleSubmit} className="space-y-5">
-          {/* ----------------------------------------------------------- */}
-          {/* Audience scope                                              */}
-          {/* ----------------------------------------------------------- */}
+          {/* Kind */}
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <Select
+              name="kind"
+              value={kind}
+              onValueChange={(v) => setKind(v as NotificationKind)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NOTIFICATION_KINDS.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {NOTIFICATION_KIND_LABELS[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Audience scope */}
           <div className="space-y-2">
             <Label>Audience</Label>
             <Select
@@ -267,9 +330,6 @@ export function AnnouncementDialog({
             </Select>
           </div>
 
-          {/* ----------------------------------------------------------- */}
-          {/* Specific Cohort: A / B / C multi-select                     */}
-          {/* ----------------------------------------------------------- */}
           {scope === 'cohort' && (
             <fieldset className="space-y-2 rounded-lg border border-border p-3">
               <legend className="px-1 text-sm font-medium">
@@ -294,7 +354,6 @@ export function AnnouncementDialog({
                   )
                 })}
               </div>
-              {/* serialise selected codes as repeated form fields */}
               {cohortCodes.map((code) => (
                 <input
                   key={code}
@@ -306,23 +365,17 @@ export function AnnouncementDialog({
             </fieldset>
           )}
 
-          {/* ----------------------------------------------------------- */}
-          {/* Specific School Team: searchable multi-select               */}
-          {/* ----------------------------------------------------------- */}
           {scope === 'school_team' && (
             <fieldset className="space-y-3 rounded-lg border border-border p-3">
               <legend className="px-1 text-sm font-medium">
                 School teams (pick one or more)
               </legend>
-
-              {/* Search */}
               <div className="relative">
                 <Search
                   className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
                   aria-hidden
                 />
                 <Input
-                  id={schoolSearchId}
                   type="search"
                   value={schoolQuery}
                   onChange={(e) => setSchoolQuery(e.target.value)}
@@ -330,8 +383,6 @@ export function AnnouncementDialog({
                   className="pl-8"
                 />
               </div>
-
-              {/* Selected chips */}
               {schoolTeamIds.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {schoolTeamIds.map((id) => {
@@ -359,8 +410,6 @@ export function AnnouncementDialog({
                   })}
                 </div>
               )}
-
-              {/* Options list */}
               <ScrollArea className="h-48 rounded-md border border-border">
                 <ul className="divide-y divide-border">
                   {filteredSchools.length === 0 ? (
@@ -387,7 +436,6 @@ export function AnnouncementDialog({
                   )}
                 </ul>
               </ScrollArea>
-
               {schoolTeamIds.map((id) => (
                 <input
                   key={id}
@@ -399,22 +447,17 @@ export function AnnouncementDialog({
             </fieldset>
           )}
 
-          {/* ----------------------------------------------------------- */}
-          {/* Specific Fellow: search + multi-select                      */}
-          {/* ----------------------------------------------------------- */}
           {scope === 'users' && (
             <fieldset className="space-y-3 rounded-lg border border-border p-3">
               <legend className="px-1 text-sm font-medium">
                 Fellows (filter by name and pick)
               </legend>
-
               <div className="relative">
                 <Search
                   className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
                   aria-hidden
                 />
                 <Input
-                  id={fellowSearchId}
                   type="search"
                   value={fellowQuery}
                   onChange={(e) => setFellowQuery(e.target.value)}
@@ -422,7 +465,6 @@ export function AnnouncementDialog({
                   className="pl-8"
                 />
               </div>
-
               {userIds.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {userIds.map((id) => {
@@ -448,7 +490,6 @@ export function AnnouncementDialog({
                   })}
                 </div>
               )}
-
               <ScrollArea className="h-56 rounded-md border border-border">
                 <ul className="divide-y divide-border">
                   {filteredFellows.length === 0 ? (
@@ -489,16 +530,13 @@ export function AnnouncementDialog({
                   )}
                 </ul>
               </ScrollArea>
-
               {userIds.map((id) => (
                 <input key={id} type="hidden" name="user_ids" value={id} />
               ))}
             </fieldset>
           )}
 
-          {/* ----------------------------------------------------------- */}
-          {/* Title / body                                                */}
-          {/* ----------------------------------------------------------- */}
+          {/* Title / body */}
           <div className="space-y-2">
             <Label htmlFor={titleId}>Title</Label>
             <Input
@@ -522,9 +560,43 @@ export function AnnouncementDialog({
             />
           </div>
 
-          {/* ----------------------------------------------------------- */}
-          {/* Optional curriculum pin                                     */}
-          {/* ----------------------------------------------------------- */}
+          {/* Optional CTA */}
+          <fieldset className="space-y-3 rounded-lg border border-border p-3">
+            <legend className="px-1 text-sm font-medium">
+              Call-to-action (optional)
+            </legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor={ctaLabelId} className="text-xs">
+                  Button label
+                </Label>
+                <Input
+                  id={ctaLabelId}
+                  name="cta_label"
+                  defaultValue={merged.cta_label ?? ''}
+                  placeholder="e.g. Open the lab"
+                  maxLength={64}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={ctaUrlId} className="text-xs">
+                  Link URL
+                </Label>
+                <Input
+                  id={ctaUrlId}
+                  name="cta_url"
+                  defaultValue={merged.cta_url ?? ''}
+                  placeholder="https:// or /path"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-text-muted">
+              Both fields are required together. Leaving them blank hides the
+              button.
+            </p>
+          </fieldset>
+
+          {/* Pin to curriculum item (legacy support) */}
           <div className="space-y-2">
             <Label htmlFor={contentSelectId}>Pin to a curriculum item</Label>
             <Select
@@ -556,15 +628,38 @@ export function AnnouncementDialog({
               value={contentId ?? ''}
               readOnly
             />
-            <p className="text-xs text-text-muted">
-              Optional. Adds a one-tap link to the lab below the message on
-              learners&apos; dashboards.
-            </p>
           </div>
 
-          {/* ----------------------------------------------------------- */}
-          {/* Pin to top                                                  */}
-          {/* ----------------------------------------------------------- */}
+          {/* Email */}
+          <fieldset className="space-y-3 rounded-lg border border-border p-3">
+            <legend className="px-1 text-sm font-medium">Email</legend>
+            <label className="inline-flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={emailEnabled}
+                onCheckedChange={(v) => setEmailEnabled(Boolean(v))}
+              />
+              <span>Also email this notification to recipients</span>
+            </label>
+            {emailEnabled && (
+              <input type="hidden" name="email_enabled" value="on" />
+            )}
+            {emailEnabled && (
+              <div className="space-y-1.5">
+                <Label htmlFor={emailSubjectId} className="text-xs">
+                  Email subject (optional)
+                </Label>
+                <Input
+                  id={emailSubjectId}
+                  name="email_subject"
+                  defaultValue={merged.email_subject ?? ''}
+                  placeholder="Defaults to the notification title"
+                  maxLength={140}
+                />
+              </div>
+            )}
+          </fieldset>
+
+          {/* Pin to top */}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -574,9 +669,59 @@ export function AnnouncementDialog({
               className="h-4 w-4 rounded border-border"
             />
             <Label htmlFor="pinned" className="font-normal">
-              Pin to the top of dashboards
+              Pin to the top of the in-portal feed
             </Label>
           </div>
+
+          {/* Schedule */}
+          {mode === 'create' && (
+            <fieldset className="space-y-3 rounded-lg border border-border p-3">
+              <legend className="px-1 text-sm font-medium">Delivery</legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {(
+                  [
+                    { value: 'send_now', label: 'Send now' },
+                    { value: 'schedule', label: 'Schedule' },
+                    { value: 'draft', label: 'Save as draft' },
+                  ] as const
+                ).map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                      scheduleAction === opt.value
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-border hover:bg-bg-muted'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="schedule_action"
+                      value={opt.value}
+                      checked={scheduleAction === opt.value}
+                      onChange={() => setScheduleAction(opt.value)}
+                      className="sr-only"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+              {scheduleAction === 'schedule' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor={scheduledForId} className="text-xs">
+                    Send at (your local time)
+                  </Label>
+                  <Input
+                    id={scheduledForId}
+                    name="scheduled_for"
+                    type="datetime-local"
+                    value={scheduledFor}
+                    onChange={(e) => setScheduledFor(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+            </fieldset>
+          )}
 
           {error && (
             <p className="text-sm text-red-600" role="alert">
@@ -595,7 +740,7 @@ export function AnnouncementDialog({
             </Button>
             <Button type="submit" disabled={isPending}>
               {isPending && <Spinner className="mr-2 h-4 w-4" />}
-              {mode === 'create' ? 'Publish' : 'Save changes'}
+              {submitLabel}
             </Button>
           </DialogFooter>
         </form>

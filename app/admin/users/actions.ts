@@ -1,34 +1,14 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth-server'
+import { sendBrandedInvite, type InvitePayload } from '@/lib/invitations/invite'
+import { parseCsv, parsePastedList, type ParsedInviteRow } from '@/lib/invitations/parse'
 import type { Role } from '@/lib/roles'
 import { isCohort, type Cohort } from '@/lib/cohorts'
 
 const ROLES: readonly Role[] = ['fellow', 'facilitator', 'admin'] as const
-
-/**
- * Returns the absolute URL the Supabase invite email should redirect to.
- * Prefers NEXT_PUBLIC_SITE_URL, falls back to the request origin so this
- * keeps working in preview deployments without extra config.
- */
-async function inviteRedirectUrl(): Promise<string | undefined> {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL
-  if (configured) {
-    return `${configured.replace(/\/$/, '')}/auth/callback?next=/auth/set-password`
-  }
-  try {
-    const h = await headers()
-    const host = h.get('x-forwarded-host') ?? h.get('host')
-    const proto = h.get('x-forwarded-proto') ?? 'https'
-    if (host) return `${proto}://${host}/auth/callback?next=/auth/set-password`
-  } catch {
-    // headers() may not be available in all contexts; fall through.
-  }
-  return undefined
-}
 
 function ok(message: string) {
   return { ok: true as const, message }
@@ -45,9 +25,19 @@ function assertRole(value: unknown): asserts value is Role {
   }
 }
 
+async function profileDisplayName(profileId: string): Promise<string | null> {
+  const admin = createAdminClient()
+  const { data } = await admin
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', profileId)
+    .maybeSingle<{ full_name: string | null; email: string | null }>()
+  return data?.full_name ?? data?.email ?? null
+}
+
 export async function inviteUserAction(formData: FormData): Promise<ActionResult> {
   try {
-    await requireAdmin()
+    const me = await requireAdmin()
 
     const email = String(formData.get('email') ?? '').trim().toLowerCase()
     const fullName = String(formData.get('fullName') ?? '').trim()
@@ -70,47 +60,116 @@ export async function inviteUserAction(formData: FormData): Promise<ActionResult
     const cohortLetter: Cohort | null =
       role === 'fellow' && isCohort(cohortLetterRaw) ? cohortLetterRaw : null
 
-    const admin = createAdminClient()
+    const invitedByName = await profileDisplayName(me.id)
 
-    // Invite (sends email; the link runs /auth/callback to exchange the
-    // code for a session, then sends the user to /auth/set-password).
-    const redirectTo = await inviteRedirectUrl()
-
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: fullName, role },
-      redirectTo,
-    })
-
-    if (error || !data.user) {
-      return fail(error?.message ?? 'Failed to send invite')
-    }
-
-    const userId = data.user.id
-
-    // The handle_new_user trigger created a profile row. Enrich it.
-    const { error: profErr } = await admin
-      .from('profiles')
-      .update({
-        full_name: fullName,
+    const result = await sendBrandedInvite(
+      {
+        email,
+        fullName,
         title: title || null,
         role,
-        cohort: cohortLetter,
-      })
-      .eq('id', userId)
+        schoolTeamId: schoolTeamId || null,
+        cohortLetter,
+        invitedByName,
+        cohortLabel: cohortLetter ? `Cohort ${cohortLetter}` : null,
+      },
+      me.id,
+    )
 
-    if (profErr) return fail(`Invited, but failed to save profile: ${profErr.message}`)
+    revalidatePath('/admin/users')
 
-    if (schoolTeamId) {
-      const { error: memErr } = await admin
-        .from('cohort_members')
-        .insert({ cohort_id: schoolTeamId, profile_id: userId })
-      if (memErr && !memErr.message.includes('duplicate')) {
-        return fail(`Invited, but failed to add to school team: ${memErr.message}`)
+    if (!result.ok) {
+      return fail(result.error ?? 'Failed to send invite')
+    }
+    return ok(result.message ?? `Invite sent to ${email}`)
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Unknown error')
+  }
+}
+
+export type BulkInviteSummary = {
+  ok: true
+  total: number
+  invited: number
+  failed: number
+  results: Array<{
+    email: string
+    status: 'invited' | 'failed'
+    message?: string
+  }>
+}
+
+export type BulkInviteResult = BulkInviteSummary | { ok: false; message: string }
+
+export async function bulkInviteAction(formData: FormData): Promise<BulkInviteResult> {
+  try {
+    const me = await requireAdmin()
+
+    const source = String(formData.get('source') ?? 'paste') as 'paste' | 'csv'
+    const text = String(formData.get('text') ?? '')
+    const role = String(formData.get('role') ?? 'fellow')
+    const schoolTeamId = String(formData.get('cohortId') ?? '')
+    const cohortLetterRaw = String(formData.get('cohortLetter') ?? '')
+
+    if (!text.trim()) return fail('Paste or upload at least one email')
+    assertRole(role)
+    const defaultCohort: Cohort | null =
+      role === 'fellow' && isCohort(cohortLetterRaw) ? cohortLetterRaw : null
+
+    const rows: ParsedInviteRow[] =
+      source === 'csv' ? parseCsv(text) : parsePastedList(text)
+
+    if (rows.length === 0) return fail('No rows found in input')
+
+    const invitedByName = await profileDisplayName(me.id)
+    const results: BulkInviteSummary['results'] = []
+    let invited = 0
+    let failed = 0
+
+    for (const row of rows) {
+      if (!row.ok || !row.data) {
+        failed++
+        results.push({
+          email: row.raw.slice(0, 80),
+          status: 'failed',
+          message: row.error ?? 'invalid row',
+        })
+        continue
+      }
+
+      // Per-row cohort overrides the bulk default if present.
+      const rowCohort: Cohort | null =
+        role === 'fellow' && row.data.cohort && isCohort(row.data.cohort)
+          ? (row.data.cohort as Cohort)
+          : defaultCohort
+
+      const payload: InvitePayload = {
+        email: row.data.email,
+        fullName: row.data.full_name ?? row.data.email,
+        title: row.data.title ?? null,
+        role: role as Role,
+        schoolTeamId: schoolTeamId || null,
+        cohortLetter: rowCohort,
+        invitedByName,
+        cohortLabel: rowCohort ? `Cohort ${rowCohort}` : null,
+      }
+
+      const result = await sendBrandedInvite(payload, me.id)
+      if (result.ok) {
+        invited++
+        results.push({ email: result.email, status: 'invited', message: result.message })
+      } else {
+        failed++
+        results.push({
+          email: result.email,
+          status: 'failed',
+          message: result.error ?? 'failed',
+        })
       }
     }
 
     revalidatePath('/admin/users')
-    return ok(`Invite sent to ${email}`)
+    return { ok: true, total: rows.length, invited, failed, results }
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
@@ -227,17 +286,52 @@ export async function updateCohortAction(formData: FormData): Promise<ActionResu
 
 export async function resendInviteAction(formData: FormData): Promise<ActionResult> {
   try {
-    await requireAdmin()
+    const me = await requireAdmin()
     const email = String(formData.get('email') ?? '').trim().toLowerCase()
     if (!email) return fail('Missing email')
 
     const admin = createAdminClient()
-    const redirectTo = await inviteRedirectUrl()
 
-    const { error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo })
-    if (error) return fail(error.message)
+    // Pull the existing profile so the resent invite preserves
+    // role, name, title, and cohort assignment - we want a true
+    // resend, not a downgrade to a defaultized fellow invite.
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('full_name, title, role, cohort, cohort_members(cohort_id)')
+      .eq('email', email)
+      .maybeSingle<{
+        full_name: string | null
+        title: string | null
+        role: Role
+        cohort: Cohort | null
+        cohort_members: { cohort_id: string }[] | { cohort_id: string } | null
+      }>()
 
-    return ok(`Invite resent to ${email}`)
+    const memberships = profile?.cohort_members
+    const schoolTeamId = Array.isArray(memberships)
+      ? memberships[0]?.cohort_id ?? null
+      : memberships?.cohort_id ?? null
+
+    const invitedByName = await profileDisplayName(me.id)
+
+    const result = await sendBrandedInvite(
+      {
+        email,
+        fullName: profile?.full_name ?? email,
+        title: profile?.title ?? null,
+        role: profile?.role ?? 'fellow',
+        schoolTeamId,
+        cohortLetter: profile?.cohort ?? null,
+        invitedByName,
+        cohortLabel: profile?.cohort ? `Cohort ${profile.cohort}` : null,
+      },
+      me.id,
+    )
+
+    revalidatePath('/admin/users')
+
+    if (!result.ok) return fail(result.error ?? 'Failed to resend invite')
+    return ok(result.message ?? `Invite resent to ${email}`)
   } catch (e) {
     return fail(e instanceof Error ? e.message : 'Unknown error')
   }
