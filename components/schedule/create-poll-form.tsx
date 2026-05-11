@@ -89,7 +89,6 @@ export function CreatePollForm({
       options,
       invited_fellows: invitedFellows,
     })
-    })
 
     // Reset form
     setTitle('')
