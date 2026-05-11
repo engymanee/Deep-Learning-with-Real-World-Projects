@@ -441,6 +441,12 @@ export default async function AdminHomePage() {
             description="Send announcements, reminders, and alerts. Targeted by cohort, school team, or specific fellows. Optionally email."
           />
           <ActionCard
+            href="/admin/schedule"
+            icon={<CalendarDays className="h-5 w-5" />}
+            title="Scheduling"
+            description="Create scheduling polls, invite specific fellows to vote on availability, and finalize event times like WhenToMeet."
+          />
+          <ActionCard
             href="/community"
             icon={<MessagesSquare className="h-5 w-5" />}
             title="View community"

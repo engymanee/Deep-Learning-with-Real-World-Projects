@@ -32,12 +32,15 @@ interface CreatePollFormProps {
     meeting_link: string
     voting_closes_at: string
     options: TimeOption[]
+    invited_fellows: string[]
   }) => Promise<void>
+  availableFellows?: Array<{ id: string; fullName: string }>
   isLoading?: boolean
 }
 
 export function CreatePollForm({
   onSubmit,
+  availableFellows = [],
   isLoading = false,
 }: CreatePollFormProps) {
   const [title, setTitle] = useState('')
@@ -45,6 +48,7 @@ export function CreatePollForm({
   const [location, setLocation] = useState('')
   const [meetingLink, setMeetingLink] = useState('')
   const [votingClosesAt, setVotingClosesAt] = useState('')
+  const [invitedFellows, setInvitedFellows] = useState<string[]>([])
   const [options, setOptions] = useState<TimeOption[]>([
     { start_time: '', end_time: '' },
   ])
@@ -70,6 +74,11 @@ export function CreatePollForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (invitedFellows.length === 0) {
+      alert('Please select at least one fellow to invite')
+      return
+    }
 
     await onSubmit({
       title,
@@ -78,6 +87,8 @@ export function CreatePollForm({
       meeting_link: meetingLink,
       voting_closes_at: votingClosesAt,
       options,
+      invited_fellows: invitedFellows,
+    })
     })
 
     // Reset form
@@ -219,6 +230,40 @@ export function CreatePollForm({
               <Plus className="mr-2 h-3 w-3" />
               Add Option
             </Button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-3">
+              Invite Fellows
+            </label>
+            <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+              {availableFellows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No fellows available</p>
+              ) : (
+                availableFellows.map((fellow) => (
+                  <label key={fellow.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={invitedFellows.includes(fellow.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setInvitedFellows([...invitedFellows, fellow.id])
+                        } else {
+                          setInvitedFellows(invitedFellows.filter((id) => id !== fellow.id))
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm">{fellow.fullName}</span>
+                  </label>
+                ))
+              )}
+            </div>
+            {invitedFellows.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {invitedFellows.length} fellow{invitedFellows.length !== 1 ? 's' : ''} selected
+              </p>
+            )}
           </div>
 
           <div className="flex gap-2 justify-end">
