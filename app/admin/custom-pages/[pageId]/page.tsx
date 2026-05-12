@@ -38,7 +38,7 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
 
   // Fetch page data if editing
   useEffect(() => {
-    if (!isNewPage && params.pageId) {
+    if (params.pageId && params.pageId !== 'new') {
       fetchPage()
     }
   }, [params.pageId])
@@ -50,7 +50,8 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
       const response = await fetch(`/api/admin/custom-pages?pageId=${params.pageId}`)
 
       if (!response.ok) {
-        throw new Error('Failed to load page')
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to load page')
       }
 
       const fetchedPage = await response.json()
