@@ -65,11 +65,14 @@ export async function startPreviewAsCohort(formData: FormData): Promise<void> {
 }
 
 /** Exit preview mode and return to the admin's own session. */
-export async function endPreview(): Promise<void> {
+export async function endPreview(formData: FormData): Promise<void> {
   // Clearing the cookie is safe even for non-admins (it's a no-op for
   // them since they wouldn't have one), so we don't gate this. We do
   // still need to be authenticated, which middleware handles.
   await clearPreviewCookie()
   revalidatePath('/', 'layout')
-  redirect('/admin')
+  
+  // Redirect to the referrer URL if provided, otherwise default to /admin
+  const referrer = String(formData.get('referrer') ?? '/admin').trim()
+  redirect(referrer)
 }

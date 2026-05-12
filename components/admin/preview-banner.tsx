@@ -46,6 +46,7 @@ export async function AdminPreviewBanner() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <form action={endPreview}>
+            <input type="hidden" name="referrer" value={typeof window !== 'undefined' ? window.location.pathname : '/admin'} />
             <button
               type="submit"
               className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90"
