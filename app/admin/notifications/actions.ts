@@ -248,7 +248,7 @@ export async function createNotification(
 
     const { mode, scheduled_for } = parseSchedule(fd)
     const initialStatus: NotificationStatus =
-      mode === 'draft' ? 'draft' : mode === 'schedule' ? 'scheduled' : 'sending'
+      mode === 'draft' ? 'draft' : mode === 'schedule' ? 'scheduled' : 'draft'
 
     const { data, error } = await supabase
       .from('notifications')
@@ -278,7 +278,7 @@ export async function createNotification(
 
     if (mode === 'send_now') {
       const result = await dispatchNotification(data.id, {
-        allowedFromStatuses: ['sending'],
+        allowedFromStatuses: ['draft'],
       })
       finalStatus = result.status
       if (!result.ok) {

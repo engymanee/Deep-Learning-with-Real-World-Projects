@@ -653,9 +653,12 @@ export function NotificationDialog({
                 </span>
               </span>
             </label>
-            {emailEnabled && (
-              <input type="hidden" name="email_enabled" value="on" />
-            )}
+            {/* Always submit email_enabled: when checked it's "on", when unchecked the input is omitted so fd.get() returns null, which becomes false */}
+            <input
+              type="hidden"
+              name="email_enabled"
+              value={emailEnabled ? 'on' : 'off'}
+            />
             {emailEnabled && (
               <div className="space-y-1.5">
                 <Label htmlFor={emailSubjectId} className="text-xs">
