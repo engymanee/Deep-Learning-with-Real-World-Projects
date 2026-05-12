@@ -1,0 +1,122 @@
+'use client'
+
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Card, CardContent } from '@/components/ui/card'
+import { Search, X } from 'lucide-react'
+
+type CohortSummary = { id: string; name: string }
+
+export function UsersSearch({ cohorts }: { cohorts: CohortSummary[] }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const search = searchParams.get('search') || ''
+  const role = searchParams.get('role') || ''
+  const cohort = searchParams.get('cohort') || ''
+
+  const handleSearch = (value: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (value) {
+      params.set('search', value)
+    } else {
+      params.delete('search')
+    }
+    params.set('page', '1')
+    router.push(`/admin/users?${params.toString()}`)
+  }
+
+  const handleRoleFilter = (value: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (value) {
+      params.set('role', value)
+    } else {
+      params.delete('role')
+    }
+    params.set('page', '1')
+    router.push(`/admin/users?${params.toString()}`)
+  }
+
+  const handleCohortFilter = (value: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (value) {
+      params.set('cohort', value)
+    } else {
+      params.delete('cohort')
+    }
+    params.set('page', '1')
+    router.push(`/admin/users?${params.toString()}`)
+  }
+
+  const handleClearFilters = () => {
+    router.push('/admin/users')
+  }
+
+  const hasFilters = search || role || cohort
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4 p-4">
+        {/* Search Input */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search by name, email, or title..."
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full rounded-md border border-border bg-background pl-10 pr-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Role
+            </label>
+            <select
+              value={role}
+              onChange={(e) => handleRoleFilter(e.target.value)}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">All roles</option>
+              <option value="fellow">Fellow</option>
+              <option value="facilitator">Facilitator</option>
+              <option value="admin">Admin</option>
+              <option value="team_lead">Team Lead</option>
+            </select>
+          </div>
+
+          <div className="flex-1">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Cohort
+            </label>
+            <select
+              value={cohort}
+              onChange={(e) => handleCohortFilter(e.target.value)}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">All cohorts</option>
+              {cohorts.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {hasFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+            >
+              <X className="h-4 w-4" />
+              Clear filters
+            </button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
