@@ -31,6 +31,10 @@ function buildUserFromProfile(
     fullName: profile.full_name ?? fallbackEmail ?? 'Unknown User',
     role: profile.role,
     schoolName: profile.schools?.name ?? '',
+    // The "school team" the rest of the app keys off of - same as the
+    // profile's school assignment. Without this, /team never finds a
+    // team for any fellow and falls into the unassigned empty state.
+    schoolTeamId: profile.school_id ?? undefined,
     profileImageUrl: profile.avatar_url ?? undefined,
     bio: profile.title ?? undefined,
     cohort: isCohort(profile.cohort) ? profile.cohort : null,

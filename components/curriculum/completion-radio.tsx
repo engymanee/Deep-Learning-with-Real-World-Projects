@@ -75,7 +75,7 @@ export function CompletionRadio({ contentId, isCompleted, itemTitle }: Props) {
       className={cn(
         'grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors',
         optimistic
-          ? 'border-foreground bg-foreground text-background'
+          ? 'border-primary bg-primary text-background'
           : 'border-muted-foreground/40 bg-transparent hover:border-foreground/70',
         pending && 'opacity-60',
       )}

@@ -48,14 +48,14 @@ export function renderPasswordSetupEmail(
   const isReset = args.isReset
 
   const subject = isReset
-    ? 'Reset your Wisdom at Work password'
-    : 'Set up your Wisdom at Work password'
+    ? 'Reset your WaW Fellows Portal password'
+    : 'Set up your WaW Fellows Portal password'
 
   const heading = isReset ? 'Reset your password' : 'Set up your password'
 
   const intro = isReset
-    ? 'You asked to reset your Wisdom at Work portal password.'
-    : 'You asked to set up a password for your Wisdom at Work portal account so you can sign in without a one-time code.'
+    ? 'You asked to reset your WaW Fellows Portal password.'
+    : 'You asked to set up a password for your WaW Fellows Portal account so you can sign in without a one-time code.'
 
   const followup = isReset
     ? 'Click the button below to choose a new password. The link expires shortly for your security.'

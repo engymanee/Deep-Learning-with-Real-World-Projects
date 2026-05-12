@@ -6,6 +6,8 @@ import { BulkInviteDialog } from './bulk-invite-dialog'
 import { UserRow } from './user-row'
 import { ROLE_LABELS, type Role } from '@/lib/roles'
 import { isCohort, type Cohort } from '@/lib/cohorts'
+import { UsersSearch } from './users-search'
+import { Users, Building2, BarChart3, CheckCircle2 } from 'lucide-react'
 
 type CohortSummary = { id: string; name: string }
 
@@ -40,7 +42,19 @@ type UserRowData = {
   invitation_last_sent_at: string | null
 }
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string; role?: string; school_team?: string; cohort?: string; page?: string }>
+}) {
+  const params = await searchParams
+  const search = params.search?.toLowerCase() || ''
+  const roleFilter = params.role || ''
+  const schoolTeamFilter = params.school_team || ''
+  const cohortFilter = params.cohort || ''
+  const page = parseInt(params.page || '1', 10)
+  const perPage = 25
+
   const supabase = await createClient()
   const admin = createAdminClient()
 
@@ -116,7 +130,62 @@ export default async function AdminUsersPage() {
     }
   })
 
+  // Filter users based on search, role, school team, and cohort
+  let filteredUsers = users
+  if (search) {
+    filteredUsers = filteredUsers.filter(
+      (u) =>
+        (u.full_name?.toLowerCase().includes(search) ?? false) ||
+        (u.email?.toLowerCase().includes(search) ?? false) ||
+        (u.title?.toLowerCase().includes(search) ?? false),
+    )
+  }
+  if (roleFilter) {
+    filteredUsers = filteredUsers.filter((u) => u.role === roleFilter)
+  }
+  if (schoolTeamFilter) {
+    filteredUsers = filteredUsers.filter((u) => u.cohort_name === schoolTeamFilter)
+  }
+  if (cohortFilter) {
+    filteredUsers = filteredUsers.filter((u) => u.cohort === cohortFilter)
+  }
+
+  // Calculate statistics
+  const totalFellows = users.filter((u) => u.role === 'fellow').length
+  const activeFellows = users.filter(
+    (u) => u.role === 'fellow' && !u.deactivated_at && u.email_confirmed_at,
+  ).length
+  const uniqueSchoolTeams = new Set(
+    users
+      .map((u) => u.cohort_name)
+      .filter((name) => name !== null && name !== undefined),
+  ).size
+  const uniqueCohorts = new Set(users.map((u) => u.cohort).filter((c) => c !== null)).size
+
+  // Pagination
+  const totalFiltered = filteredUsers.length
+  const totalPages = Math.ceil(totalFiltered / perPage)
+  const start = (page - 1) * perPage
+  const end = start + perPage
+  const paginatedUsers = filteredUsers.slice(start, end)
+
   const cohortList: CohortSummary[] = (cohorts ?? []).map((c) => ({ id: c.id, name: c.name }))
+
+  // Get unique school teams (cohort names) for filter dropdown
+  const schoolTeamSet = new Set(
+    users
+      .map((u) => u.cohort_name)
+      .filter((name): name is string => name !== null && name !== undefined),
+  )
+  const schoolTeamList = Array.from(schoolTeamSet)
+    .sort()
+    .map((name) => ({ id: name, name }))
+
+  // Get unique cohorts (A, B, C) from user data for filter dropdown
+  const cohortLetters = new Set(users.map((u) => u.cohort).filter((c): c is Cohort => c !== null))
+  const cohortFilterList = Array.from(cohortLetters)
+    .sort()
+    .map((letter) => ({ id: letter, name: letter }))
 
   return (
     <div className="flex flex-col gap-6">
@@ -133,6 +202,69 @@ export default async function AdminUsersPage() {
         </div>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Users className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Total Fellows
+              </p>
+              <p className="text-2xl font-semibold text-foreground">{totalFellows}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-success/10 text-success">
+              <CheckCircle2 className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Active
+              </p>
+              <p className="text-2xl font-semibold text-foreground">{activeFellows}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-accent/10 text-accent">
+              <Building2 className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                School Teams
+              </p>
+              <p className="text-2xl font-semibold text-foreground">{uniqueSchoolTeams}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-warning/10 text-warning">
+              <BarChart3 className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Cohorts
+              </p>
+              <p className="text-2xl font-semibold text-foreground">{uniqueCohorts}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search and Filter */}
+      <UsersSearch cohorts={cohortFilterList} schoolTeams={schoolTeamList} />
+
+      {/* Users List */}
       <Card>
         <CardContent className="p-0">
           <div className="hidden grid-cols-12 gap-4 border-b border-border px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground md:grid">
@@ -144,17 +276,59 @@ export default async function AdminUsersPage() {
             <div className="col-span-1 text-right">Actions</div>
           </div>
           <ul className="divide-y divide-border">
-            {users.map((u) => (
+            {paginatedUsers.map((u) => (
               <UserRow key={u.id} user={u} cohorts={cohortList} />
             ))}
-            {users.length === 0 && (
+            {paginatedUsers.length === 0 && (
               <li className="p-10 text-center text-sm text-muted-foreground">
-                No users yet. Invite someone to get started.
+                {filteredUsers.length === 0 && search
+                  ? 'No users match your search.'
+                  : 'No users found.'}
               </li>
             )}
           </ul>
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground">
+            Showing {start + 1} to {Math.min(end, totalFiltered)} of {totalFiltered} users
+          </p>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <a
+                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&school_team=${schoolTeamFilter}&cohort=${cohortFilter}&page=${page - 1}`}
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                Previous
+              </a>
+            )}
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <a
+                key={p}
+                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&school_team=${schoolTeamFilter}&cohort=${cohortFilter}&page=${p}`}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  p === page
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border border-border text-foreground hover:bg-muted'
+                }`}
+              >
+                {p}
+              </a>
+            ))}
+            {page < totalPages && (
+              <a
+                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&school_team=${schoolTeamFilter}&cohort=${cohortFilter}&page=${page + 1}`}
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                Next
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Roles: {Object.values(ROLE_LABELS).join(' · ')}

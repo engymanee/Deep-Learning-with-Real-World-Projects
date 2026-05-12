@@ -23,7 +23,8 @@ export default async function WhatsNewPage() {
     user.role === 'facilitator'
 
   return (
-    <div className="flex flex-col">
+    <>
+      <div className="flex flex-col">
       <SectionHeader
         section={section}
         count={posts.length}
@@ -35,5 +36,6 @@ export default async function WhatsNewPage() {
         emptyCopy={section.emptyCopy}
       />
     </div>
+    </>
   )
 }

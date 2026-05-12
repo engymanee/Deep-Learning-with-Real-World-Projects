@@ -18,8 +18,8 @@ const _sans = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Wisdom At Work - Learning Portal',
-  description: 'Professional development and leadership learning platform',
+  title: 'WaW Fellows Portal',
+  description: 'The Wisdom at Work Fellowship portal for professional development and leadership learning',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -60,7 +60,13 @@ export default async function RootLayout({
         className={`${_sans.variable} ${_serif.variable} font-sans antialiased`}
       >
         <UserProvider initialUser={user}>
-          <AdminPreviewBanner />
+          {user?.preview && (
+            <AdminPreviewBanner
+              label={user.preview.label}
+              mode={user.preview.mode}
+              actualAdminName={user.preview.actualAdminName}
+            />
+          )}
           {children}
         </UserProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

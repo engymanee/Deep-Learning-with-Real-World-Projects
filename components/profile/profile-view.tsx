@@ -1,6 +1,13 @@
 'use client'
 
-import { Mail } from 'lucide-react'
+import {
+  Globe,
+  HandHelping,
+  Linkedin,
+  Mail,
+  Sparkles,
+  Twitter,
+} from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -78,6 +85,17 @@ export function ProfileView({ profile, showCohort = false }: ProfileViewProps) {
                 Cohort {profile.cohort}
               </Badge>
             )}
+            {profile.community_role && (
+              <Badge variant="outline" className="text-xs">
+                {profile.community_role}
+              </Badge>
+            )}
+            {typeof profile.years_in_education === 'number' &&
+              profile.years_in_education > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  {profile.years_in_education} years in education
+                </Badge>
+              )}
           </div>
         </div>
       </div>
@@ -93,18 +111,95 @@ export function ProfileView({ profile, showCohort = false }: ProfileViewProps) {
         </section>
       )}
 
-      {profile.email && (
+      {/*
+        Looking for / willing to help. Rendered side-by-side on
+        wider screens so the "want / offer" symmetry is obvious;
+        each side hides if the user hasn't filled it in.
+      */}
+      {(profile.looking_for?.trim() || profile.willing_to_help?.trim()) && (
+        <section className="grid gap-3 sm:grid-cols-2">
+          {profile.looking_for?.trim() && (
+            <div className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+              <h3 className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                Looking for
+              </h3>
+              <p className="whitespace-pre-wrap text-pretty text-sm leading-relaxed text-foreground">
+                {profile.looking_for}
+              </p>
+            </div>
+          )}
+          {profile.willing_to_help?.trim() && (
+            <div className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+              <h3 className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <HandHelping className="h-3.5 w-3.5" aria-hidden="true" />
+                Can help with
+              </h3>
+              <p className="whitespace-pre-wrap text-pretty text-sm leading-relaxed text-foreground">
+                {profile.willing_to_help}
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/*
+        Contact + links combined into one section so the modal
+        doesn't sprout four headings for sparsely-filled profiles.
+        Each row is independently optional.
+      */}
+      {(profile.email ||
+        profile.linkedin_url ||
+        profile.twitter_url ||
+        profile.website_url) && (
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Contact
+            Connect
           </h3>
-          <a
-            href={`mailto:${profile.email}`}
-            className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-          >
-            <Mail className="h-4 w-4" aria-hidden="true" />
-            {profile.email}
-          </a>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            {profile.email && (
+              <a
+                href={`mailto:${profile.email}`}
+                className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+              >
+                <Mail className="h-4 w-4" aria-hidden="true" />
+                {profile.email}
+              </a>
+            )}
+            {profile.linkedin_url && (
+              <a
+                href={profile.linkedin_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+              >
+                <Linkedin className="h-4 w-4" aria-hidden="true" />
+                LinkedIn
+              </a>
+            )}
+            {profile.twitter_url && (
+              <a
+                href={profile.twitter_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+              >
+                <Twitter className="h-4 w-4" aria-hidden="true" />
+                Twitter / X
+              </a>
+            )}
+            {profile.website_url && (
+              <a
+                href={profile.website_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+              >
+                <Globe className="h-4 w-4" aria-hidden="true" />
+                Website
+              </a>
+            )}
+          </div>
         </section>
       )}
     </div>

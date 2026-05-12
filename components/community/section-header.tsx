@@ -2,12 +2,43 @@ import { Badge } from '@/components/ui/badge'
 import { PostComposer } from '@/components/community/post-composer'
 import type { CommunitySection } from '@/lib/community/sections'
 
+/**
+ * Lightweight serialisable shape for the framework dropdown. Mirrors
+ * the FrameworkOption type in lib/community/load-frameworks.ts but
+ * is duplicated here to keep this file's import surface small.
+ */
+interface FrameworkOption {
+  id: string
+  title: string
+}
+
 interface Props {
   section: CommunitySection
   /** Total items in the section (posts or, for bios, profiles). */
   count: number
   /** Whether the current viewer can compose in this section. */
   canPost: boolean
+  /**
+   * Optional list of PWF Protocols to surface as a framework picker
+   * inside the composer. Forwarded as-is; the composer hides the
+   * dropdown when this list is empty / missing.
+   */
+  frameworks?: FrameworkOption[]
+  /**
+   * When true, the composer enforces the Ask category picker. Used
+   * by the Asks section to make categorisation a hard requirement.
+   */
+  requireAskCategory?: boolean
+  /**
+   * When true, the composer requires + surfaces a star rating picker
+   * (1-5 stars). Used by the Wins section to capture win valuation.
+   */
+  requireStarRating?: boolean
+  /**
+   * When true, the composer requires + surfaces visibility/scope options
+   * (public, cohort, school_team). Used by the Wins section.
+   */
+  requireVisibilitySettings?: boolean
 }
 
 /**
@@ -15,7 +46,15 @@ interface Props {
  * Keeps the layout consistent: section name, count badge, one-line
  * description, and (when allowed) the "New post" composer trigger.
  */
-export function SectionHeader({ section, count, canPost }: Props) {
+export function SectionHeader({
+  section,
+  count,
+  canPost,
+  frameworks,
+  requireAskCategory = false,
+  requireStarRating = false,
+  requireVisibilitySettings = false,
+}: Props) {
   return (
     <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div className="flex flex-col gap-2">
@@ -47,6 +86,10 @@ export function SectionHeader({ section, count, canPost }: Props) {
             bodyPlaceholder={section.composerBodyPlaceholder}
             composerCta={section.composerCta}
             canPost={canPost}
+            frameworks={frameworks}
+            requireAskCategory={requireAskCategory}
+            requireStarRating={requireStarRating}
+            requireVisibilitySettings={requireVisibilitySettings}
           />
         </div>
       )}

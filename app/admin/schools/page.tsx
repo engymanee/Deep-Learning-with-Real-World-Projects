@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Building2, Users } from 'lucide-react'
+import { Building2, Users, Plus } from 'lucide-react'
 import { AddSchoolForm } from './add-school-form'
 import { AddTeamForm } from './add-team-form'
 import { AddMemberForm } from './add-member-form'
@@ -93,46 +93,105 @@ export default async function AdminSchoolsPage() {
     }))
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-serif text-foreground">Schools &amp; teams</h2>
-          <p className="text-sm text-muted-foreground">
-            {schoolList.length} school{schoolList.length === 1 ? '' : 's'} · {cohortList.length} team
-            {cohortList.length === 1 ? '' : 's'} · Each school can have one or more
-            leadership teams moving through the program.
-          </p>
-        </div>
-        <AddSchoolForm />
+    <div className="flex flex-col gap-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-balance font-serif text-4xl text-foreground">Schools &amp; Teams</h1>
+        <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
+          Organize fellows into leadership teams by school. Each school can have multiple teams
+          progressing through different years of the program.
+        </p>
       </div>
 
+      {/* Summary Stats */}
+      {schoolList.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Card>
+            <CardContent className="flex items-center gap-3 p-4">
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Building2 className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Schools
+                </p>
+                <p className="text-2xl font-semibold text-foreground">{schoolList.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="flex items-center gap-3 p-4">
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-accent/10 text-accent">
+                <Users className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Teams
+                </p>
+                <p className="text-2xl font-semibold text-foreground">{cohortList.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="flex items-center gap-3 p-4">
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-success/10 text-success">
+                <Users className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Total Members
+                </p>
+                <p className="text-2xl font-semibold text-foreground">{memberList.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Add School Button */}
+      {schoolList.length > 0 && (
+        <div>
+          <AddSchoolForm />
+        </div>
+      )}
+
+      {/* Schools List */}
       {schoolList.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
-            <Building2 className="h-6 w-6 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              No schools yet. Add one to start grouping fellows into leadership teams.
-            </p>
+          <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground mb-1">No schools yet</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add your first school to start organizing fellows into leadership teams.
+              </p>
+            </div>
+            <AddSchoolForm />
           </CardContent>
         </Card>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           {schoolList.map((school) => {
             const cohortsForSchool = cohortsBySchool.get(school.id) ?? []
             const totalMembers = membersBySchool.get(school.id) ?? 0
+
             return (
-              <Card key={school.id}>
-                <CardContent className="flex flex-col gap-5 p-5">
+              <Card key={school.id} className="overflow-hidden">
+                {/* School Header */}
+                <CardHeader className="border-b border-border pb-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 mt-0.5">
                         <Building2 className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-serif text-lg text-foreground">{school.name}</h3>
-                        <p className="text-xs text-muted-foreground">
-                          {cohortsForSchool.length} team
-                          {cohortsForSchool.length === 1 ? '' : 's'} ·{' '}
+                        <CardTitle className="text-lg font-serif">{school.name}</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {cohortsForSchool.length} team{cohortsForSchool.length === 1 ? '' : 's'} ·{' '}
                           {totalMembers} member{totalMembers === 1 ? '' : 's'}
                         </p>
                       </div>
@@ -143,34 +202,38 @@ export default async function AdminSchoolsPage() {
                       memberCount={totalMembers}
                     />
                   </div>
+                </CardHeader>
 
+                {/* Teams Section */}
+                <CardContent className="p-0">
                   {cohortsForSchool.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No teams yet.
-                    </p>
+                    <div className="px-6 py-8 text-center">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        No teams yet. Create your first team to get started.
+                      </p>
+                      <AddTeamForm
+                        schoolId={school.id}
+                        defaultName={`${school.name} Leadership Team`}
+                      />
+                    </div>
                   ) : (
-                    <div className="flex flex-col gap-4">
+                    <div className="divide-y divide-border">
                       {cohortsForSchool.map((cohort) => {
                         const cohortMembers = membersByCohort.get(cohort.id) ?? []
+
                         return (
-                          <div
-                            key={cohort.id}
-                            className="rounded-md border border-border bg-muted/20 p-4"
-                          >
-                            <div className="flex items-start justify-between gap-3">
+                          <div key={cohort.id} className="p-6">
+                            {/* Team Header */}
+                            <div className="flex items-start justify-between gap-3 mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <Users className="h-4 w-4 text-muted-foreground" />
-                                  <span className="font-medium text-foreground">
-                                    {cohort.name}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    · Year {cohort.current_year}
+                                  <h4 className="font-medium text-foreground">{cohort.name}</h4>
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                                    Year {cohort.current_year}
                                   </span>
                                 </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {cohortMembers.length} member
-                                  {cohortMembers.length === 1 ? '' : 's'}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {cohortMembers.length} member{cohortMembers.length === 1 ? '' : 's'}
                                 </p>
                               </div>
                               <TeamMenu
@@ -181,34 +244,39 @@ export default async function AdminSchoolsPage() {
                               />
                             </div>
 
-                            <ul className="mt-3 flex flex-col divide-y divide-border rounded-md border border-border bg-background">
-                              {cohortMembers.length === 0 ? (
-                                <li className="px-3 py-2 text-xs text-muted-foreground">
-                                  No members yet.
-                                </li>
-                              ) : (
-                                cohortMembers.map((m) => {
+                            {/* Team Members */}
+                            {cohortMembers.length === 0 ? (
+                              <div className="text-center py-6 text-sm text-muted-foreground">
+                                <p className="mb-3">No members yet</p>
+                                <AddMemberForm
+                                  cohortId={cohort.id}
+                                  fellows={unassignedFellows}
+                                />
+                              </div>
+                            ) : (
+                              <div className="space-y-2 mb-4">
+                                {cohortMembers.map((m) => {
                                   const fullName = m.profiles?.full_name ?? 'Unknown'
                                   return (
-                                    <li
+                                    <div
                                       key={m.profile_id}
-                                      className="flex items-center justify-between gap-3 px-3 py-2"
+                                      className="flex items-center justify-between gap-3 p-3 rounded-md border border-border/50 hover:border-border transition-colors"
                                     >
-                                      <div className="flex items-center gap-2">
-                                        <Avatar className="h-6 w-6">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <Avatar className="h-7 w-7 flex-shrink-0">
                                           <AvatarFallback className="text-xs">
                                             {initialsFor(fullName)}
                                           </AvatarFallback>
                                         </Avatar>
-                                        <div className="flex flex-col leading-tight">
-                                          <span className="text-sm text-foreground">
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-medium text-foreground truncate">
                                             {fullName}
-                                          </span>
-                                          {m.profiles?.title ? (
-                                            <span className="text-xs text-muted-foreground">
+                                          </p>
+                                          {m.profiles?.title && (
+                                            <p className="text-xs text-muted-foreground truncate">
                                               {m.profiles.title}
-                                            </span>
-                                          ) : null}
+                                            </p>
+                                          )}
                                         </div>
                                       </div>
                                       <RemoveMemberButton
@@ -216,25 +284,29 @@ export default async function AdminSchoolsPage() {
                                         profileId={m.profile_id}
                                         label={fullName}
                                       />
-                                    </li>
+                                    </div>
                                   )
-                                })
-                              )}
-                            </ul>
+                                })}
+                              </div>
+                            )}
 
-                            <div className="mt-3">
-                              <AddMemberForm
-                                cohortId={cohort.id}
-                                fellows={unassignedFellows}
-                              />
-                            </div>
+                            {/* Add Member */}
+                            {unassignedFellows.length > 0 && (
+                              <div className="mt-3">
+                                <AddMemberForm
+                                  cohortId={cohort.id}
+                                  fellows={unassignedFellows}
+                                />
+                              </div>
+                            )}
                           </div>
                         )
                       })}
                     </div>
                   )}
 
-                  <div>
+                  {/* Add Team Button */}
+                  <div className="border-t border-border px-6 py-4">
                     <AddTeamForm
                       schoolId={school.id}
                       defaultName={`${school.name} Leadership Team`}

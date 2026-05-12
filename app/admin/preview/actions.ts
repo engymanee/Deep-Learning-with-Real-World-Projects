@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/auth-server'
 import {
   clearPreviewCookie,
   setPreviewCookie,
@@ -35,6 +36,7 @@ async function assertRealAdmin(): Promise<void> {
 export async function startPreviewAsFellow(formData: FormData): Promise<void> {
   await assertRealAdmin()
   const fellowId = String(formData.get('fellowId') ?? '').trim()
+  const referrer = String(formData.get('referrer') ?? '/admin').trim()
   if (!fellowId) return
 
   // Confirm the target is actually a fellow before impersonating - we
@@ -48,7 +50,7 @@ export async function startPreviewAsFellow(formData: FormData): Promise<void> {
 
   if (!target || target.role !== 'fellow') return
 
-  await setPreviewCookie({ type: 'by_fellow', fellowId: target.id })
+  await setPreviewCookie({ type: 'by_fellow', fellowId: target.id, referrer })
   revalidatePath('/', 'layout')
   redirect('/dashboard')
 }
@@ -57,19 +59,25 @@ export async function startPreviewAsFellow(formData: FormData): Promise<void> {
 export async function startPreviewAsCohort(formData: FormData): Promise<void> {
   await assertRealAdmin()
   const raw = String(formData.get('cohort') ?? '').trim()
+  const referrer = String(formData.get('referrer') ?? '/admin').trim()
   if (!isCohort(raw)) return
 
-  await setPreviewCookie({ type: 'by_cohort', cohort: raw })
+  await setPreviewCookie({ type: 'by_cohort', cohort: raw, referrer })
   revalidatePath('/', 'layout')
   redirect('/dashboard')
 }
 
 /** Exit preview mode and return to the admin's own session. */
-export async function endPreview(): Promise<void> {
+export async function endPreview(formData: FormData): Promise<void> {
+  // Get the stored referrer from the preview cookie before clearing it
+  const user = await getCurrentUser()
+  const referrer = user?.preview?.referrer || '/admin'
+  
   // Clearing the cookie is safe even for non-admins (it's a no-op for
   // them since they wouldn't have one), so we don't gate this. We do
   // still need to be authenticated, which middleware handles.
   await clearPreviewCookie()
   revalidatePath('/', 'layout')
-  redirect('/admin')
+  
+  redirect(referrer)
 }

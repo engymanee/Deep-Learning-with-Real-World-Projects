@@ -1,14 +1,14 @@
 import { Resend } from 'resend'
 
 /**
- * Default sender for the Wisdom at Work portal. Resend's shared
+ * Default sender for the WaW Fellows Portal. Resend's shared
  * `onboarding@resend.dev` works without domain verification but is
  * rate-limited and may only deliver to the email tied to your Resend
  * account. Override with EMAIL_FROM in production once the project's
  * sending domain is verified.
  */
 export const DEFAULT_FROM =
-  process.env.EMAIL_FROM ?? 'Wisdom at Work Portal <onboarding@resend.dev>'
+  process.env.EMAIL_FROM ?? 'WaW Fellows Portal <onboarding@resend.dev>'
 
 let cached: Resend | null = null
 

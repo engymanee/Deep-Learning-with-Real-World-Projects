@@ -26,6 +26,25 @@ const ALLOWED_MIME = new Set([
 const MAX_NAME_LEN = 200
 const MAX_TITLE_LEN = 200
 const MAX_BIO_LEN = 4_000
+// Lengths for the Community of Practice profile fields. URLs are
+// generously sized to fit long LinkedIn slugs without rejecting
+// legitimate inputs; the textarea fields stay short so the
+// directory cards don't wrap into walls of text.
+const MAX_URL_LEN = 500
+const MAX_LOOKING_FOR_LEN = 500
+const MAX_WILLING_HELP_LEN = 500
+const MAX_COMMUNITY_ROLE_LEN = 80
+
+/** http(s) URL allowlist, mirrored on the client. */
+function looksLikeUrl(value: string): boolean {
+  if (!value) return true
+  try {
+    const u = new URL(value)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
 
 function extensionFor(mime: string): string {
   switch (mime) {
@@ -75,6 +94,16 @@ export async function updateProfile(
   const removeAvatar = formData.get('removeAvatar') === '1'
   const avatar = formData.get('avatar')
 
+  // Community of Practice profile fields. Each is independently
+  // optional; an empty string is the sentinel for "clear this".
+  const linkedinUrl = String(formData.get('linkedinUrl') ?? '').trim()
+  const twitterUrl = String(formData.get('twitterUrl') ?? '').trim()
+  const websiteUrl = String(formData.get('websiteUrl') ?? '').trim()
+  const lookingFor = String(formData.get('lookingFor') ?? '').trim()
+  const willingToHelp = String(formData.get('willingToHelp') ?? '').trim()
+  const yearsRaw = String(formData.get('yearsInEducation') ?? '').trim()
+  const communityRole = String(formData.get('communityRole') ?? '').trim()
+
   if (fullName.length === 0) {
     return { ok: false, message: 'Please enter your name.' }
   }
@@ -86,6 +115,45 @@ export async function updateProfile(
   }
   if (bio.length > MAX_BIO_LEN) {
     return { ok: false, message: 'Bio is too long.' }
+  }
+
+  // Re-validate URLs server-side. We accept blank, http, or https.
+  for (const [label, value] of [
+    ['LinkedIn URL', linkedinUrl],
+    ['Twitter / X URL', twitterUrl],
+    ['Website URL', websiteUrl],
+  ] as const) {
+    if (value.length > MAX_URL_LEN) {
+      return { ok: false, message: `${label} is too long.` }
+    }
+    if (!looksLikeUrl(value)) {
+      return {
+        ok: false,
+        message: `${label} must start with http:// or https://`,
+      }
+    }
+  }
+  if (lookingFor.length > MAX_LOOKING_FOR_LEN) {
+    return { ok: false, message: '“Looking for” text is too long.' }
+  }
+  if (willingToHelp.length > MAX_WILLING_HELP_LEN) {
+    return { ok: false, message: '“Willing to help” text is too long.' }
+  }
+  if (communityRole.length > MAX_COMMUNITY_ROLE_LEN) {
+    return { ok: false, message: 'Community role is too long.' }
+  }
+
+  // Years: blank means clear; otherwise must be 0-80 integer.
+  let yearsInEducation: number | null = null
+  if (yearsRaw.length > 0) {
+    const parsed = Number(yearsRaw)
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 80) {
+      return {
+        ok: false,
+        message: 'Years in education must be a whole number between 0 and 80.',
+      }
+    }
+    yearsInEducation = parsed
   }
 
   // Pull the current avatar URL once so we can clean up the old
@@ -144,10 +212,20 @@ export async function updateProfile(
   // Build the patch lazily so we never overwrite a column we didn't
   // intend to touch. avatar_url is only included when undefined !==
   // typeof nextAvatarUrl.
-  const patch: Record<string, string | null> = {
+  const patch: Record<string, string | number | null> = {
     full_name: fullName,
     title: title.length > 0 ? title : null,
     bio: bio.length > 0 ? bio : null,
+    // Community of Practice fields. Empty strings are normalised
+    // to NULL so a cleared input becomes a real null in the DB
+    // (rather than a "" that breaks isEmpty checks).
+    linkedin_url: linkedinUrl.length > 0 ? linkedinUrl : null,
+    twitter_url: twitterUrl.length > 0 ? twitterUrl : null,
+    website_url: websiteUrl.length > 0 ? websiteUrl : null,
+    looking_for: lookingFor.length > 0 ? lookingFor : null,
+    willing_to_help: willingToHelp.length > 0 ? willingToHelp : null,
+    community_role: communityRole.length > 0 ? communityRole : null,
+    years_in_education: yearsInEducation,
   }
   if (nextAvatarUrl !== undefined) patch.avatar_url = nextAvatarUrl
 

@@ -1,9 +1,10 @@
 'use client'
 
 import { useDeferredValue, useMemo, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, Sparkles, X } from 'lucide-react'
 import { MemberCard } from '@/components/profile/member-card'
 import { ProfileModal } from '@/components/profile/profile-view'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,7 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { type DirectoryProfile, roleLabelFor } from '@/lib/types/profile'
+import {
+  type DirectoryProfile,
+  initialsFor,
+  roleLabelFor,
+} from '@/lib/types/profile'
 
 interface Props {
   profiles: DirectoryProfile[]
@@ -52,13 +57,43 @@ const FACULTY_ROLES = new Set(['facilitator', 'admin'])
  * card variant is used here so each tile teases the bio - the
  * modal is reserved for the full view.
  */
+/**
+ * "Help orientation" filter values:
+ *  - 'looking' shows members who filled in `looking_for`
+ *  - 'offering' shows members who filled in `willing_to_help`
+ *  - ALL skips the filter
+ */
+type HelpFilter = typeof ALL | 'looking' | 'offering'
+
 export function BiosDirectory({ profiles, showCohort = false }: Props) {
   const [query, setQuery] = useState('')
   const [cohort, setCohort] = useState<string>(ALL)
   const [team, setTeam] = useState<string>(ALL)
   const [peopleType, setPeopleType] = useState<PeopleType>(ALL)
+  const [help, setHelp] = useState<HelpFilter>(ALL)
   const [selected, setSelected] = useState<DirectoryProfile | null>(null)
   const deferredQuery = useDeferredValue(query)
+
+  // Member of the Week: at most one profile is currently in window.
+  // We compute it client-side because the data is already fetched
+  // and there's no need to round-trip for what amounts to a date
+  // comparison. If multiple profiles overlap (admin oversight),
+  // we surface the first by name to stay deterministic.
+  const featuredMember = useMemo(() => {
+    const now = Date.now()
+    return (
+      profiles.find((p) => {
+        const from = p.featured_member_from
+          ? Date.parse(p.featured_member_from)
+          : null
+        const until = p.featured_member_until
+          ? Date.parse(p.featured_member_until)
+          : null
+        if (from === null || until === null) return false
+        return from <= now && now <= until
+      }) ?? null
+    )
+  }, [profiles])
 
   // Surface the people-type tabs only when the directory contains
   // both fellows and faculty - no need to show a single-option
@@ -111,6 +146,11 @@ export function BiosDirectory({ profiles, showCohort = false }: Props) {
       ) {
         return false
       }
+      // Help-orientation filter. "Looking" = members who described
+      // what they want; "offering" = members who described how
+      // they can help. Empty strings (whitespace-only) don't count.
+      if (help === 'looking' && !p.looking_for?.trim()) return false
+      if (help === 'offering' && !p.willing_to_help?.trim()) return false
       if (cohort !== ALL && p.cohort !== cohort) return false
       if (team !== ALL) {
         // A member matches the team filter when the selected team
@@ -150,12 +190,13 @@ export function BiosDirectory({ profiles, showCohort = false }: Props) {
       }
       return true
     })
-  }, [profiles, deferredQuery, cohort, team, peopleType])
+  }, [profiles, deferredQuery, cohort, team, peopleType, help])
 
   const showReset =
     cohort !== ALL ||
     team !== ALL ||
     peopleType !== ALL ||
+    help !== ALL ||
     query.trim().length > 0
 
   function reset() {
@@ -163,6 +204,7 @@ export function BiosDirectory({ profiles, showCohort = false }: Props) {
     setCohort(ALL)
     setTeam(ALL)
     setPeopleType(ALL)
+    setHelp(ALL)
   }
 
   const peopleTabs: Array<{
@@ -186,6 +228,56 @@ export function BiosDirectory({ profiles, showCohort = false }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/*
+        Member of the Week banner. Renders only when an admin has
+        scheduled someone via featured_member_{from,until}; quietly
+        absent otherwise so the page never shows an empty hero.
+        Clicking the banner opens the same modal the directory cards
+        use, so visitors can read the full bio without scrolling.
+      */}
+      {featuredMember && (
+        <button
+          type="button"
+          onClick={() => setSelected(featuredMember)}
+          className="group flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 text-left transition-colors hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-row sm:items-center sm:gap-4"
+          aria-label={`Open profile for ${featuredMember.full_name ?? 'featured member'}`}
+        >
+          <Avatar className="h-16 w-16 shrink-0 ring-2 ring-primary/30">
+            {featuredMember.avatar_url ? (
+              <AvatarImage src={featuredMember.avatar_url} alt="" />
+            ) : null}
+            <AvatarFallback className="text-lg font-medium">
+              {initialsFor(featuredMember.full_name, featuredMember.email)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+              Member of the Week
+            </p>
+            <p className="mt-1 truncate font-serif text-lg text-foreground">
+              {featuredMember.full_name ?? 'Featured member'}
+            </p>
+            {featuredMember.title && (
+              <p className="truncate text-xs text-muted-foreground">
+                {featuredMember.title}
+                {featuredMember.school_name
+                  ? ` · ${featuredMember.school_name}`
+                  : ''}
+              </p>
+            )}
+            {featuredMember.bio?.trim() && (
+              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                {featuredMember.bio}
+              </p>
+            )}
+          </div>
+          <span className="hidden text-xs font-medium text-primary group-hover:underline sm:inline">
+            Open profile →
+          </span>
+        </button>
+      )}
+
       {/* People-type tabs. Rendered only when the list contains both
           fellows and faculty so we don't show a one-option toggle. */}
       {showPeopleType && (
@@ -270,6 +362,34 @@ export function BiosDirectory({ profiles, showCohort = false }: Props) {
                     {t}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/*
+            Help orientation: "Looking for help" / "Offering help".
+            We only render the dropdown when at least one member in
+            the dataset has populated either field, otherwise the
+            options return an empty list and create a confusing
+            dead-end filter.
+          */}
+          {profiles.some(
+            (p) => p.looking_for?.trim() || p.willing_to_help?.trim(),
+          ) && (
+            <Select
+              value={help}
+              onValueChange={(v) => setHelp(v as HelpFilter)}
+            >
+              <SelectTrigger
+                className="h-9 min-w-[12rem]"
+                aria-label="Filter by help orientation"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Anyone</SelectItem>
+                <SelectItem value="looking">Looking for help</SelectItem>
+                <SelectItem value="offering">Offering help</SelectItem>
               </SelectContent>
             </Select>
           )}

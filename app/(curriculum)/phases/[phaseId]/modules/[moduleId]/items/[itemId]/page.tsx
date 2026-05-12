@@ -3,6 +3,7 @@ import { LessonFooter } from '@/components/curriculum/lesson-footer'
 import { LinkOpenButton } from '@/components/curriculum/link-open-button'
 import { LiveSessionStatus } from '@/components/curriculum/live-session-status'
 import { ReflectionForm } from '@/components/curriculum/reflection-form'
+import { ReflectionDisplay } from '@/components/curriculum/reflection-display'
 import { VideoEmbed } from '@/components/curriculum/video-embed'
 // Detector is server-safe (pure URL parsing) and lives in a
 // non-client module so this server component can call it without
@@ -294,11 +295,18 @@ export default async function ContentItemPage({
       {/* Reflection prompt + response. Required to complete the
           item when enabled. */}
       {reflectionRequired && (
-        <ReflectionForm
-          contentId={item.id}
-          prompt={item.reflection_prompt!.trim()}
-          initialResponse={reflectionResponse}
-        />
+        <>
+          <ReflectionForm
+            contentId={item.id}
+            prompt={item.reflection_prompt!.trim()}
+            initialResponse={reflectionResponse}
+          />
+          <ReflectionDisplay
+            reflection={reflectionResponse}
+            contentTitle={item.title}
+            nextHref={next?.href ?? null}
+          />
+        </>
       )}
 
       {/* Footer pairs Mark-complete with Continue.

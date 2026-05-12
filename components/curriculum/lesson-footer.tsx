@@ -116,7 +116,25 @@ export function LessonFooter({
   }
 
   function handleContinue() {
-    if (nextHref) router.push(nextHref)
+    if (!optimistic && !blocked) {
+      // Item not yet completed, no gates blocking - mark complete
+      // then navigate. This is for reflection items that have met
+      // the minimum but no link gate to click.
+      setError(null)
+      setOptimistic(true)
+      startTransition(async () => {
+        const res = await toggleContentCompletion(contentId, true)
+        if (!res.ok) {
+          setOptimistic(false)
+          setError(res.message)
+          return
+        }
+        if (nextHref) router.push(nextHref)
+      })
+    } else if (nextHref) {
+      // Already completed - just navigate.
+      router.push(nextHref)
+    }
   }
 
   // "Completed" indicator. Doubles as the re-open affordance: hover
@@ -177,36 +195,65 @@ export function LessonFooter({
               <Button
                 type="button"
                 onClick={handleContinue}
-                className="inline-flex items-center gap-1.5"
+                size="lg"
+                className="inline-flex items-center gap-2"
               >
                 Go to next item
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </Button>
             ) : (
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push('/dashboard')}
-                className="inline-flex items-center gap-1.5"
+                className="inline-flex items-center gap-2"
               >
                 Back to dashboard
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </Button>
             )}
             {completedBadge}
           </>
-        ) : blocked ? (
-          // Reflection (or link) gate is active. Don't even render
-          // the Mark complete button - completion isn't a visual
-          // option yet. The hint above explains why.
-          null
+        ) : needsLinkClick ? (
+          // Link gate is active but reflection (if required) is cleared.
+          // Show the Mark complete button as disabled with the link hint.
+          <Button
+            type="button"
+            onClick={handleMarkComplete}
+            disabled={pending || blocked}
+          >
+            {pending ? 'Marking...' : 'Mark complete'}
+          </Button>
+        ) : needsReflection ? (
+          // Reflection gate is active. Show disabled Mark complete
+          // with the reflection hint.
+          <Button
+            type="button"
+            onClick={handleMarkComplete}
+            disabled={pending || blocked}
+          >
+            {pending ? 'Marking...' : 'Mark complete'}
+          </Button>
         ) : autoComplete ? (
           // Completion is owned by an external mechanism (e.g. the
           // scheduled live-session block above auto-marks the item
           // complete once the session ends). No manual CTA needed.
           null
+        ) : nextHref ? (
+          // All gates cleared, no auto-complete: show "Go to next item"
+          // which will mark complete and navigate.
+          <Button
+            type="button"
+            onClick={handleContinue}
+            size="lg"
+            className="inline-flex items-center gap-2"
+            disabled={pending}
+          >
+            Go to next item
+            <ArrowRight className="h-5 w-5" aria-hidden="true" />
+          </Button>
         ) : (
-          // All gates cleared: single primary CTA.
+          // Final item, all gates cleared - just show Mark complete.
           <Button
             type="button"
             onClick={handleMarkComplete}

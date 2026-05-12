@@ -25,12 +25,12 @@ export type RenderedEmail = {
 export function renderSignInCodeEmail(args: SignInCodeEmailArgs): RenderedEmail {
   const greeting = args.recipientName?.trim() ? args.recipientName.trim() : 'there'
   const expires = args.expiresInLabel?.trim() || '1 hour'
-  const subject = `Your Wisdom at Work sign-in code: ${args.code}`
+  const subject = `Your WaW Fellows Portal sign-in code: ${args.code}`
 
   const text = [
     `Hi ${greeting},`,
     '',
-    'Use the code below to finish signing in to the Wisdom at Work portal:',
+    'Use the code below to finish signing in to the WaW Fellows Portal:',
     '',
     `    ${args.code}`,
     '',
@@ -52,7 +52,7 @@ export function renderSignInCodeEmail(args: SignInCodeEmailArgs): RenderedEmail 
       greeting,
     )},</p>
     <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#1f2937;">
-      Use the code below to finish signing in to the Wisdom at Work portal.
+      Use the code below to finish signing in to the WaW Fellows Portal.
     </p>
     ${codeBlock}
     <p style="margin:0 0 4px;font-size:13px;line-height:1.6;color:#6b7280;">

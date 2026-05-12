@@ -20,6 +20,7 @@ export async function initializeDatabase() {
           CREATE TYPE IF NOT EXISTS program_year AS ENUM ('year_one', 'year_two', 'year_three');
           CREATE TYPE IF NOT EXISTS enrollment_status AS ENUM ('pending', 'enrolled', 'completed', 'dropped');
           CREATE TYPE IF NOT EXISTS discussion_type AS ENUM ('forum', 'qa', 'announcement');
+          CREATE TYPE IF NOT EXISTS schedule_status AS ENUM ('polling', 'scheduled', 'completed');
 
           CREATE TABLE IF NOT EXISTS users (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -134,8 +135,31 @@ export async function initializeDatabase() {
             location VARCHAR(255),
             meeting_link VARCHAR(500),
             capacity INTEGER,
+            status schedule_status DEFAULT 'scheduled',
+            is_poll BOOLEAN DEFAULT FALSE,
+            voting_closes_at TIMESTAMP WITH TIME ZONE,
+            created_by_admin UUID REFERENCES users(id) ON DELETE SET NULL,
+            selected_option_id UUID,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS schedule_options (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            schedule_id UUID NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+            start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+            end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+            order_number INTEGER NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS schedule_votes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            schedule_id UUID NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+            preferred_option_id UUID NOT NULL REFERENCES schedule_options(id) ON DELETE CASCADE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, schedule_id)
           );
 
           CREATE TABLE IF NOT EXISTS attendance (
@@ -178,6 +202,10 @@ export async function initializeDatabase() {
           CREATE INDEX IF NOT EXISTS idx_resources_module_id ON resources(module_id);
           CREATE INDEX IF NOT EXISTS idx_resources_program_id ON resources(program_id);
           CREATE INDEX IF NOT EXISTS idx_schedules_module_id ON schedules(module_id);
+          CREATE INDEX IF NOT EXISTS idx_schedules_status ON schedules(status);
+          CREATE INDEX IF NOT EXISTS idx_schedule_options_schedule_id ON schedule_options(schedule_id);
+          CREATE INDEX IF NOT EXISTS idx_schedule_votes_user_id ON schedule_votes(user_id);
+          CREATE INDEX IF NOT EXISTS idx_schedule_votes_schedule_id ON schedule_votes(schedule_id);
           CREATE INDEX IF NOT EXISTS idx_attendance_user_id ON attendance(user_id);
           CREATE INDEX IF NOT EXISTS idx_attendance_schedule_id ON attendance(schedule_id);
           CREATE INDEX IF NOT EXISTS idx_discussions_program_id ON discussions(program_id);

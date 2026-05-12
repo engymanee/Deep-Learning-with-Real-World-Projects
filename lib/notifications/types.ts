@@ -92,4 +92,10 @@ export interface NotificationRow {
 export interface NotificationFeedItem extends NotificationRow {
   read_at: string | null
   recipient_id: string | null
+  /**
+   * Per-user "cleared from feed" timestamp (migration 048). Null when
+   * the notification is still active in the user's feed. Set when the
+   * user pressed the dismiss button or "Clear all".
+   */
+  dismissed_at: string | null
 }

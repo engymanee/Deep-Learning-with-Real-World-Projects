@@ -24,7 +24,11 @@ export default async function ProfilePage() {
 
   const { data: row } = await supabase
     .from('profiles')
-    .select('id, full_name, email, title, avatar_url, bio')
+    .select(
+      `id, full_name, email, title, avatar_url, bio,
+       linkedin_url, twitter_url, website_url,
+       looking_for, willing_to_help, years_in_education, community_role`,
+    )
     .eq('id', user.id)
     .maybeSingle<{
       id: string
@@ -33,6 +37,13 @@ export default async function ProfilePage() {
       title: string | null
       avatar_url: string | null
       bio: string | null
+      linkedin_url: string | null
+      twitter_url: string | null
+      website_url: string | null
+      looking_for: string | null
+      willing_to_help: string | null
+      years_in_education: number | null
+      community_role: string | null
     }>()
 
   const initial = {
@@ -42,6 +53,13 @@ export default async function ProfilePage() {
     title: row?.title ?? null,
     bio: row?.bio ?? null,
     avatarUrl: row?.avatar_url ?? user.profileImageUrl ?? null,
+    linkedinUrl: row?.linkedin_url ?? null,
+    twitterUrl: row?.twitter_url ?? null,
+    websiteUrl: row?.website_url ?? null,
+    lookingFor: row?.looking_for ?? null,
+    willingToHelp: row?.willing_to_help ?? null,
+    yearsInEducation: row?.years_in_education ?? null,
+    communityRole: row?.community_role ?? null,
   }
 
   return (

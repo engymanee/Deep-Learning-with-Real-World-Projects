@@ -105,7 +105,13 @@ const DEFAULTS: NotificationFormInitial = {
   content_id: null,
   cta_label: null,
   cta_url: null,
-  email_enabled: false,
+  // Default new notifications to "also send by email". Admins can
+  // uncheck the box per-notification, but the common case is that a
+  // new in-portal notification should also reach inboxes - the
+  // previous default of `false` made it easy to miss the toggle and
+  // ship a notification with no email at all (which is what
+  // happened with notification b4c529f9... on 2026-05-10).
+  email_enabled: true,
   email_subject: null,
   scheduled_for: null,
 }
@@ -633,12 +639,19 @@ export function NotificationDialog({
           {/* Email */}
           <fieldset className="space-y-3 rounded-lg border border-border p-3">
             <legend className="px-1 text-sm font-medium">Email</legend>
-            <label className="inline-flex items-center gap-2 text-sm">
+            <label className="inline-flex items-start gap-2 text-sm">
               <Checkbox
                 checked={emailEnabled}
                 onCheckedChange={(v) => setEmailEnabled(Boolean(v))}
+                className="mt-0.5"
               />
-              <span>Also email this notification to recipients</span>
+              <span>
+                Also email this notification to recipients
+                <span className="block text-xs text-muted-foreground">
+                  When checked, an email is sent to each fellow in the audience as
+                  soon as the notification is published.
+                </span>
+              </span>
             </label>
             {emailEnabled && (
               <input type="hidden" name="email_enabled" value="on" />

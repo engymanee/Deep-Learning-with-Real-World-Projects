@@ -1,24 +1,20 @@
+'use client'
+
 import { Eye, X } from 'lucide-react'
-import { getCurrentUser } from '@/lib/auth-server'
 import { endPreview } from '@/app/admin/preview/actions'
 
-/**
- * Sticky banner shown at the very top of every authenticated page while
- * an admin is in "Preview as fellow" mode. Renders nothing for normal
- * sessions. The exit button posts to a server action that clears the
- * preview cookie and redirects back to /admin.
- */
-export async function AdminPreviewBanner() {
-  const user = await getCurrentUser()
-  if (!user?.preview) return null
+type AdminPreviewBannerProps = {
+  label: string
+  mode: 'by_fellow' | 'by_cohort'
+  actualAdminName: string
+}
 
-  const { label, mode, actualAdminName } = user.preview
-
+export function AdminPreviewBanner({
+  label,
+  mode,
+  actualAdminName,
+}: AdminPreviewBannerProps) {
   return (
-    // Rendered as a regular block element at the top of <body> so it
-    // pushes the rest of the layout (including any sticky page top-bar)
-    // down. Avoids overlap with fellow-facing TopBar that is also
-    // `sticky top-0`.
     <div
       role="status"
       aria-live="polite"

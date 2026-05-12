@@ -6,6 +6,11 @@ interface RecipientRow {
   id: string
   notification_id: string
   read_at: string | null
+  // `dismissed_at` is the per-user "clear from feed" timestamp added
+  // in migration 048. It hides the notification from this user's
+  // surfaces only - delivery state and other recipients are
+  // untouched. Null means the notification is still in the feed.
+  dismissed_at: string | null
 }
 
 /**
@@ -19,9 +24,20 @@ interface RecipientRow {
  */
 export async function getNotificationFeedForUser(
   userId: string,
-  options: { limit?: number; onlyUnread?: boolean } = {},
+  options: {
+    limit?: number
+    onlyUnread?: boolean
+    /**
+     * When true (the default) items the user has cleared from their
+     * feed via `dismissNotification` are filtered out. Set to false
+     * for admin-style views that need to show the full history
+     * regardless of per-user dismissals.
+     */
+    excludeDismissed?: boolean
+  } = {},
 ): Promise<NotificationFeedItem[]> {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
+  const excludeDismissed = options.excludeDismissed ?? true
   const supabase = await createClient()
 
   const { data: notifications, error } = await supabase
@@ -38,11 +54,11 @@ export async function getNotificationFeedForUser(
   if (rows.length === 0) return []
 
   const ids = rows.map((r) => r.id)
-  // Read state lives in notification_recipients - own RLS allows the
-  // user to read their own rows directly.
+  // Read + dismiss state lives in notification_recipients. Own RLS
+  // allows the user to read their own rows directly.
   const { data: recipients } = await supabase
     .from('notification_recipients')
-    .select('id, notification_id, read_at')
+    .select('id, notification_id, read_at, dismissed_at')
     .eq('profile_id', userId)
     .in('notification_id', ids)
 
@@ -57,10 +73,14 @@ export async function getNotificationFeedForUser(
       ...row,
       read_at: r?.read_at ?? null,
       recipient_id: r?.id ?? null,
+      dismissed_at: r?.dismissed_at ?? null,
     }
   })
 
-  return options.onlyUnread ? items.filter((i) => !i.read_at) : items
+  let filtered = items
+  if (excludeDismissed) filtered = filtered.filter((i) => !i.dismissed_at)
+  if (options.onlyUnread) filtered = filtered.filter((i) => !i.read_at)
+  return filtered
 }
 
 /**
@@ -120,5 +140,63 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
   if (unread.length === 0) return
   for (const item of unread) {
     await markNotificationRead(userId, item.id)
+  }
+}
+
+/**
+ * Clears a single notification from the user's feed. Idempotent: a
+ * second call just refreshes `dismissed_at`. Inserts a recipient row
+ * if one didn't exist yet (legacy announcements, or items the user
+ * is seeing because of a global audience but never received an email
+ * for).
+ *
+ * We also set `read_at` defensively so the unread badge clears even
+ * for users who skipped reading and went straight to dismissing.
+ */
+export async function dismissNotification(
+  userId: string,
+  notificationId: string,
+): Promise<void> {
+  const admin = createAdminClient()
+  const now = new Date().toISOString()
+
+  await admin
+    .from('notification_recipients')
+    .upsert(
+      {
+        notification_id: notificationId,
+        profile_id: userId,
+        email_status: 'skipped',
+        read_at: now,
+        dismissed_at: now,
+      },
+      { onConflict: 'notification_id,profile_id' },
+    )
+
+  // Upsert with onConflict will update existing rows, but it leaves
+  // any prior NULLs intact. Make absolutely sure the dismiss flag is
+  // set on rows that already existed.
+  await admin
+    .from('notification_recipients')
+    .update({ dismissed_at: now, read_at: now })
+    .eq('notification_id', notificationId)
+    .eq('profile_id', userId)
+    .is('dismissed_at', null)
+}
+
+/**
+ * Clears every visible notification from the user's feed at once.
+ * "Visible" means anything currently in their feed that hasn't been
+ * dismissed already - we look it up via the same query the UI uses
+ * so there's no risk of dismissing items they couldn't see.
+ */
+export async function dismissAllNotifications(userId: string): Promise<void> {
+  const visible = await getNotificationFeedForUser(userId, {
+    excludeDismissed: true,
+    limit: 200,
+  })
+  if (visible.length === 0) return
+  for (const item of visible) {
+    await dismissNotification(userId, item.id)
   }
 }
