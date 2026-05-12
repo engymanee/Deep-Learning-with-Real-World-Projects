@@ -99,15 +99,17 @@ export function MaintenanceAuditLog() {
             setPage(1)
           }}
         />
-        <Select value={filterActionType} onValueChange={(v) => {
-          setFilterActionType(v)
+        <Select 
+          value={filterActionType || 'all'} 
+          onValueChange={(v) => {
+          setFilterActionType(v === 'all' ? '' : v)
           setPage(1)
         }}>
           <SelectTrigger>
             <SelectValue placeholder="Filter by action..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Actions</SelectItem>
+            <SelectItem value="all">All Actions</SelectItem>
             {actionTypes.map((type) => (
               <SelectItem key={type} value={type}>
                 {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
@@ -115,15 +117,17 @@ export function MaintenanceAuditLog() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filterItemType} onValueChange={(v) => {
-          setFilterItemType(v)
+        <Select 
+          value={filterItemType || 'all'} 
+          onValueChange={(v) => {
+          setFilterItemType(v === 'all' ? '' : v)
           setPage(1)
         }}>
           <SelectTrigger>
             <SelectValue placeholder="Filter by item type..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Types</SelectItem>
+            <SelectItem value="all">All Types</SelectItem>
             {itemTypes.map((type) => (
               <SelectItem key={type} value={type}>
                 {type.charAt(0).toUpperCase() + type.slice(1)}

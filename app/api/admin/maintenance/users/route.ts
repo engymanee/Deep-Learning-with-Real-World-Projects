@@ -32,9 +32,7 @@ export async function GET(request: NextRequest) {
         deactivated_at,
         created_at,
         schools(name),
-        community_posts!community_posts_created_by_fkey(id),
-        reflections(id),
-        reflection_comments(id)
+        community_posts!community_posts_created_by_fkey(id)
       `,
         { count: 'exact' }
       )
@@ -76,12 +74,9 @@ export async function GET(request: NextRequest) {
       school: user.schools?.name,
       deactivated: !!user.deactivated_at,
       postsCount: user.community_posts?.length || 0,
-      reflectionsCount: user.reflections?.length || 0,
-      commentsCount: user.reflection_comments?.length || 0,
-      relatedContentCount:
-        (user.community_posts?.length || 0) +
-        (user.reflections?.length || 0) +
-        (user.reflection_comments?.length || 0),
+      reflectionsCount: 0,
+      commentsCount: 0,
+      relatedContentCount: user.community_posts?.length || 0,
     }))
 
     return NextResponse.json({
@@ -116,16 +111,12 @@ export async function DELETE(request: NextRequest) {
       `
       full_name,
       email,
-      community_posts!community_posts_created_by_fkey(id),
-      reflections(id),
-      reflection_comments(id)
+      community_posts!community_posts_created_by_fkey(id)
     `
     ).eq('id', userId).single()
 
     const hasContent = userContent &&
-      ((userContent.community_posts?.length || 0) > 0 ||
-        (userContent.reflections?.length || 0) > 0 ||
-        (userContent.reflection_comments?.length || 0) > 0)
+      ((userContent.community_posts?.length || 0) > 0)
 
     if (action === 'archive' || action === 'deactivate') {
       // Deactivate the user
@@ -143,10 +134,7 @@ export async function DELETE(request: NextRequest) {
         itemName: userContent?.email,
         details: {
           hasRelatedContent: hasContent,
-          relatedContentCount:
-            (userContent?.community_posts?.length || 0) +
-            (userContent?.reflections?.length || 0) +
-            (userContent?.reflection_comments?.length || 0),
+          relatedContentCount: userContent?.community_posts?.length || 0,
         },
       })
 
