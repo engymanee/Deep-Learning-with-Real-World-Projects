@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import type { CustomPage, PageBlock, PageImage, PageBlockType } from '@/lib/custom-pages/types'
 
 interface PageEditorProps {
@@ -148,6 +149,14 @@ export function PageEditor({
             />
           </div>
 
+          {!page.id && (
+            <Alert className="mt-4 bg-blue-50 border-blue-200">
+              <AlertDescription className="text-blue-900">
+                Save your page as a draft first before publishing
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex gap-2 pt-2">
             <Button
               onClick={handleSave}
@@ -159,6 +168,7 @@ export function PageEditor({
             <Button
               variant={isPublished ? 'secondary' : 'default'}
               onClick={() => onPublish(!isPublished)}
+              disabled={!page.id || isSaving}
               className="gap-2"
             >
               {isPublished ? (
