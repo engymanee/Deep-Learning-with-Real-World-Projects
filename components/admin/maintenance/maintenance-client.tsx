@@ -197,8 +197,6 @@ export function MaintenanceClient() {
                 <Edit2 className="h-3 w-3" />
               </button>
             )}
-              </CardContent>
-            </Card>
           </div>
         ))}
       </div>
