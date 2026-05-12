@@ -64,16 +64,8 @@ export type SendResult =
 export async function sendEmail(args: SendArgs): Promise<SendResult> {
   try {
     const resend = getResend()
-    const fromAddress = args.from ?? DEFAULT_FROM
-    
-    console.log('[v0] Email config:', {
-      EMAIL_FROM_env: process.env.EMAIL_FROM,
-      fromAddress,
-      DEFAULT_FROM,
-    })
-    
     const { data, error } = await resend.emails.send({
-      from: fromAddress,
+      from: args.from ?? DEFAULT_FROM,
       to: Array.isArray(args.to) ? args.to : [args.to],
       subject: args.subject,
       html: args.html,
@@ -83,7 +75,6 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
     })
 
     if (error) {
-      console.error('[v0] Resend error:', error.message)
       return {
         ok: false,
         error: error.message ?? 'Resend returned an unspecified error',
