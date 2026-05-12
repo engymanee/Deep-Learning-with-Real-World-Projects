@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 import { CohortBadge } from '@/components/admin/cohort-access-field'
 import { CreatePhaseDialog } from './create-phase-dialog'
+import { PreviewLauncher, type PreviewFellow } from '@/components/admin/preview-launcher'
+import { isCohort, type Cohort } from '@/lib/cohorts'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,11 +21,19 @@ type ContentCountRow = {
   year_id: string
 }
 
+type ProfileRow = {
+  id: string
+  full_name: string | null
+  email: string | null
+  cohort: string | null
+  schools: { name: string | null } | null
+}
+
 export default async function AdminCurriculumPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const [{ data: phases }, { data: contents }] = await Promise.all([
+  const [{ data: phases }, { data: contents }, { data: fellows }] = await Promise.all([
     supabase
       .from('years')
       .select('id, title, description, order_index, cohorts')
@@ -33,6 +43,13 @@ export default async function AdminCurriculumPage() {
       .from('labs')
       .select('year_id')
       .returns<ContentCountRow[]>(),
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, cohort, schools(name)')
+      .eq('role', 'fellow')
+      .is('deactivated_at', null)
+      .order('full_name', { ascending: true, nullsFirst: false })
+      .returns<ProfileRow[]>(),
   ])
 
   // Tally content count per phase. Categories deliberately aren't
@@ -45,6 +62,15 @@ export default async function AdminCurriculumPage() {
   }
 
   const phaseList = phases ?? []
+
+  // Transform fellows data for PreviewLauncher
+  const previewFellows: PreviewFellow[] = (fellows ?? []).map((f) => ({
+    id: f.id,
+    fullName: f.full_name ?? 'Unnamed fellow',
+    email: f.email,
+    cohort: isCohort(f.cohort) ? f.cohort : null,
+    schoolName: f.schools?.name ?? null,
+  }))
 
   return (
     <div className="flex flex-col gap-8">
@@ -59,6 +85,9 @@ export default async function AdminCurriculumPage() {
         </div>
         <CreatePhaseDialog />
       </div>
+
+      {/* Preview Launcher */}
+      {previewFellows.length > 0 && <PreviewLauncher fellows={previewFellows} />}
 
       {phaseList.length === 0 ? (
         <div className="rounded-md border border-dashed border-border p-10 text-center">
