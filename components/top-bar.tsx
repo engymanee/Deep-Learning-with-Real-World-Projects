@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Settings, LogOut, User as UserIcon, Shield } from 'lucide-react'
+import { Settings, LogOut, User as UserIcon, Shield, Edit2, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,12 +22,41 @@ import { NotificationsBell } from '@/components/notifications/notifications-bell
 export function TopBar() {
   const { user } = useMaybeUser()
   const router = useRouter()
+  const [editingLabel, setEditingLabel] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState<string>('')
+  const [labels, setLabels] = useState({
+    dashboard: 'Dashboard',
+    about: 'About',
+    library: 'Library',
+    community: 'Community',
+  })
 
   const handleSignOut = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/auth/login')
     router.refresh()
+  }
+
+  const handleEditStart = (key: string, currentLabel: string) => {
+    setEditingLabel(key)
+    setEditValue(currentLabel)
+  }
+
+  const handleEditSave = (key: string) => {
+    if (editValue.trim()) {
+      setLabels((prev) => ({
+        ...prev,
+        [key]: editValue.trim(),
+      }))
+    }
+    setEditingLabel(null)
+    setEditValue('')
+  }
+
+  const handleEditCancel = () => {
+    setEditingLabel(null)
+    setEditValue('')
   }
 
   const initials = user?.fullName
@@ -47,30 +78,170 @@ export function TopBar() {
 
       {/* Center: Horizontal Nav */}
       <nav className="hidden md:flex items-center gap-8">
-        <Link
-          href="/dashboard"
-          className="text-sm font-medium text-white/80 hover:text-white transition-colors"
-        >
-          Dashboard
-        </Link>
-        <Link
-          href="/about"
-          className="text-sm font-medium text-white/80 hover:text-white transition-colors"
-        >
-          About
-        </Link>
-        <Link
-          href="/resources"
-          className="text-sm font-medium text-white/80 hover:text-white transition-colors"
-        >
-          Library
-        </Link>
-        <Link
-          href="/community"
-          className="text-sm font-medium text-white/80 hover:text-white transition-colors"
-        >
-          Community
-        </Link>
+        <div className="relative group">
+          {editingLabel === 'dashboard' ? (
+            <div className="flex items-center gap-1">
+              <Input
+                autoFocus
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                className="h-8 px-2 text-sm w-24"
+              />
+              <button
+                onClick={() => handleEditSave('dashboard')}
+                className="p-1 hover:bg-primary-light rounded"
+              >
+                <Check className="h-4 w-4 text-green-300" />
+              </button>
+              <button
+                onClick={handleEditCancel}
+                className="p-1 hover:bg-primary-light rounded"
+              >
+                <X className="h-4 w-4 text-red-300" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/dashboard"
+              className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1 group/nav"
+            >
+              {labels.dashboard}
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => handleEditStart('dashboard', labels.dashboard)}
+                  className="opacity-0 group-hover/nav:opacity-100 hover:bg-primary-light p-0.5 rounded transition-opacity"
+                >
+                  <Edit2 className="h-3 w-3" />
+                </button>
+              )}
+            </Link>
+          )}
+        </div>
+
+        <div className="relative group">
+          {editingLabel === 'about' ? (
+            <div className="flex items-center gap-1">
+              <Input
+                autoFocus
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                className="h-8 px-2 text-sm w-20"
+              />
+              <button
+                onClick={() => handleEditSave('about')}
+                className="p-1 hover:bg-primary-light rounded"
+              >
+                <Check className="h-4 w-4 text-green-300" />
+              </button>
+              <button
+                onClick={handleEditCancel}
+                className="p-1 hover:bg-primary-light rounded"
+              >
+                <X className="h-4 w-4 text-red-300" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/about"
+              className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1 group/nav"
+            >
+              {labels.about}
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => handleEditStart('about', labels.about)}
+                  className="opacity-0 group-hover/nav:opacity-100 hover:bg-primary-light p-0.5 rounded transition-opacity"
+                >
+                  <Edit2 className="h-3 w-3" />
+                </button>
+              )}
+            </Link>
+          )}
+        </div>
+
+        <div className="relative group">
+          {editingLabel === 'library' ? (
+            <div className="flex items-center gap-1">
+              <Input
+                autoFocus
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                className="h-8 px-2 text-sm w-24"
+              />
+              <button
+                onClick={() => handleEditSave('library')}
+                className="p-1 hover:bg-primary-light rounded"
+              >
+                <Check className="h-4 w-4 text-green-300" />
+              </button>
+              <button
+                onClick={handleEditCancel}
+                className="p-1 hover:bg-primary-light rounded"
+              >
+                <X className="h-4 w-4 text-red-300" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/resources"
+              className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1 group/nav"
+            >
+              {labels.library}
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => handleEditStart('library', labels.library)}
+                  className="opacity-0 group-hover/nav:opacity-100 hover:bg-primary-light p-0.5 rounded transition-opacity"
+                >
+                  <Edit2 className="h-3 w-3" />
+                </button>
+              )}
+            </Link>
+          )}
+        </div>
+
+        <div className="relative group">
+          {editingLabel === 'community' ? (
+            <div className="flex items-center gap-1">
+              <Input
+                autoFocus
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                className="h-8 px-2 text-sm w-24"
+              />
+              <button
+                onClick={() => handleEditSave('community')}
+                className="p-1 hover:bg-primary-light rounded"
+              >
+                <Check className="h-4 w-4 text-green-300" />
+              </button>
+              <button
+                onClick={handleEditCancel}
+                className="p-1 hover:bg-primary-light rounded"
+              >
+                <X className="h-4 w-4 text-red-300" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/community"
+              className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1 group/nav"
+            >
+              {labels.community}
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => handleEditStart('community', labels.community)}
+                  className="opacity-0 group-hover/nav:opacity-100 hover:bg-primary-light p-0.5 rounded transition-opacity"
+                >
+                  <Edit2 className="h-3 w-3" />
+                </button>
+              )}
+            </Link>
+          )}
+        </div>
+
         {user?.role === 'admin' && (
           <Link
             href="/admin"

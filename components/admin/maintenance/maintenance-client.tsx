@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, BookOpen, Library, Megaphone, Bell, FileText, History, Edit2, Check, X } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Users, BookOpen, Library, Megaphone, Bell, FileText, History } from 'lucide-react'
 import { UsersCleanupSection } from './users-cleanup'
 import { ContentCleanupSection } from './content-cleanup'
 import { LibraryCleanupSection } from './library-cleanup'
@@ -68,67 +67,37 @@ const sections: SectionConfig[] = [
 
 export function MaintenanceClient() {
   const [activeSection, setActiveSection] = useState<Section>('users')
-  const [editingLabel, setEditingLabel] = useState<Section | null>(null)
-  const [editValues, setEditValues] = useState<Record<Section, string>>({
-    users: 'Users',
-    content: 'Content',
-    library: 'Library',
-    community: 'Community',
-    notifications: 'Notifications',
-    pages: 'Pages',
-    audit: 'Audit Log',
-  })
 
   const currentSection = sections.find((s) => s.id === activeSection)
   const CurrentComponent = currentSection?.component
-
-  const handleRenameStart = (id: Section) => {
-    setEditingLabel(id)
-    setEditValues((prev) => ({
-      ...prev,
-      [id]: sections.find((s) => s.id === id)?.label || '',
-    }))
-  }
-
-  const handleRenameSave = (id: Section) => {
-    setEditingLabel(null)
-  }
-
-  const handleRenameCancel = () => {
-    setEditingLabel(null)
-  }
-
-  const getDisplayLabel = (id: Section) => {
-    return editValues[id] || sections.find((s) => s.id === id)?.label || ''
-  }
 
   return (
     <div className="flex flex-col gap-6">
       {/* Navigation Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         {sections.map((section) => (
-          <div key={section.id} className="relative group">
-            <button
-              onClick={() => setActiveSection(section.id)}
-              className={`w-full transition-all duration-200 ${
+          <button
+            key={section.id}
+            onClick={() => setActiveSection(section.id)}
+            className={`transition-all duration-200 ${
+              activeSection === section.id
+                ? 'ring-2 ring-primary'
+                : 'hover:shadow-md'
+            }`}
+          >
+            <Card
+              className={`cursor-pointer h-full ${
                 activeSection === section.id
-                  ? 'ring-2 ring-primary'
-                  : 'hover:shadow-md'
+                  ? 'border-primary bg-primary/5'
+                  : 'hover:bg-accent'
               }`}
             >
-              <Card
-                className={`cursor-pointer h-full ${
-                  activeSection === section.id
-                    ? 'border-primary bg-primary/5'
-                    : 'hover:bg-accent'
-                }`}
-              >
-                <CardContent className="p-4 flex flex-col items-center justify-center gap-2 text-center h-full min-h-24">
-                  <div
-                    className={`${
-                      activeSection === section.id
-                        ? 'text-primary'
-                        : 'text-muted-foreground'
+              <CardContent className="p-4 flex flex-col items-center justify-center gap-2 text-center h-full min-h-24">
+                <div
+                  className={`${
+                    activeSection === section.id
+                      ? 'text-primary'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   {section.icon}
@@ -140,65 +109,11 @@ export function MaintenanceClient() {
                       : 'text-muted-foreground'
                   }`}
                 >
-                  {editingLabel === section.id ? (
-                    <Input
-                      autoFocus
-                      type="text"
-                      value={editValues[section.id]}
-                      onChange={(e) =>
-                        setEditValues((prev) => ({
-                          ...prev,
-                          [section.id]: e.target.value,
-                        }))
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-7 text-xs text-center p-1"
-                    />
-                  ) : (
-                    getDisplayLabel(section.id)
-                  )}
+                  {section.label}
                 </span>
               </CardContent>
             </Card>
-            </button>
-
-            {/* Rename Button - visible on hover */}
-            {editingLabel === section.id ? (
-              <div className="absolute -bottom-9 right-0 flex gap-1 bg-background border rounded p-1 shadow-sm z-10">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleRenameSave(section.id)
-                  }}
-                  className="p-1 hover:bg-accent rounded"
-                  title="Save"
-                >
-                  <Check className="h-3 w-3 text-green-600" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleRenameCancel()
-                  }}
-                  className="p-1 hover:bg-accent rounded"
-                  title="Cancel"
-                >
-                  <X className="h-3 w-3 text-red-600" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleRenameStart(section.id)
-                }}
-                className="absolute -bottom-9 right-0 p-1 opacity-0 group-hover:opacity-100 hover:bg-accent rounded transition-opacity bg-background border shadow-sm"
-                title="Rename section"
-              >
-                <Edit2 className="h-3 w-3" />
-              </button>
-            )}
-          </div>
+          </button>
         ))}
       </div>
 
