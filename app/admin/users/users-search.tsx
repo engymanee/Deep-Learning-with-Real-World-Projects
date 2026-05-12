@@ -5,12 +5,20 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Search, X } from 'lucide-react'
 
 type CohortSummary = { id: string; name: string }
+type SchoolTeam = { id: string; name: string }
 
-export function UsersSearch({ cohorts }: { cohorts: CohortSummary[] }) {
+export function UsersSearch({
+  cohorts,
+  schoolTeams,
+}: {
+  cohorts: CohortSummary[]
+  schoolTeams: SchoolTeam[]
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const search = searchParams.get('search') || ''
   const role = searchParams.get('role') || ''
+  const schoolTeam = searchParams.get('school_team') || ''
   const cohort = searchParams.get('cohort') || ''
 
   const handleSearch = (value: string) => {
@@ -35,6 +43,17 @@ export function UsersSearch({ cohorts }: { cohorts: CohortSummary[] }) {
     router.push(`/admin/users?${params.toString()}`)
   }
 
+  const handleSchoolTeamFilter = (value: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (value) {
+      params.set('school_team', value)
+    } else {
+      params.delete('school_team')
+    }
+    params.set('page', '1')
+    router.push(`/admin/users?${params.toString()}`)
+  }
+
   const handleCohortFilter = (value: string) => {
     const params = new URLSearchParams(searchParams)
     if (value) {
@@ -50,7 +69,7 @@ export function UsersSearch({ cohorts }: { cohorts: CohortSummary[] }) {
     router.push('/admin/users')
   }
 
-  const hasFilters = search || role || cohort
+  const hasFilters = search || role || schoolTeam || cohort
 
   return (
     <Card>
@@ -85,6 +104,24 @@ export function UsersSearch({ cohorts }: { cohorts: CohortSummary[] }) {
               <option value="facilitator">Facilitator</option>
               <option value="admin">Admin</option>
               <option value="team_lead">Team Lead</option>
+            </select>
+          </div>
+
+          <div className="flex-1">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              School Team
+            </label>
+            <select
+              value={schoolTeam}
+              onChange={(e) => handleSchoolTeamFilter(e.target.value)}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">All teams</option>
+              {schoolTeams.map((team) => (
+                <option key={team.id} value={team.name}>
+                  {team.name}
+                </option>
+              ))}
             </select>
           </div>
 

@@ -45,11 +45,12 @@ type UserRowData = {
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; role?: string; cohort?: string; page?: string }>
+  searchParams: Promise<{ search?: string; role?: string; school_team?: string; cohort?: string; page?: string }>
 }) {
   const params = await searchParams
   const search = params.search?.toLowerCase() || ''
   const roleFilter = params.role || ''
+  const schoolTeamFilter = params.school_team || ''
   const cohortFilter = params.cohort || ''
   const page = parseInt(params.page || '1', 10)
   const perPage = 25
@@ -129,7 +130,7 @@ export default async function AdminUsersPage({
     }
   })
 
-  // Filter users based on search, role, and cohort
+  // Filter users based on search, role, school team, and cohort
   let filteredUsers = users
   if (search) {
     filteredUsers = filteredUsers.filter(
@@ -141,6 +142,9 @@ export default async function AdminUsersPage({
   }
   if (roleFilter) {
     filteredUsers = filteredUsers.filter((u) => u.role === roleFilter)
+  }
+  if (schoolTeamFilter) {
+    filteredUsers = filteredUsers.filter((u) => u.cohort_name === schoolTeamFilter)
   }
   if (cohortFilter) {
     filteredUsers = filteredUsers.filter((u) => u.cohort === cohortFilter)
@@ -166,6 +170,16 @@ export default async function AdminUsersPage({
   const paginatedUsers = filteredUsers.slice(start, end)
 
   const cohortList: CohortSummary[] = (cohorts ?? []).map((c) => ({ id: c.id, name: c.name }))
+
+  // Get unique school teams (cohort names) for filter dropdown
+  const schoolTeamSet = new Set(
+    users
+      .map((u) => u.cohort_name)
+      .filter((name): name is string => name !== null && name !== undefined),
+  )
+  const schoolTeamList = Array.from(schoolTeamSet)
+    .sort()
+    .map((name) => ({ id: name, name }))
 
   return (
     <div className="flex flex-col gap-6">
@@ -242,7 +256,7 @@ export default async function AdminUsersPage({
       </div>
 
       {/* Search and Filter */}
-      <UsersSearch cohorts={cohortList} />
+      <UsersSearch cohorts={cohortList} schoolTeams={schoolTeamList} />
 
       {/* Users List */}
       <Card>
@@ -279,7 +293,7 @@ export default async function AdminUsersPage({
           <div className="flex gap-2">
             {page > 1 && (
               <a
-                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&cohort=${cohortFilter}&page=${page - 1}`}
+                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&school_team=${schoolTeamFilter}&cohort=${cohortFilter}&page=${page - 1}`}
                 className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
               >
                 Previous
@@ -288,7 +302,7 @@ export default async function AdminUsersPage({
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <a
                 key={p}
-                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&cohort=${cohortFilter}&page=${p}`}
+                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&school_team=${schoolTeamFilter}&cohort=${cohortFilter}&page=${p}`}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                   p === page
                     ? 'bg-primary text-primary-foreground'
@@ -300,7 +314,7 @@ export default async function AdminUsersPage({
             ))}
             {page < totalPages && (
               <a
-                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&cohort=${cohortFilter}&page=${page + 1}`}
+                href={`/admin/users?search=${encodeURIComponent(search)}&role=${roleFilter}&school_team=${schoolTeamFilter}&cohort=${cohortFilter}&page=${page + 1}`}
                 className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
               >
                 Next
