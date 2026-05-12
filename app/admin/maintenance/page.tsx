@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { requireAdmin } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Card,
   CardContent,
@@ -12,13 +11,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertTriangle } from 'lucide-react'
 import { PortalMaintenanceSummary } from '@/components/admin/maintenance/summary-dashboard'
-import { UsersCleanupSection } from '@/components/admin/maintenance/users-cleanup'
-import { ContentCleanupSection } from '@/components/admin/maintenance/content-cleanup'
-import { LibraryCleanupSection } from '@/components/admin/maintenance/library-cleanup'
-import { CommunityCleanupSection } from '@/components/admin/maintenance/community-cleanup'
-import { NotificationsCleanupSection } from '@/components/admin/maintenance/notifications-cleanup'
-import { CustomPagesCleanupSection } from '@/components/admin/maintenance/custom-pages-cleanup'
-import { MaintenanceAuditLog } from '@/components/admin/maintenance/audit-log'
+import { MaintenanceClient } from '@/components/admin/maintenance/maintenance-client'
 
 export const metadata = {
   title: 'Portal Maintenance | Admin',
@@ -103,46 +96,8 @@ export default async function PortalMaintenancePage() {
         }}
       />
 
-      {/* Cleanup Sections */}
-      <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7">
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="library">Library</TabsTrigger>
-          <TabsTrigger value="community">Community</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="pages">Pages</TabsTrigger>
-          <TabsTrigger value="audit">Audit Log</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="users" className="space-y-4">
-          <UsersCleanupSection />
-        </TabsContent>
-
-        <TabsContent value="content" className="space-y-4">
-          <ContentCleanupSection />
-        </TabsContent>
-
-        <TabsContent value="library" className="space-y-4">
-          <LibraryCleanupSection />
-        </TabsContent>
-
-        <TabsContent value="community" className="space-y-4">
-          <CommunityCleanupSection />
-        </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-4">
-          <NotificationsCleanupSection />
-        </TabsContent>
-
-        <TabsContent value="pages" className="space-y-4">
-          <CustomPagesCleanupSection />
-        </TabsContent>
-
-        <TabsContent value="audit" className="space-y-4">
-          <MaintenanceAuditLog />
-        </TabsContent>
-      </Tabs>
+      {/* Card-based Navigation and Content */}
+      <MaintenanceClient />
     </div>
   )
 }
