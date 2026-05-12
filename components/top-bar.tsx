@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Settings, LogOut, User as UserIcon, Shield, Edit2, Check, X } from 'lucide-react'
@@ -30,6 +30,31 @@ export function TopBar() {
     library: 'Library',
     community: 'Community',
   })
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Load labels from API on mount
+  useEffect(() => {
+    const loadLabels = async () => {
+      try {
+        const response = await fetch('/api/admin/navigation-labels')
+        if (response.ok) {
+          const data = await response.json()
+          setLabels({
+            dashboard: data.dashboard || 'Dashboard',
+            about: data.about || 'About',
+            library: data.library || 'Library',
+            community: data.community || 'Community',
+          })
+        }
+      } catch (error) {
+        console.error('[v0] Error loading navigation labels:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadLabels()
+  }, [])
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -43,13 +68,33 @@ export function TopBar() {
     setEditValue(currentLabel)
   }
 
-  const handleEditSave = (key: string) => {
-    if (editValue.trim()) {
-      setLabels((prev) => ({
-        ...prev,
-        [key]: editValue.trim(),
-      }))
+  const handleEditSave = async (key: string) => {
+    if (!editValue.trim()) {
+      setEditingLabel(null)
+      return
     }
+
+    const newLabels = {
+      ...labels,
+      [key]: editValue.trim(),
+    }
+
+    try {
+      const response = await fetch('/api/admin/navigation-labels', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLabels),
+      })
+
+      if (response.ok) {
+        setLabels(newLabels)
+      } else {
+        console.error('[v0] Failed to save navigation label')
+      }
+    } catch (error) {
+      console.error('[v0] Error saving navigation label:', error)
+    }
+
     setEditingLabel(null)
     setEditValue('')
   }
