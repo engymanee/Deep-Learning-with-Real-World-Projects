@@ -39,13 +39,14 @@ const COVER_MIME_TYPES = new Set([
  * Add a resource to the shared Library. Admin / facilitator only.
  *
  * Visibility model:
- *  - `isUniversal=true` -> rendered on the "Further Reading" tab,
+ *  - `isUniversal=true` -> rendered on the "Recommended Resources" tab,
  *    visible to every authenticated user. Cohort labels are still
  *    accepted on the wire (for future filtering), but stored as the
  *    full A/B/C set so RLS / non-cumulative consumers don't accidentally
  *    hide the row.
  *  - `isUniversal=false` -> "My Resources" tab, cohort-gated using
- *    the cumulative-access rule (`cohortReleasedFor`).
+ *    strict assignment (fellowCanAccess): a fellow only sees resources
+ *    explicitly assigned to their cohort.
  *
  * URL-only for the first cut. File upload via Vercel Blob is the
  * natural follow-up; when wired, it'll PUT the blob and pass the

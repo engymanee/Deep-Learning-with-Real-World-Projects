@@ -1,5 +1,5 @@
 import { requireUser } from '@/lib/auth-server'
-import { cohortReleasedFor } from '@/lib/cohorts'
+import { fellowCanAccess } from '@/lib/cohorts'
 import { createClient } from '@/lib/supabase/server'
 import { TopBar } from '@/components/top-bar'
 import {
@@ -18,15 +18,24 @@ const VALID_TYPES = new Set(['document', 'video', 'link', 'reading'])
 
 /**
  * Library route. Server component: pulls every published resource,
- * splits Further Reading (universal) from My Resources (cohort-gated),
- * applies cumulative cohort access for fellows, then hands the lists
+ * splits Recommended Resources (universal) from My Resources (cohort-gated),
+ * applies strict cohort assignment for fellows, then hands the lists
  * to the client `<LibraryView>` for tabs / search / filters.
  *
- * Cohort rules (see lib/cohorts.ts):
- *  - Universal rows: visible to every authenticated user.
- *  - Cohort-gated rows for fellows: cumulative - a fellow in B sees A + B,
- *    a fellow in C sees A + B + C (`cohortReleasedFor`).
+ * Cohort rules:
+ *  - Universal rows (is_universal=true): visible to every authenticated user.
+ *  - Cohort-gated rows for fellows (is_universal=false): strict assignment
+ *    only. A fellow ONLY sees resources explicitly assigned to their cohort.
+ *    A Cohort C fellow does NOT see resources assigned to A or B.
+ *    Uses `fellowCanAccess` for exact cohort matching (not cumulative).
  *  - Facilitators / admins: see every resource so they can curate.
+ *
+ * Test cases:
+ *  - Case 1: Fellow in Cohort C, no My Resources assigned to C → sees zero My Resources
+ *  - Case 2: Fellow in Cohort A, resource assigned to A → sees it
+ *  - Case 3: Fellow in Cohort C, resource assigned to A → does NOT see it
+ *  - Case 4: Fellow in Cohort C, resource assigned to A+B → does NOT see it
+ *  - Case 5: Any fellow, resource is Recommended → all see it
  */
 export default async function LibraryPage() {
   // requireUser redirects to /auth/login when there's no session;
@@ -46,14 +55,15 @@ export default async function LibraryPage() {
 
   // Two parallel slices, each gated independently. Universal rows
   // are visible to everyone authenticated, so the only check is the
-  // is_universal flag. Cohort-gated rows go through the cumulative
-  // helper for fellows; staff bypass.
+  // is_universal flag. Cohort-gated rows use strict assignment (fellowCanAccess)
+  // for fellows; staff bypass and see everything.
   const universalRows = all.filter((r) => r.is_universal === true)
   const cohortGatedRows = all
     .filter((r) => r.is_universal !== true)
     .filter((r) => {
       if (!isFellow) return true
-      return cohortReleasedFor(
+      // Strict cohort assignment: fellow only sees if their cohort is in the list
+      return fellowCanAccess(
         r.cohorts as string[] | null,
         user.cohort ?? null,
       )
