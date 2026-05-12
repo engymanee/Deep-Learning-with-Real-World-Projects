@@ -160,6 +160,7 @@ export function MaintenanceClient() {
                 </span>
               </CardContent>
             </Card>
+            </button>
 
             {/* Rename Button - visible on hover */}
             {editingLabel === section.id ? (
