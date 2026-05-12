@@ -36,12 +36,9 @@ export function TopBar() {
   useEffect(() => {
     const loadLabels = async () => {
       try {
-        console.log('[v0] Loading navigation labels...')
         const response = await fetch('/api/admin/navigation-labels')
-        console.log('[v0] Navigation labels response:', response.status)
         if (response.ok) {
           const data = await response.json()
-          console.log('[v0] Loaded labels:', data)
           setLabels({
             dashboard: data.dashboard || 'Dashboard',
             about: data.about || 'About',
@@ -83,17 +80,14 @@ export function TopBar() {
     }
 
     try {
-      console.log('[v0] Saving navigation label:', key, editValue)
       const response = await fetch('/api/admin/navigation-labels', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newLabels),
       })
 
-      console.log('[v0] Save response:', response.status)
       if (response.ok) {
         const data = await response.json()
-        console.log('[v0] Saved successfully:', data)
         setLabels(newLabels)
       } else {
         console.error('[v0] Failed to save navigation label')

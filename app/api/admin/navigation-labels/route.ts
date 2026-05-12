@@ -2,49 +2,56 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 
 export async function GET() {
-  const supabase = await createClient()
-
   try {
-    // Get navigation labels from the database
+    const supabase = await createClient()
+
+    // Get navigation labels from the database - get all rows (should only be 1)
     const { data, error } = await supabase
       .from('navigation_labels')
       .select('*')
-      .single()
+      .limit(1)
 
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 = no rows found, which is fine
-      throw error
+    if (error) {
+      console.error('[v0] Error fetching navigation labels:', error)
+      // Return defaults if any error
+      return Response.json({
+        dashboard: 'Dashboard',
+        about: 'About',
+        library: 'Library',
+        community: 'Community',
+      })
     }
 
-    // Return default labels if none exist
-    return Response.json(
-      data || {
-        dashboard: 'Dashboard',
-        about: 'About',
-        library: 'Library',
-        community: 'Community',
-      }
-    )
+    // If we have data, return the first row
+    if (data && data.length > 0) {
+      return Response.json(data[0])
+    }
+
+    // Return defaults if empty
+    return Response.json({
+      dashboard: 'Dashboard',
+      about: 'About',
+      library: 'Library',
+      community: 'Community',
+    })
   } catch (error) {
-    console.error('[v0] Error fetching navigation labels:', error)
-    return Response.json(
-      {
-        dashboard: 'Dashboard',
-        about: 'About',
-        library: 'Library',
-        community: 'Community',
-      },
-      { status: 200 }
-    )
+    console.error('[v0] Error in navigation labels GET:', error)
+    return Response.json({
+      dashboard: 'Dashboard',
+      about: 'About',
+      library: 'Library',
+      community: 'Community',
+    })
   }
 }
 
 export async function PUT(request: Request) {
-  await requireAdmin()
-  const supabase = await createClient()
-
   try {
+    await requireAdmin()
+    const supabase = await createClient()
     const labels = await request.json()
+
+    console.log('[v0] PUT navigation labels:', labels)
 
     // Validate labels
     if (
@@ -56,35 +63,58 @@ export async function PUT(request: Request) {
       return Response.json({ error: 'All labels are required' }, { status: 400 })
     }
 
-    // Get existing record to know if we need to insert or update
-    const { data: existing } = await supabase
+    // Get existing record
+    const { data: existing, error: fetchError } = await supabase
       .from('navigation_labels')
       .select('id')
-      .single()
+      .limit(1)
+
+    if (fetchError) {
+      console.error('[v0] Error fetching existing labels:', fetchError)
+    }
 
     let result
-    if (existing) {
-      // Update existing
+    if (existing && existing.length > 0) {
+      // Update existing record
+      console.log('[v0] Updating existing record:', existing[0].id)
       result = await supabase
         .from('navigation_labels')
-        .update(labels)
-        .eq('id', existing.id)
+        .update({
+          dashboard: labels.dashboard,
+          about: labels.about,
+          library: labels.library,
+          community: labels.community,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing[0].id)
         .select()
         .single()
     } else {
-      // Insert new
+      // Insert new record
+      console.log('[v0] Inserting new record')
       result = await supabase
         .from('navigation_labels')
-        .insert([labels])
+        .insert([
+          {
+            dashboard: labels.dashboard,
+            about: labels.about,
+            library: labels.library,
+            community: labels.community,
+          },
+        ])
         .select()
         .single()
     }
 
-    if (result.error) throw result.error
+    if (result.error) {
+      console.error('[v0] Error updating/inserting labels:', result.error)
+      throw result.error
+    }
 
+    console.log('[v0] Successfully saved labels:', result.data)
     return Response.json(result.data)
   } catch (error) {
-    console.error('[v0] Error updating navigation labels:', error)
+    console.error('[v0] Error in navigation labels PUT:', error)
     return Response.json(
       { error: 'Failed to update navigation labels' },
       { status: 500 }
