@@ -60,7 +60,13 @@ export default async function RootLayout({
         className={`${_sans.variable} ${_serif.variable} font-sans antialiased`}
       >
         <UserProvider initialUser={user}>
-          <AdminPreviewBanner />
+          {user?.preview && (
+            <AdminPreviewBanner
+              label={user.preview.label}
+              mode={user.preview.mode}
+              actualAdminName={user.preview.actualAdminName}
+            />
+          )}
           {children}
         </UserProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

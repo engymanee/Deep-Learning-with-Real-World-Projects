@@ -1,24 +1,23 @@
+'use client'
+
+import { usePathname } from 'next/navigation'
 import { Eye, X } from 'lucide-react'
-import { getCurrentUser } from '@/lib/auth-server'
 import { endPreview } from '@/app/admin/preview/actions'
 
-/**
- * Sticky banner shown at the very top of every authenticated page while
- * an admin is in "Preview as fellow" mode. Renders nothing for normal
- * sessions. The exit button posts to a server action that clears the
- * preview cookie and redirects back to /admin.
- */
-export async function AdminPreviewBanner() {
-  const user = await getCurrentUser()
-  if (!user?.preview) return null
+type AdminPreviewBannerProps = {
+  label: string
+  mode: 'by_fellow' | 'by_cohort'
+  actualAdminName: string
+}
 
-  const { label, mode, actualAdminName } = user.preview
+export function AdminPreviewBanner({
+  label,
+  mode,
+  actualAdminName,
+}: AdminPreviewBannerProps) {
+  const pathname = usePathname()
 
   return (
-    // Rendered as a regular block element at the top of <body> so it
-    // pushes the rest of the layout (including any sticky page top-bar)
-    // down. Avoids overlap with fellow-facing TopBar that is also
-    // `sticky top-0`.
     <div
       role="status"
       aria-live="polite"
@@ -46,7 +45,7 @@ export async function AdminPreviewBanner() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <form action={endPreview}>
-            <input type="hidden" name="referrer" value={typeof window !== 'undefined' ? window.location.pathname : '/admin'} />
+            <input type="hidden" name="referrer" value={pathname} />
             <button
               type="submit"
               className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90"
