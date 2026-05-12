@@ -11,6 +11,10 @@ import {
 import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
 import { ASK_CATEGORY_BY_VALUE } from '@/lib/community/ask-categories'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export const dynamic = 'force-dynamic'
 
@@ -350,6 +354,7 @@ export default async function CommunityDashboardPage() {
         </Card>
       </div>
     </div>
+    </>
   )
 }
 
@@ -420,8 +425,23 @@ function AuthorLine({
         </>
       )}
     </div>
-    </>
   )
+}
+
+/** Extract initials from a name or email. */
+function initialsFor(name: string | null, email: string | null): string {
+  if (name) {
+    return name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase())
+      .filter(Boolean)
+      .join('')
+  }
+  if (email) {
+    return email[0]?.toUpperCase() ?? '?'
+  }
+  return '?'
 }
 
 /** Relative timestamp shared by all dashboard cards. */
