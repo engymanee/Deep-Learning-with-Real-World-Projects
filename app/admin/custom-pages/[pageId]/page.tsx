@@ -38,10 +38,10 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
 
   // Fetch page data if editing
   useEffect(() => {
-    if (!isNewPage) {
+    if (!isNewPage && params.pageId) {
       fetchPage()
     }
-  }, [params.pageId, isNewPage])
+  }, [params.pageId])
 
   const fetchPage = async () => {
     try {
@@ -118,16 +118,17 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pageId: page.id,
-          title: page.title,
-          slug: page.slug,
-          description: page.description,
+          title: page.title || 'Untitled Page',
+          slug: page.slug || 'untitled-page',
+          description: page.description || '',
           is_published: published,
-          blocks: page.blocks,
+          blocks: page.blocks || [],
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update publish status')
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to update publish status')
       }
 
       const updated = await response.json()
