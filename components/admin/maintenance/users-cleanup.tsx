@@ -56,6 +56,7 @@ interface User {
 export function UsersCleanupSection() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [roleFilter, setRoleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -63,6 +64,7 @@ export function UsersCleanupSection() {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [actionInProgress, setActionInProgress] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; userId?: string; action?: string; user?: User }>({ open: false })
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     fetchUsers()
@@ -70,6 +72,7 @@ export function UsersCleanupSection() {
 
   const fetchUsers = async () => {
     setIsLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -79,12 +82,15 @@ export function UsersCleanupSection() {
       })
 
       const response = await fetch(`/api/admin/maintenance/users?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data.users || [])
+      if (!response.ok) {
+        throw new Error('Failed to load users')
       }
-    } catch (error) {
-      console.error('[v0] Error fetching users:', error)
+      const data = await response.json()
+      setUsers(data.users || [])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load users'
+      console.error('[v0] Error fetching users:', message)
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -118,11 +124,18 @@ export function UsersCleanupSection() {
       })
 
       if (response.ok) {
+        const result = await response.json()
         setUsers(users.filter((u) => u.id !== userId))
+        setActionSuccess(result.message || 'User archived successfully')
         setConfirmDialog({ open: false })
+        setTimeout(() => setActionSuccess(null), 3000)
+      } else {
+        const err = await response.json()
+        setError(err.error || 'Failed to archive user')
       }
     } catch (error) {
       console.error('[v0] Error archiving user:', error)
+      setError(error instanceof Error ? error.message : 'Failed to archive user')
     } finally {
       setActionInProgress(false)
     }
@@ -183,6 +196,19 @@ export function UsersCleanupSection() {
         </Alert>
       )}
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {actionSuccess && (
+        <Alert className="bg-green-50 border-green-200">
+          <AlertDescription className="text-green-900">{actionSuccess}</AlertDescription>
+        </Alert>
+      )}
+
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Input
@@ -193,30 +219,36 @@ export function UsersCleanupSection() {
             setPage(1)
           }}
         />
-        <Select value={roleFilter} onValueChange={(v) => {
-          setRoleFilter(v)
-          setPage(1)
-        }}>
+        <Select 
+          value={roleFilter || 'all'} 
+          onValueChange={(v) => {
+            setRoleFilter(v === 'all' ? '' : v)
+            setPage(1)
+          }}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Filter by role..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Roles</SelectItem>
+            <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="fellow">Fellow</SelectItem>
             <SelectItem value="facilitator">Facilitator</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select value={statusFilter} onValueChange={(v) => {
-          setStatusFilter(v)
-          setPage(1)
-        }}>
+        <Select 
+          value={statusFilter || 'all'} 
+          onValueChange={(v) => {
+            setStatusFilter(v === 'all' ? '' : v)
+            setPage(1)
+          }}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Filter by status..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Users</SelectItem>
+            <SelectItem value="all">All Users</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="deactivated">Deactivated</SelectItem>
           </SelectContent>

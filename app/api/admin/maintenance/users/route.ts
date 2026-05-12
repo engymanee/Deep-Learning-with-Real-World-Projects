@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         deactivated_at,
         created_at,
         schools(name),
-        community_posts(id),
+        community_posts!community_posts_created_by_fkey(id),
         reflections(id),
         reflection_comments(id)
       `,
@@ -116,7 +116,7 @@ export async function DELETE(request: NextRequest) {
       `
       full_name,
       email,
-      community_posts(id),
+      community_posts!community_posts_created_by_fkey(id),
       reflections(id),
       reflection_comments(id)
     `
