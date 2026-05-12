@@ -19,15 +19,15 @@ export default async function TeamPage() {
         {/* Welcome header section */}
         <section className="border-b border-border bg-card">
           <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
-            <div className="space-y-6">
+            <div className="space-y-6 text-center">
               <div>
                 <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4">
                   Welcome to the WaW Fellows&apos; Portal
                 </h1>
-                <p className="text-lg text-foreground font-medium mb-3 text-center">
+                <p className="text-lg text-foreground font-medium mb-3">
                   Congratulations and welcome to the WaW Fellowship!
                 </p>
-                <p className="text-base text-muted-foreground leading-relaxed text-center">
+                <p className="text-base text-muted-foreground leading-relaxed">
                   This site is your dashboard for the WAW Syllabus, Learning Journals, Additional Resources.
                 </p>
               </div>
@@ -80,7 +80,7 @@ export default async function TeamPage() {
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-kCoiFTogFnqrrOloeNsvOSi9SOMEDN.png"
               alt="John Templeton Foundation"
-              className="h-32 w-auto inline-block"
+              className="h-48 w-auto inline-block"
               style={{ fontSize: '20px' }}
             />
           </div>

@@ -17,11 +17,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Plus, Calendar } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Plus, Calendar, Users, Users2 } from 'lucide-react'
 
 interface TimeOption {
   start_time: string
   end_time: string
+}
+
+interface Fellow {
+  id: string
+  full_name: string
+}
+
+interface Cohort {
+  id: string
+  name: string
+  schoolName?: string | null
 }
 
 interface CreatePollFormProps {
@@ -33,14 +45,17 @@ interface CreatePollFormProps {
     voting_closes_at: string
     options: TimeOption[]
     invited_fellows: string[]
+    invited_cohorts: string[]
   }) => Promise<void>
-  availableFellows?: Array<{ id: string; fullName: string }>
+  availableFellows?: Fellow[]
+  availableCohorts?: Cohort[]
   isLoading?: boolean
 }
 
 export function CreatePollForm({
   onSubmit,
   availableFellows = [],
+  availableCohorts = [],
   isLoading = false,
 }: CreatePollFormProps) {
   const [title, setTitle] = useState('')
@@ -49,10 +64,12 @@ export function CreatePollForm({
   const [meetingLink, setMeetingLink] = useState('')
   const [votingClosesAt, setVotingClosesAt] = useState('')
   const [invitedFellows, setInvitedFellows] = useState<string[]>([])
+  const [invitedCohorts, setInvitedCohorts] = useState<string[]>([])
   const [options, setOptions] = useState<TimeOption[]>([
     { start_time: '', end_time: '' },
   ])
   const [open, setOpen] = useState(false)
+  const [selectedTab, setSelectedTab] = useState<'fellows' | 'cohorts'>('fellows')
 
   const handleAddOption = () => {
     setOptions([...options, { start_time: '', end_time: '' }])
@@ -75,8 +92,13 @@ export function CreatePollForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (invitedFellows.length === 0) {
-      alert('Please select at least one fellow to invite')
+    if (invitedFellows.length === 0 && invitedCohorts.length === 0) {
+      alert('Please select at least one fellow or team to invite')
+      return
+    }
+
+    if (options.some((opt) => !opt.start_time || !opt.end_time)) {
+      alert('Please fill in all time option start and end times')
       return
     }
 
@@ -88,6 +110,7 @@ export function CreatePollForm({
       voting_closes_at: votingClosesAt,
       options,
       invited_fellows: invitedFellows,
+      invited_cohorts: invitedCohorts,
     })
 
     // Reset form
@@ -97,8 +120,12 @@ export function CreatePollForm({
     setMeetingLink('')
     setVotingClosesAt('')
     setOptions([{ start_time: '', end_time: '' }])
+    setInvitedFellows([])
+    setInvitedCohorts([])
     setOpen(false)
   }
+
+  const totalInvitees = invitedFellows.length + invitedCohorts.length
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -233,35 +260,94 @@ export function CreatePollForm({
 
           <div>
             <label className="block text-sm font-medium mb-3">
-              Invite Fellows
+              Invite Participants
             </label>
-            <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-              {availableFellows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No fellows available</p>
-              ) : (
-                availableFellows.map((fellow) => (
-                  <label key={fellow.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={invitedFellows.includes(fellow.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setInvitedFellows([...invitedFellows, fellow.id])
-                        } else {
-                          setInvitedFellows(invitedFellows.filter((id) => id !== fellow.id))
-                        }
-                      }}
-                      className="rounded"
-                    />
-                    <span className="text-sm">{fellow.fullName}</span>
-                  </label>
-                ))
-              )}
-            </div>
-            {invitedFellows.length > 0 && (
-              <p className="text-xs text-muted-foreground mt-2">
-                {invitedFellows.length} fellow{invitedFellows.length !== 1 ? 's' : ''} selected
-              </p>
+            <Tabs value={selectedTab} onValueChange={(v: any) => setSelectedTab(v)}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="fellows" className="gap-1.5">
+                  <Users className="h-4 w-4" />
+                  Individual Fellows
+                </TabsTrigger>
+                <TabsTrigger value="cohorts" className="gap-1.5">
+                  <Users2 className="h-4 w-4" />
+                  Teams by Cohort
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="fellows" className="mt-3">
+                <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                  {availableFellows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No fellows available</p>
+                  ) : (
+                    availableFellows.map((fellow) => (
+                      <label key={fellow.id} className="flex items-center gap-2 cursor-pointer hover:bg-accent/30 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={invitedFellows.includes(fellow.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setInvitedFellows([...invitedFellows, fellow.id])
+                            } else {
+                              setInvitedFellows(invitedFellows.filter((id) => id !== fellow.id))
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm">{fellow.full_name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {invitedFellows.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {invitedFellows.length} fellow{invitedFellows.length !== 1 ? 's' : ''} selected
+                  </p>
+                )}
+              </TabsContent>
+
+              <TabsContent value="cohorts" className="mt-3">
+                <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                  {availableCohorts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No cohorts available</p>
+                  ) : (
+                    availableCohorts.map((cohort) => (
+                      <label key={cohort.id} className="flex items-center gap-2 cursor-pointer hover:bg-accent/30 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={invitedCohorts.includes(cohort.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setInvitedCohorts([...invitedCohorts, cohort.id])
+                            } else {
+                              setInvitedCohorts(invitedCohorts.filter((id) => id !== cohort.id))
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm">
+                          {cohort.name}
+                          {cohort.schoolName && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({cohort.schoolName})
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {invitedCohorts.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {invitedCohorts.length} cohort{invitedCohorts.length !== 1 ? 's' : ''} selected
+                  </p>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            {totalInvitees > 0 && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+                <strong>{totalInvitees} participant{totalInvitees !== 1 ? 's' : ''} will be invited</strong> to set their availability
+              </div>
             )}
           </div>
 

@@ -146,7 +146,7 @@ export async function dispatchNotification(
         profile_id: r.id,
         email: r.email,
         email_status:
-          notification.email_enabled && r.email ? 'pending' : 'skipped',
+          notification.email_enabled === true && r.email ? 'pending' : 'skipped',
       }))
 
       const { error: upsertErr } = await supabase
