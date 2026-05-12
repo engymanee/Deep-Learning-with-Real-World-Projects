@@ -8,18 +8,21 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1')
-  const pageSize = 50
+  const pageSize = 100
   const offset = (page - 1) * pageSize
 
   try {
-    const { data: labs, count } = await supabase
+    // Load ALL draft labs (not published) - labs table
+    const { data: labs, count, error } = await supabase
       .from('labs')
-      .select('id, title, description, is_published, created_at, updated_at, phase_id', {
+      .select('id, title, description, created_at, updated_at, is_published', {
         count: 'exact',
       })
-      .eq('is_published', false)
+      .is('is_published', false)
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
+
+    if (error) throw error
 
     return Response.json({
       items: labs || [],
@@ -52,18 +55,62 @@ export async function DELETE(request: Request) {
       )
     }
 
-    let query = supabase.from('labs').delete()
+    let deletedCount = 0
+
+    if (labIds && labIds.length > 0) {
+      // Delete specific labs and all their child records
+      for (const labId of labIds) {
+        // Delete all related reflections, activities, comments, etc.
+        await supabase
+          .from('reflections')
+          .delete()
+          .eq('lab_id', labId)
+
+        await supabase
+          .from('lab_activities')
+          .delete()
+          .eq('lab_id', labId)
+
+        // Finally delete the lab itself
+        const { error } = await supabase
+          .from('labs')
+          .delete()
+          .eq('id', labId)
+
+        if (!error) deletedCount++
+      }
+    }
 
     if (beforeDate) {
-      query = query.lt('created_at', beforeDate)
-    }
-    if (labIds && labIds.length > 0) {
-      query = query.in('id', labIds)
-    }
+      // Get all labs before this date
+      const { data: labsToDelete } = await supabase
+        .from('labs')
+        .select('id')
+        .lt('created_at', beforeDate)
 
-    const { count, error } = await query
+      if (labsToDelete && labsToDelete.length > 0) {
+        for (const lab of labsToDelete) {
+          // Delete all related reflections, activities, comments, etc.
+          await supabase
+            .from('reflections')
+            .delete()
+            .eq('lab_id', lab.id)
 
-    if (error) throw error
+          await supabase
+            .from('lab_activities')
+            .delete()
+            .eq('lab_id', lab.id)
+
+          // Delete the lab
+          await supabase
+            .from('labs')
+            .delete()
+            .eq('id', lab.id)
+
+          deletedCount++
+        }
+      }
+    }
 
     // Log the action
     if (adminId) {
@@ -71,9 +118,9 @@ export async function DELETE(request: Request) {
         actionType: 'bulk_delete',
         itemType: 'labs',
         itemId: labIds?.[0] || 'batch',
-        itemName: `${count} draft labs`,
+        itemName: `${deletedCount} draft labs with related content`,
         details: {
-          count,
+          count: deletedCount,
           beforeDate,
           labIds,
         },
@@ -81,8 +128,8 @@ export async function DELETE(request: Request) {
     }
 
     return Response.json({
-      message: `Deleted ${count} draft labs`,
-      deletedCount: count,
+      message: `Deleted ${deletedCount} draft labs and all related content`,
+      deletedCount,
     })
   } catch (error) {
     console.error('[v0] Error deleting content:', error)

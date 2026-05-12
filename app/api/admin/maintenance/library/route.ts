@@ -8,18 +8,20 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1')
-  const pageSize = 50
+  const pageSize = 100
   const offset = (page - 1) * pageSize
 
   try {
-    const { data: resources, count } = await supabase
+    const { data: resources, count, error } = await supabase
       .from('library_resources')
-      .select('id, title, resource_type, created_at, updated_at, cohort_code', {
+      .select('id, title, resource_type, created_at, updated_at', {
         count: 'exact',
       })
       .is('cohort_code', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
+
+    if (error) throw error
 
     return Response.json({
       items: resources || [],
@@ -52,18 +54,25 @@ export async function DELETE(request: Request) {
       )
     }
 
-    let query = supabase.from('library_resources').delete()
+    let deletedCount = 0
+
+    if (resourceIds && resourceIds.length > 0) {
+      const { count, error } = await supabase
+        .from('library_resources')
+        .delete()
+        .in('id', resourceIds)
+
+      if (!error) deletedCount = count || 0
+    }
 
     if (beforeDate) {
-      query = query.lt('created_at', beforeDate)
-    }
-    if (resourceIds && resourceIds.length > 0) {
-      query = query.in('id', resourceIds)
-    }
+      const { count, error } = await supabase
+        .from('library_resources')
+        .delete()
+        .lt('created_at', beforeDate)
 
-    const { count, error } = await query
-
-    if (error) throw error
+      if (!error) deletedCount += count || 0
+    }
 
     // Log the action
     if (adminId) {
@@ -71,9 +80,9 @@ export async function DELETE(request: Request) {
         actionType: 'bulk_delete',
         itemType: 'library_resources',
         itemId: resourceIds?.[0] || 'batch',
-        itemName: `${count} resources`,
+        itemName: `${deletedCount} unassigned library resources`,
         details: {
-          count,
+          count: deletedCount,
           beforeDate,
           resourceIds,
         },
@@ -81,8 +90,8 @@ export async function DELETE(request: Request) {
     }
 
     return Response.json({
-      message: `Deleted ${count} resources`,
-      deletedCount: count,
+      message: `Deleted ${deletedCount} unassigned library resources`,
+      deletedCount,
     })
   } catch (error) {
     console.error('[v0] Error deleting resources:', error)

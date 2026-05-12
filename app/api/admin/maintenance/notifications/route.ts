@@ -8,18 +8,20 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1')
-  const pageSize = 50
+  const pageSize = 100
   const offset = (page - 1) * pageSize
 
   try {
-    const { data: notifications, count } = await supabase
+    const { data: notifications, count, error } = await supabase
       .from('notifications')
-      .select('id, title, status, scheduled_for, created_at, updated_at', {
+      .select('id, title, status, created_at, updated_at', {
         count: 'exact',
       })
       .neq('status', 'sent')
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
+
+    if (error) throw error
 
     return Response.json({
       items: notifications || [],
@@ -52,18 +54,25 @@ export async function DELETE(request: Request) {
       )
     }
 
-    let query = supabase.from('notifications').delete()
+    let deletedCount = 0
+
+    if (notificationIds && notificationIds.length > 0) {
+      const { count, error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', notificationIds)
+
+      if (!error) deletedCount = count || 0
+    }
 
     if (beforeDate) {
-      query = query.lt('created_at', beforeDate)
-    }
-    if (notificationIds && notificationIds.length > 0) {
-      query = query.in('id', notificationIds)
-    }
+      const { count, error } = await supabase
+        .from('notifications')
+        .delete()
+        .lt('created_at', beforeDate)
 
-    const { count, error } = await query
-
-    if (error) throw error
+      if (!error) deletedCount += count || 0
+    }
 
     // Log the action
     if (adminId) {
@@ -71,9 +80,9 @@ export async function DELETE(request: Request) {
         actionType: 'bulk_delete',
         itemType: 'notifications',
         itemId: notificationIds?.[0] || 'batch',
-        itemName: `${count} notifications`,
+        itemName: `${deletedCount} unsent notifications`,
         details: {
-          count,
+          count: deletedCount,
           beforeDate,
           notificationIds,
         },
@@ -81,8 +90,8 @@ export async function DELETE(request: Request) {
     }
 
     return Response.json({
-      message: `Deleted ${count} notifications`,
-      deletedCount: count,
+      message: `Deleted ${deletedCount} unsent notifications`,
+      deletedCount,
     })
   } catch (error) {
     console.error('[v0] Error deleting notifications:', error)

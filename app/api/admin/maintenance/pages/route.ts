@@ -8,17 +8,19 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1')
-  const pageSize = 50
+  const pageSize = 100
   const offset = (page - 1) * pageSize
 
   try {
-    const { data: pages, count } = await supabase
+    const { data: pages, count, error } = await supabase
       .from('custom_pages')
       .select('id, title, slug, is_published, created_at, updated_at', {
         count: 'exact',
       })
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
+
+    if (error) throw error
 
     return Response.json({
       items: pages || [],
@@ -51,18 +53,25 @@ export async function DELETE(request: Request) {
       )
     }
 
-    let query = supabase.from('custom_pages').delete()
+    let deletedCount = 0
+
+    if (pageIds && pageIds.length > 0) {
+      const { count, error } = await supabase
+        .from('custom_pages')
+        .delete()
+        .in('id', pageIds)
+
+      if (!error) deletedCount = count || 0
+    }
 
     if (beforeDate) {
-      query = query.lt('created_at', beforeDate)
-    }
-    if (pageIds && pageIds.length > 0) {
-      query = query.in('id', pageIds)
-    }
+      const { count, error } = await supabase
+        .from('custom_pages')
+        .delete()
+        .lt('created_at', beforeDate)
 
-    const { count, error } = await query
-
-    if (error) throw error
+      if (!error) deletedCount += count || 0
+    }
 
     // Log the action
     if (adminId) {
@@ -70,9 +79,9 @@ export async function DELETE(request: Request) {
         actionType: 'bulk_delete',
         itemType: 'custom_pages',
         itemId: pageIds?.[0] || 'batch',
-        itemName: `${count} custom pages`,
+        itemName: `${deletedCount} custom pages`,
         details: {
-          count,
+          count: deletedCount,
           beforeDate,
           pageIds,
         },
@@ -80,8 +89,8 @@ export async function DELETE(request: Request) {
     }
 
     return Response.json({
-      message: `Deleted ${count} custom pages`,
-      deletedCount: count,
+      message: `Deleted ${deletedCount} custom pages`,
+      deletedCount,
     })
   } catch (error) {
     console.error('[v0] Error deleting custom pages:', error)
