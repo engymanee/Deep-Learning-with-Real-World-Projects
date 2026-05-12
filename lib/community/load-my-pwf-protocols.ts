@@ -1,7 +1,7 @@
 'use server'
 
 import { requireUser } from '@/lib/auth-server'
-import { cohortReleasedFor } from '@/lib/cohorts'
+import { fellowCanAccess } from '@/lib/cohorts'
 import { createClient } from '@/lib/supabase/server'
 
 export interface MyResourcesPwfProtocol {
@@ -17,7 +17,7 @@ export interface MyResourcesPwfProtocol {
  * Filters to:
  * - Cohort-gated resources (is_universal = false)
  * - Type = 'document' (PWF Protocols)
- * - User has access via cohortReleasedFor
+ * - User has access via fellowCanAccess (strict assignment, not cumulative)
  *
  * Returns sorted by title for a clean dropdown experience.
  */
@@ -41,10 +41,11 @@ export async function loadMyResourcesPwfProtocols(): Promise<
 
   const isFellow = user.role === 'fellow'
 
-  // Filter by cohort access for fellows; staff see all
+  // Filter by strict cohort assignment for fellows; staff see all
   const filtered = (data ?? []).filter((r) => {
     if (!isFellow) return true
-    return cohortReleasedFor(
+    // Strict assignment: fellow only sees if their cohort is explicitly assigned
+    return fellowCanAccess(
       (r.cohorts as string[] | null) ?? null,
       user.cohort ?? null,
     )
