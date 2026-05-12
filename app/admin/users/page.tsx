@@ -181,6 +181,12 @@ export default async function AdminUsersPage({
     .sort()
     .map((name) => ({ id: name, name }))
 
+  // Get unique cohorts (A, B, C) from user data for filter dropdown
+  const cohortLetters = new Set(users.map((u) => u.cohort).filter((c): c is Cohort => c !== null))
+  const cohortFilterList = Array.from(cohortLetters)
+    .sort()
+    .map((letter) => ({ id: letter, name: letter }))
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
@@ -256,7 +262,7 @@ export default async function AdminUsersPage({
       </div>
 
       {/* Search and Filter */}
-      <UsersSearch cohorts={cohortList} schoolTeams={schoolTeamList} />
+      <UsersSearch cohorts={cohortFilterList} schoolTeams={schoolTeamList} />
 
       {/* Users List */}
       <Card>
