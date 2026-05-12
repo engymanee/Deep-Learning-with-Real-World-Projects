@@ -8,6 +8,7 @@ import {
   MessagesSquare,
   Users,
   Mail,
+  FileText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
@@ -96,6 +97,12 @@ export default async function AdminHomePage() {
             icon={<Mail className="h-5 w-5" />}
             title="Email Logs"
             description="Track all emails sent in the past week. Monitor delivery status and resend failed emails."
+          />
+          <ActionCard
+            href="/admin/custom-pages"
+            icon={<FileText className="h-5 w-5" />}
+            title="Custom Pages"
+            description="Create and manage custom pages with rich content blocks, images, and text. Publish to the public site with custom URLs."
           />
         </div>
       </section>
