@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, Trash2, Copy, Edit2 } from 'lucide-react'
+import { Upload, Trash2, Copy, Edit2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import type { PageImage } from '@/lib/custom-pages/types'
 
 interface ImageGalleryProps {
@@ -39,27 +40,46 @@ export function ImageGallery({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingAlt, setEditingAlt] = useState('')
   const [isOpen, setIsOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.currentTarget.files?.[0]
-    if (file) {
-      try {
-        await onUpload(file)
-        e.currentTarget.value = ''
-      } catch (error) {
-        console.error('Upload failed:', error)
-      }
+    setError(null)
+    setSuccess(null)
+
+    if (!file) return
+
+    try {
+      console.log('[v0] Starting file upload:', file.name)
+      await onUpload(file)
+      setSuccess(`Image ${file.name} uploaded successfully!`)
+      e.currentTarget.value = ''
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed'
+      console.error('[v0] Upload failed:', message)
+      setError(message)
     }
   }
 
   const handleEditAlt = async (imageId: string) => {
-    await onUpdateAlt(imageId, editingAlt)
-    setEditingId(null)
-    setEditingAlt('')
+    try {
+      await onUpdateAlt(imageId, editingAlt)
+      setEditingId(null)
+      setEditingAlt('')
+      setSuccess('Alt text updated!')
+      setTimeout(() => setSuccess(null), 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update alt text')
+    }
   }
 
   const copyUrl = (url: string) => {
     navigator.clipboard.writeText(url)
+    setSuccess('URL copied to clipboard!')
+    setTimeout(() => setSuccess(null), 2000)
   }
 
   return (
@@ -92,7 +112,20 @@ export function ImageGallery({
         </label>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {success && (
+          <Alert className="bg-green-50 border-green-200">
+            <AlertDescription className="text-green-800">{success}</AlertDescription>
+          </Alert>
+        )}
+
         {images.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">
@@ -133,6 +166,7 @@ export function ImageGallery({
                     src={image.url}
                     alt={image.alt_text || image.filename}
                     className="w-full h-full object-cover group-hover:scale-105 transition"
+                    loading="lazy"
                   />
                 </button>
 
@@ -141,7 +175,9 @@ export function ImageGallery({
                   <div className="truncate">
                     <p className="text-sm font-medium truncate">{image.filename}</p>
                     <p className="text-xs text-muted-foreground">
-                      {(image.width || '?')} × {(image.height || '?')}px
+                      {image.width && image.height
+                        ? `${image.width} × ${image.height}px`
+                        : 'Dimensions unknown'}
                     </p>
                   </div>
 

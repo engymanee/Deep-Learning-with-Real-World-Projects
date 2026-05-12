@@ -7,11 +7,11 @@ export const runtime = 'nodejs'
 
 /**
  * POST /api/admin/custom-pages/images/upload
- * Upload an image for custom pages with validation and metadata extraction
+ * Upload an image for custom pages with validation
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin()
+    const user = await requireAdmin()
     const supabase = await createClient()
 
     const formData = await request.formData()
@@ -44,37 +44,27 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split('.').pop() || 'jpg'
     const filename = `custom-pages/${timestamp}-${random}.${ext}`
 
+    console.log('[v0] Uploading image to Vercel Blob:', filename)
+
     // Upload to Vercel Blob
-    const blob = await put(filename, file, {
-      access: 'public',
-      contentType: file.type,
-    })
-
-    // Get image dimensions
-    let width: number | null = null
-    let height: number | null = null
-
+    let blob
     try {
-      const img = new Image()
-      const buffer = await file.arrayBuffer()
-      const base64 = Buffer.from(buffer).toString('base64')
-      img.src = `data:${file.type};base64,${base64}`
-
-      // Wait for image to load
-      await new Promise((resolve, reject) => {
-        img.onload = resolve
-        img.onerror = reject
-        // Timeout after 5s
-        setTimeout(() => reject(new Error('Image load timeout')), 5000)
+      blob = await put(filename, file, {
+        access: 'public',
+        contentType: file.type,
       })
-
-      width = img.width
-      height = img.height
-    } catch (err) {
-      console.log('[v0] Could not extract image dimensions:', err)
+    } catch (blobError) {
+      console.error('[v0] Blob upload failed:', blobError)
+      return NextResponse.json(
+        { error: 'Failed to upload to blob storage. Check BLOB_READ_WRITE_TOKEN env var.' },
+        { status: 500 }
+      )
     }
 
+    console.log('[v0] Image uploaded to Blob:', blob.url)
+
     // Log to database
+    console.log('[v0] Logging image to database...')
     const { data: imageRecord, error: dbError } = await supabase
       .from('page_images')
       .insert({
@@ -82,21 +72,28 @@ export async function POST(request: NextRequest) {
         filename: file.name,
         size_bytes: file.size,
         mime_type: file.type,
-        width,
-        height,
+        width: null,
+        height: null,
         alt_text: '',
-        uploaded_by: (await requireAdmin()).id,
       })
       .select()
       .single()
 
     if (dbError) {
       console.error('[v0] Error logging image to database:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to log image metadata' },
-        { status: 500 }
-      )
+      // If we can't log to DB, at least return the blob URL
+      return NextResponse.json({
+        id: `temp-${timestamp}`,
+        url: blob.url,
+        filename: file.name,
+        width: null,
+        height: null,
+        size_bytes: file.size,
+        warning: 'Image uploaded but database logging failed',
+      })
     }
+
+    console.log('[v0] Image record created:', imageRecord.id)
 
     return NextResponse.json({
       id: imageRecord.id,
@@ -114,3 +111,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
