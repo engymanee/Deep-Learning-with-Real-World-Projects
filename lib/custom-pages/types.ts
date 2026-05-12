@@ -19,6 +19,7 @@ export interface PageBlock {
   order_number: number
   title: string | null
   content: string | null
+  metadata: Record<string, any> | null
   image_id: string | null
   image?: PageImage | null
   created_at: string
