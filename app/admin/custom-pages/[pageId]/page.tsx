@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageEditor } from '@/components/custom-pages/page-editor'
 import { ImageGallery } from '@/components/custom-pages/image-gallery'
@@ -10,10 +10,11 @@ import { AlertCircle } from 'lucide-react'
 import type { CustomPage, PageImage, PageBlock } from '@/lib/custom-pages/types'
 
 interface PageEditorPageProps {
-  params: { pageId: string }
+  params: Promise<{ pageId: string }>
 }
 
-export default function PageEditorPageClient({ params }: PageEditorPageProps) {
+export default function PageEditorPageClient({ params: paramPromise }: PageEditorPageProps) {
+  const params = use(paramPromise)
   const router = useRouter()
   const isNewPage = params.pageId === 'new'
 
@@ -40,7 +41,7 @@ export default function PageEditorPageClient({ params }: PageEditorPageProps) {
     if (!isNewPage) {
       fetchPage()
     }
-  }, [params.pageId])
+  }, [params.pageId, isNewPage])
 
   const fetchPage = async () => {
     try {
