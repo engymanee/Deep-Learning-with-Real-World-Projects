@@ -48,7 +48,7 @@ export type BaseLayoutOptions = {
   footerNote?: string
 }
 
-const BRAND_NAME = 'Wisdom at Work Portal'
+const BRAND_NAME = 'WaW Fellows Portal'
 
 /**
  * Renders a complete, email-client-friendly HTML document around the

@@ -18,8 +18,8 @@ const _sans = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Wisdom At Work - Learning Portal',
-  description: 'Professional development and leadership learning platform',
+  title: 'WaW Fellows Portal',
+  description: 'The Wisdom at Work Fellowship portal for professional development and leadership learning',
   generator: 'v0.app',
   icons: {
     icon: [

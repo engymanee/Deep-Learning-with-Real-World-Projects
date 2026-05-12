@@ -4,9 +4,9 @@ import { requireUser } from '@/lib/auth-server'
 import { TopBar } from '@/components/top-bar'
 
 export const metadata = {
-  title: 'WaW Fellowship | Wisdom at Work',
+  title: 'WaW Fellows Portal | About',
   description:
-    'Welcome to the Wisdom at Work Fellowship Portal - your dashboard for the WAW Syllabus, Learning Journals, and Additional Resources.',
+    'Welcome to the WaW Fellows Portal - your dashboard for the WAW Syllabus, Learning Journals, and Additional Resources.',
 }
 
 export default async function TeamPage() {
@@ -22,10 +22,10 @@ export default async function TeamPage() {
             <div className="space-y-6">
               <div>
                 <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4">
-                  Welcome to the Wisdom at Work Fellows&apos; Portal
+                  Welcome to the WaW Fellows&apos; Portal
                 </h1>
                 <p className="text-lg text-foreground font-medium mb-3 text-center">
-                  Congratulations and welcome to the Wisdom at Work Fellowship!
+                  Congratulations and welcome to the WaW Fellowship!
                 </p>
                 <p className="text-base text-muted-foreground leading-relaxed text-center">
                   This site is your dashboard for the WAW Syllabus, Learning Journals, Additional Resources.
@@ -40,7 +40,7 @@ export default async function TeamPage() {
           <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-yk9hNgyQQIeZ2sMEpmaQzrCr1BlN8x.png"
-              alt="Wisdom at Work Fellows in collaborative discussion"
+              alt="WaW Fellows in collaborative discussion"
               className="w-full rounded-lg shadow-md"
             />
           </div>
@@ -68,7 +68,7 @@ export default async function TeamPage() {
           <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12 text-center text-sm">
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-Q4wysyC8JWLi02dGNyrSqptIHF6gYQ.png"
-              alt="Wisdom at Work Three-Year Curriculum Structure"
+              alt="WaW Three-Year Curriculum Structure"
               className="w-2/3 rounded-lg shadow-md mx-auto"
             />
           </div>

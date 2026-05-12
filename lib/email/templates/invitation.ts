@@ -41,11 +41,11 @@ export function renderInvitationEmail(args: InvitationEmailArgs): RenderedEmail 
   const cohort = args.cohortLabel?.trim()
   const expires = args.expiresAtLabel?.trim() || '1 hour'
 
-  const subject = 'Activate your Wisdom at Work account'
+  const subject = 'Activate your WaW Fellows Portal account'
 
   const intro = invitedBy
-    ? `${invitedBy} has invited you to join the Wisdom at Work portal.`
-    : `You have been invited to join the Wisdom at Work portal.`
+    ? `${invitedBy} has invited you to join the WaW Fellows Portal.`
+    : `You have been invited to join the WaW Fellows Portal.`
 
   const cohortLine = cohort ? `You will join as part of ${cohort}.` : ''
 
