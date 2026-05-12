@@ -9,6 +9,7 @@ import {
   Users,
   Mail,
   FileText,
+  Trash2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
@@ -103,6 +104,12 @@ export default async function AdminHomePage() {
             icon={<FileText className="h-5 w-5" />}
             title="Custom Pages"
             description="Create and manage custom pages with rich content blocks, images, and text. Publish to the public site with custom URLs."
+          />
+          <ActionCard
+            href="/admin/maintenance"
+            icon={<Trash2 className="h-5 w-5" />}
+            title="Portal Maintenance"
+            description="Clean up test data, duplicate content, and unused resources. Manage invitations, archive drafts, and review audit logs."
           />
         </div>
       </section>
