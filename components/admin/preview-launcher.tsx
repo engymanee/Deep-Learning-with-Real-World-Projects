@@ -1,5 +1,6 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { Eye, Search, User2, Users } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +28,7 @@ type Tab = 'by_fellow' | 'by_cohort'
  * synthetic fellow with no progress, useful for verifying gating).
  */
 export function PreviewLauncher({ fellows }: { fellows: PreviewFellow[] }) {
+  const pathname = usePathname()
   const [tab, setTab] = useState<Tab>('by_fellow')
   const [query, setQuery] = useState('')
   const [selectedFellowId, setSelectedFellowId] = useState<string | null>(
@@ -51,12 +53,14 @@ export function PreviewLauncher({ fellows }: { fellows: PreviewFellow[] }) {
     if (!selectedFellowId) return
     const fd = new FormData()
     fd.set('fellowId', selectedFellowId)
+    fd.set('referrer', pathname)
     startTransition(() => startPreviewAsFellow(fd))
   }
 
   function handleStartCohortPreview() {
     const fd = new FormData()
     fd.set('cohort', selectedCohort)
+    fd.set('referrer', pathname)
     startTransition(() => startPreviewAsCohort(fd))
   }
 

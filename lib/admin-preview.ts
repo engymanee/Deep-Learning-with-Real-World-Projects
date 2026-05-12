@@ -24,8 +24,8 @@ import { isCohort, type Cohort } from '@/lib/cohorts'
 export const PREVIEW_COOKIE = 'wfp_preview'
 
 export type PreviewState =
-  | { type: 'by_fellow'; fellowId: string }
-  | { type: 'by_cohort'; cohort: Cohort }
+  | { type: 'by_fellow'; fellowId: string; referrer?: string }
+  | { type: 'by_cohort'; cohort: Cohort; referrer?: string }
 
 /**
  * Read and parse the preview descriptor from cookies. Returns null when
