@@ -1,17 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageEditor } from '@/components/custom-pages/page-editor'
 import { ImageGallery } from '@/components/custom-pages/image-gallery'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle } from 'lucide-react'
 import type { CustomPage, PageImage, PageBlock } from '@/lib/custom-pages/types'
 
 interface PageEditorPageProps {
-  params: { pageId?: string }
+  params: { pageId: string }
 }
 
-export default function PageEditorPage({ params }: PageEditorPageProps) {
+export default function PageEditorPageClient({ params }: PageEditorPageProps) {
   const router = useRouter()
   const isNewPage = params.pageId === 'new'
 
@@ -30,29 +32,113 @@ export default function PageEditorPage({ params }: PageEditorPageProps) {
   const [images, setImages] = useState<PageImage[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isLoading, setIsLoading] = useState(!isNewPage)
+  const [error, setError] = useState<string | null>(null)
 
   // Fetch page data if editing
+  useEffect(() => {
+    if (!isNewPage) {
+      fetchPage()
+    }
+  }, [params.pageId])
+
+  const fetchPage = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await fetch(`/api/admin/custom-pages?pageId=${params.pageId}`)
+
+      if (!response.ok) {
+        throw new Error('Failed to load page')
+      }
+
+      const fetchedPage = await response.json()
+      setPage({
+        ...fetchedPage,
+        blocks: fetchedPage.page_blocks || [],
+      })
+    } catch (err) {
+      console.error('[v0] Error fetching page:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load page')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleSavePage = async (updates: Partial<CustomPage>) => {
     setIsSaving(true)
+    setError(null)
     try {
-      // TODO: Save to API
-      console.log('Saving page:', updates)
-      setIsSaving(false)
-    } catch (error) {
-      console.error('Error saving page:', error)
+      const payload = {
+        ...(isNewPage ? {} : { pageId: page.id }),
+        title: updates.title || page.title,
+        slug: updates.slug || page.slug,
+        description: updates.description || page.description,
+        is_published: updates.is_published ?? page.is_published,
+        blocks: updates.blocks || page.blocks,
+      }
+
+      const method = isNewPage ? 'POST' : 'PATCH'
+      const response = await fetch('/api/admin/custom-pages', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to save page')
+      }
+
+      const savedPage = await response.json()
+      setPage({
+        ...savedPage,
+        blocks: savedPage.page_blocks || updates.blocks || page.blocks,
+      })
+
+      if (isNewPage) {
+        router.push(`/admin/custom-pages/${savedPage.id}`)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save page'
+      console.error('[v0] Error saving page:', message)
+      setError(message)
+    } finally {
       setIsSaving(false)
     }
   }
 
   const handlePublish = async (published: boolean) => {
     setIsSaving(true)
+    setError(null)
     try {
-      // TODO: Publish via API
-      console.log('Publishing page:', published)
-      setPage({ ...page, is_published: published })
-      setIsSaving(false)
-    } catch (error) {
-      console.error('Error publishing page:', error)
+      const response = await fetch('/api/admin/custom-pages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageId: page.id,
+          title: page.title,
+          slug: page.slug,
+          description: page.description,
+          is_published: published,
+          blocks: page.blocks,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update publish status')
+      }
+
+      const updated = await response.json()
+      setPage({
+        ...updated,
+        blocks: updated.page_blocks || page.blocks,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update publish status'
+      console.error('[v0] Error publishing:', message)
+      setError(message)
+    } finally {
       setIsSaving(false)
     }
   }
@@ -69,17 +155,18 @@ export default function PageEditorPage({ params }: PageEditorPageProps) {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Upload failed')
+        const err = await response.json()
+        throw new Error(err.error || 'Upload failed')
       }
 
       const uploadedImage = await response.json()
       setImages([...images, uploadedImage])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed'
+      console.error('[v0] Upload error:', message)
+      throw new Error(message)
+    } finally {
       setIsUploading(false)
-    } catch (error) {
-      console.error('Upload error:', error)
-      setIsUploading(false)
-      throw error
     }
   }
 
@@ -90,14 +177,15 @@ export default function PageEditorPage({ params }: PageEditorPageProps) {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Delete failed')
+        const err = await response.json()
+        throw new Error(err.error || 'Delete failed')
       }
 
       setImages(images.filter((img) => img.id !== imageId))
-    } catch (error) {
-      console.error('Delete error:', error)
-      throw error
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Delete failed'
+      console.error('[v0] Delete error:', message)
+      throw new Error(message)
     }
   }
 
@@ -115,10 +203,19 @@ export default function PageEditorPage({ params }: PageEditorPageProps) {
 
       const updated = await response.json()
       setImages(images.map((img) => (img.id === imageId ? updated : img)))
-    } catch (error) {
-      console.error('Update error:', error)
-      throw error
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update failed'
+      console.error('[v0] Update error:', message)
+      throw new Error(message)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-muted-foreground">Loading page...</p>
+      </div>
+    )
   }
 
   return (
@@ -131,6 +228,13 @@ export default function PageEditorPage({ params }: PageEditorPageProps) {
           Build your page with text, images, and custom content blocks
         </p>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="content" className="w-full">
         <TabsList>

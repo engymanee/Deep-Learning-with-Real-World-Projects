@@ -53,6 +53,7 @@ export function PageEditor({
       order_number: blocks.length,
       title: type === 'combined' ? 'New Section' : null,
       content: type === 'text' ? '' : null,
+      metadata: null,
       image_id: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
