@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { requireAdmin } from '@/lib/auth-server'
 import { TopBar } from '@/components/top-bar'
+import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   // requireAdmin always evaluates the real underlying account, ignoring
@@ -13,6 +14,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <div className="min-h-screen bg-background">
       <TopBar />
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:py-12">
+        <AdminBreadcrumb />
         <main>{children}</main>
       </div>
     </div>
