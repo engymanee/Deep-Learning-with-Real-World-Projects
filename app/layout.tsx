@@ -48,7 +48,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const user = await getCurrentUser()
+  let user = null
+  try {
+    user = await getCurrentUser()
+  } catch (error) {
+    // If Supabase client initialization fails (e.g., missing env vars),
+    // continue rendering the app without user data. This allows the app
+    // to render even during preview phase when env vars might not be fully available.
+    console.error('[v0] Failed to get current user:', error)
+  }
 
   return (
     <html lang="en" className="bg-background">
