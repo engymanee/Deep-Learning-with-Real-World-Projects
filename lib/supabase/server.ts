@@ -10,10 +10,19 @@ export async function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+  // During build time or if env vars are missing, return a gracefully degraded client
+  // that will fail with a clear error only when actually used
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Missing Supabase environment variables. Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set."
-    )
+    // Create a proxy that throws a clear error only when methods are called
+    return new Proxy({} as any, {
+      get: (target, prop) => {
+        return () => {
+          throw new Error(
+            "Missing Supabase environment variables. Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set."
+          )
+        }
+      }
+    })
   }
 
   const cookieStore = await cookies()

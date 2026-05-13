@@ -4,6 +4,9 @@ import { requireUser } from '@/lib/auth-server'
 import { TopBar } from '@/components/top-bar'
 import { Footer } from '@/components/footer'
 
+// Skip prerendering since this page requires authentication
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'WaW Fellowship | Wisdom at Work',
   description:

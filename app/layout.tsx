@@ -6,6 +6,9 @@ import { getCurrentUser } from '@/lib/auth-server'
 import { AdminPreviewBanner } from '@/components/admin/preview-banner'
 import './globals.css'
 
+// Skip prerendering for the entire app since it requires Supabase which may not be available at build time
+export const dynamic = 'force-dynamic'
+
 const _serif = Lora({
   subsets: ['latin'],
   weight: ['400', '600', '700'],
