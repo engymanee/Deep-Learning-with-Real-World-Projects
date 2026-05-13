@@ -7,6 +7,9 @@ import {
   Megaphone,
   MessagesSquare,
   Users,
+  Mail,
+  FileText,
+  Trash2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
@@ -91,10 +94,22 @@ export default async function AdminHomePage() {
             description="Create scheduling polls, invite specific fellows to vote on availability, and finalize event times like WhenToMeet."
           />
           <ActionCard
-            href="/community"
-            icon={<MessagesSquare className="h-5 w-5" />}
-            title="View community"
-            description="Open the live community feed the way fellows see it (without preview)."
+            href="/admin/email-logs"
+            icon={<Mail className="h-5 w-5" />}
+            title="Email Logs"
+            description="Track all emails sent in the past week. Monitor delivery status and resend failed emails."
+          />
+          <ActionCard
+            href="/admin/custom-pages"
+            icon={<FileText className="h-5 w-5" />}
+            title="Custom Pages"
+            description="Create and manage custom pages with rich content blocks, images, and text. Publish to the public site with custom URLs."
+          />
+          <ActionCard
+            href="/admin/maintenance"
+            icon={<Trash2 className="h-5 w-5" />}
+            title="Portal Maintenance"
+            description="Clean up test data, duplicate content, and unused resources. Manage invitations, archive drafts, and review audit logs."
           />
         </div>
       </section>

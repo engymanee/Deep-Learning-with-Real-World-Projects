@@ -2,14 +2,15 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { requireUser } from '@/lib/auth-server'
 import { TopBar } from '@/components/top-bar'
+import { Footer } from '@/components/footer'
 
 export const metadata = {
-  title: 'WaW Fellows Portal | About',
+  title: 'WaW Fellowship | Wisdom at Work',
   description:
-    'Welcome to the WaW Fellows Portal - your dashboard for the WAW Syllabus, Learning Journals, and Additional Resources.',
+    'Welcome to the Wisdom at Work Fellowship Portal - your dashboard for the WAW Syllabus, Learning Journals, and Additional Resources.',
 }
 
-export default async function TeamPage() {
+export default async function AboutPage() {
   await requireUser()
 
   return (
@@ -19,15 +20,15 @@ export default async function TeamPage() {
         {/* Welcome header section */}
         <section className="border-b border-border bg-card">
           <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
-            <div className="space-y-6 text-center">
+            <div className="space-y-6">
               <div>
                 <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4">
-                  Welcome to the WaW Fellows&apos; Portal
+                  Welcome to the Wisdom at Work Fellows&apos; Portal
                 </h1>
-                <p className="text-lg text-foreground font-medium mb-3">
-                  Congratulations and welcome to the WaW Fellowship!
+                <p className="text-lg text-foreground font-medium mb-3 text-center">
+                  Congratulations and welcome to the Wisdom at Work Fellowship!
                 </p>
-                <p className="text-base text-muted-foreground leading-relaxed">
+                <p className="text-base text-muted-foreground leading-relaxed text-center">
                   This site is your dashboard for the WAW Syllabus, Learning Journals, Additional Resources.
                 </p>
               </div>
@@ -40,7 +41,7 @@ export default async function TeamPage() {
           <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-yk9hNgyQQIeZ2sMEpmaQzrCr1BlN8x.png"
-              alt="WaW Fellows in collaborative discussion"
+              alt="Wisdom at Work Fellows in collaborative discussion"
               className="w-full rounded-lg shadow-md"
             />
           </div>
@@ -68,7 +69,7 @@ export default async function TeamPage() {
           <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12 text-center text-sm">
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-Q4wysyC8JWLi02dGNyrSqptIHF6gYQ.png"
-              alt="WaW Three-Year Curriculum Structure"
+              alt="Wisdom at Work Three-Year Curriculum Structure"
               className="w-2/3 rounded-lg shadow-md mx-auto"
             />
           </div>
@@ -80,7 +81,7 @@ export default async function TeamPage() {
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-kCoiFTogFnqrrOloeNsvOSi9SOMEDN.png"
               alt="John Templeton Foundation"
-              className="h-48 w-auto inline-block"
+              className="h-32 w-auto inline-block"
               style={{ fontSize: '20px' }}
             />
           </div>
@@ -100,6 +101,8 @@ export default async function TeamPage() {
             </div>
           </div>
         </section>
+
+        <Footer />
       </main>
     </div>
   )
