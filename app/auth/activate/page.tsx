@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { EmailOtpType } from '@supabase/supabase-js'
@@ -111,15 +113,21 @@ function ActivateForm() {
   useEffect(() => {
     if (didSignOutRef.current) return
     didSignOutRef.current = true
-    const supabase = createClient()
-    // `local` scope: just clear THIS browser's tokens. Don't fan out
-    // to other devices, and don't hit the global signout endpoint
-    // (which would 401 if there is no session - perfectly fine, but
-    // noisy in the network tab).
-    supabase.auth.signOut({ scope: 'local' }).catch(() => {
-      // Best-effort. If signout fails (e.g. there was no session to
-      // begin with) we still want activation to proceed.
-    })
+    try {
+      const supabase = createClient()
+      // `local` scope: just clear THIS browser's tokens. Don't fan out
+      // to other devices, and don't hit the global signout endpoint
+      // (which would 401 if there is no session - perfectly fine, but
+      // noisy in the network tab).
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {
+        // Best-effort. If signout fails (e.g. there was no session to
+        // begin with) we still want activation to proceed.
+      })
+    } catch (err) {
+      // If Supabase client creation fails (e.g., during build or with missing env vars),
+      // skip the sign-out attempt. This is safe because we're just trying to clear
+      // any pre-existing session as a belt-and-braces measure.
+    }
   }, [])
 
   async function handlePasswordSubmit(e: React.FormEvent) {
