@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that do not require authentication.
 // (Edited to bust the Turbopack edge cache after switching from middleware.ts to proxy.ts.)
-const PUBLIC_PATH_PREFIXES = ['/auth', '/_next', '/favicon', '/icon', '/apple']
+const PUBLIC_PATH_PREFIXES = ['/auth', '/_next', '/favicon', '/icon', '/apple', '/api/cron']
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === '/') return true // root does its own redirect
