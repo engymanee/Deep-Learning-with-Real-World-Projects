@@ -1,8 +1,9 @@
 'use client'
 
-import React, { createContext, useContext } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 import { UserRole } from './roles'
 import type { Cohort } from './cohorts'
+import { createClient } from './supabase/client'
 
 export interface CurrentUser {
   id: string
@@ -52,8 +53,46 @@ export function UserProvider({
   initialUser: CurrentUser | null
   children: React.ReactNode
 }) {
+  const [user, setUser] = useState<CurrentUser | null>(initialUser)
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    // Set up auth state listener to update user when auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        // User logged out
+        setUser(null)
+      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        // User logged in or updated - fetch fresh user data from server
+        try {
+          const response = await fetch('/api/user', {
+            method: 'GET',
+            credentials: 'include',
+          })
+
+          if (response.ok) {
+            const freshUser = await response.json()
+            setUser(freshUser)
+          } else if (response.status === 401) {
+            // Not authenticated
+            setUser(null)
+          }
+        } catch (error) {
+          console.error('[v0] Error fetching updated user:', error)
+        }
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
   return (
-    <UserContext.Provider value={{ user: initialUser }}>
+    <UserContext.Provider value={{ user }}>
       {children}
     </UserContext.Provider>
   )
