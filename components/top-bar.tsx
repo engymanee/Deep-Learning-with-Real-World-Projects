@@ -20,7 +20,11 @@ import { roleLabels } from '@/lib/roles'
 import { NotificationsBell } from '@/components/notifications/notifications-bell'
 import type { CustomPage } from '@/lib/custom-pages/types'
 
-export function TopBar() {
+interface TopBarProps {
+  customPages?: CustomPage[]
+}
+
+export function TopBar({ customPages = [] }: TopBarProps) {
   const { user } = useMaybeUser()
   const router = useRouter()
   const [editingLabel, setEditingLabel] = useState<string | null>(null)
@@ -31,14 +35,12 @@ export function TopBar() {
     library: 'Library',
     community: 'Community',
   })
-  const [customPages, setCustomPages] = useState<CustomPage[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Load labels from API on mount
   useEffect(() => {
-    const loadData = async () => {
+    const loadLabels = async () => {
       try {
-        // Load navigation labels
         const response = await fetch('/api/admin/navigation-labels')
         if (response.ok) {
           const data = await response.json()
@@ -49,21 +51,14 @@ export function TopBar() {
             community: data.community || 'Community',
           })
         }
-
-        // Load custom pages that should show in menu
-        const pagesResponse = await fetch('/api/custom-pages?menu=true')
-        if (pagesResponse.ok) {
-          const pages = await pagesResponse.json()
-          setCustomPages(Array.isArray(pages) ? pages : [])
-        }
       } catch (error) {
-        console.error('[v0] Error loading navigation data:', error)
+        console.error('[v0] Error loading navigation labels:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadData()
+    loadLabels()
   }, [])
 
   const handleSignOut = async () => {

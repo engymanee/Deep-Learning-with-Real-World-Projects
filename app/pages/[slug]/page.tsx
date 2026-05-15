@@ -3,15 +3,16 @@ import { createClient } from '@/lib/supabase/server'
 import { PageRenderer } from '@/components/custom-pages/page-renderer'
 
 interface PageProps {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 export async function generateMetadata({ params }: PageProps) {
+  const { slug } = await params
   const supabase = await createClient()
   const { data: page } = await supabase
     .from('custom_pages')
     .select('*')
-    .eq('slug', params.slug)
+    .eq('slug', slug)
     .eq('is_published', true)
     .single()
 
@@ -31,31 +32,31 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function PublicPage({ params }: PageProps) {
+  const { slug } = await params
   const supabase = await createClient()
 
-  // Fetch published page with blocks and images
-  const { data: page } = await supabase
+  // Fetch published page with blocks
+  const { data: page, error: pageError } = await supabase
     .from('custom_pages')
-    .select(
-      `
-      *,
-      blocks:page_blocks(
-        *,
-        image:page_images(*)
-      )
-    `
-    )
-    .eq('slug', params.slug)
+    .select('*')
+    .eq('slug', slug)
     .eq('is_published', true)
     .single()
 
-  if (!page) {
+  if (pageError || !page) {
     notFound()
   }
 
+  // Fetch page blocks separately
+  const { data: blocks = [] } = await supabase
+    .from('page_blocks')
+    .select('*')
+    .eq('page_id', page.id)
+    .order('order_number', { ascending: true })
+
   return (
     <main className="min-h-screen bg-background">
-      <PageRenderer page={page} />
+      <PageRenderer page={{ ...page, blocks }} />
     </main>
   )
 }
