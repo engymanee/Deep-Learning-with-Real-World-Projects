@@ -20,7 +20,7 @@ WITH CHECK (
   bucket_id = 'custom-page-images'
   AND auth.role() = 'authenticated'
   AND (
-    SELECT role FROM public.user_profiles WHERE id = auth.uid()
+    SELECT role FROM public.profiles WHERE id = auth.uid()
   ) = 'admin'
 );
 
@@ -32,7 +32,7 @@ USING (
   bucket_id = 'custom-page-images'
   AND auth.role() = 'authenticated'
   AND (
-    SELECT role FROM public.user_profiles WHERE id = auth.uid()
+    SELECT role FROM public.profiles WHERE id = auth.uid()
   ) = 'admin'
 );
 
