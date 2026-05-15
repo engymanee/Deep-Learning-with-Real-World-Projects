@@ -33,31 +33,33 @@ export default async function AdminSchedulePage() {
     .order('name')
 
   // Get schedules created by this admin
-  const { data: schedules } = await supabase
-    .from('schedules')
-    .select(`
-      id,
-      title,
-      description,
-      location,
-      event_date,
-      start_time,
-      status,
-      is_poll,
-      voting_closes_at,
-      created_at,
-      schedule_options (
+  let schedules: any[] = []
+  try {
+    const { data, error } = await supabase
+      .from('schedules')
+      .select(`
         id,
-        start_time,
-        end_time
-      ),
-      schedule_votes (
-        id,
-        user_id
-      )
-    `)
-    .eq('created_by_admin', (await requireAdmin()).id)
-    .order('created_at', { ascending: false })
+        title,
+        description,
+        event_date,
+        status,
+        is_poll,
+        voting_closes_at,
+        schedule_options(id, start_time, end_time, order_number),
+        schedule_votes(id)
+      `)
+      .eq('created_by_admin', (await supabase.auth.getUser()).data.user?.id)
+      .order('created_at', { ascending: false })
+    
+    if (error && error.code !== 'PGRST205') {
+      console.error('[v0] Error fetching schedules:', error)
+    }
+    if (data) {
+      schedules = data
+    }
+  } catch (error) {
+    console.error('[v0] Error fetching schedules:', error)
+  }
 
   async function createPoll(data: {
     title: string
