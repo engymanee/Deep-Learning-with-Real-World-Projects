@@ -122,19 +122,38 @@ export async function PATCH(request: NextRequest) {
       // Delete existing blocks
       await supabase.from('page_blocks').delete().eq('page_id', pageId)
 
-      // Insert new blocks
+      // Fetch all images to map image_id to url for content field
+      const { data: allImages } = await supabase
+        .from('page_images')
+        .select('id, url, alt_text')
+
+      const imageMap = new Map((allImages || []).map((img: any) => [img.id, img]))
+
+      // Insert new blocks with image URLs in content field
       const { error: blocksError } = await supabase
         .from('page_blocks')
         .insert(
-          blocks.map((block: any, index: number) => ({
-            page_id: page.id,
-            block_type: block.block_type,
-            title: block.title || null,
-            content: block.content || null,
-            metadata: block.metadata || null,
-            image_id: block.image_id || null,
-            order_number: index,
-          }))
+          blocks.map((block: any, index: number) => {
+            let content = block.content || null
+
+            // If this is an image block with image_id, populate content with the image URL
+            if (block.block_type === 'image' && block.image_id) {
+              const image = imageMap.get(block.image_id)
+              if (image) {
+                content = image.url
+              }
+            }
+
+            return {
+              page_id: page.id,
+              block_type: block.block_type,
+              title: block.title || null,
+              content,
+              metadata: block.metadata || null,
+              image_id: block.image_id || null,
+              order_number: index,
+            }
+          })
         )
 
       if (blocksError) {
