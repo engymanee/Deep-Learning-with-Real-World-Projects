@@ -5,7 +5,6 @@ import Image from 'next/image'
 import Markdown from 'react-markdown'
 import { ArrowRight } from 'lucide-react'
 import { CustomPage, PageBlock } from '@/lib/custom-pages/types'
-import { Footer } from '@/components/footer'
 
 interface PageRendererProps {
   page: CustomPage
@@ -111,8 +110,6 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
           </div>
         </section>
       )}
-
-      <Footer />
     </main>
   )
 }
