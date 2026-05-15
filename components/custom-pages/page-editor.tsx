@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import Markdown from 'react-markdown'
-import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff, AlertCircle, Link as LinkIcon, Copy } from 'lucide-react'
+import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff, AlertCircle, Link as LinkIcon, Copy, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { CustomPage, PageBlock, PageImage, PageBlockType } from '@/lib/custom-pages/types'
 
 interface PageEditorProps {
@@ -55,6 +56,8 @@ export function PageEditor({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [showImageDialog, setShowImageDialog] = useState(false)
+  const [selectedImageForAdd, setSelectedImageForAdd] = useState<string | null>(null)
 
   // Track if there are unsaved changes
   useEffect(() => {
@@ -95,18 +98,38 @@ export function PageEditor({
 
   const addBlock = (type: PageBlockType) => {
     const newBlock: PageBlock = {
-      id: `temp-${Date.now()}`,
+      id: `block-${Date.now()}`,
       page_id: page.id,
       block_type: type,
       order_number: blocks.length,
-      title: type === 'combined' ? 'New Section' : null,
-      content: type === 'text' ? '' : null,
+      title: null,
+      content: null,
       metadata: null,
       image_id: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
     setBlocks([...blocks, newBlock])
+  }
+
+  const handleAddImageBlock = () => {
+    if (selectedImageForAdd) {
+      const newBlock: PageBlock = {
+        id: `block-${Date.now()}`,
+        page_id: page.id,
+        block_type: 'image',
+        order_number: blocks.length,
+        title: null,
+        content: null,
+        metadata: null,
+        image_id: selectedImageForAdd,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      setBlocks([...blocks, newBlock])
+      setShowImageDialog(false)
+      setSelectedImageForAdd(null)
+    }
   }
 
   const removeBlock = (blockId: string) => {
@@ -370,20 +393,11 @@ export function PageEditor({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => addBlock('image')}
+              onClick={() => setShowImageDialog(true)}
               className="gap-1"
             >
               <Plus className="h-4 w-4" />
               Image
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => addBlock('combined')}
-              className="gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              Combined
             </Button>
           </div>
         </CardHeader>
@@ -436,23 +450,8 @@ export function PageEditor({
 
                             {/* Block Content */}
                             <div className="space-y-3">
-                              {(block.block_type === 'text' || block.block_type === 'combined') && (
+                              {block.block_type === 'text' && (
                                 <>
-                                  {block.block_type === 'combined' && (
-                                    <div>
-                                      <label className="block text-xs font-medium mb-1">
-                                        Section Title
-                                      </label>
-                                      <Input
-                                        value={block.title || ''}
-                                        onChange={(e) =>
-                                          updateBlock(block.id, { title: e.target.value })
-                                        }
-                                        placeholder="Section title"
-                                        size="sm"
-                                      />
-                                    </div>
-                                  )}
                                   <div>
                                     <label className="block text-xs font-medium mb-1">
                                       Content
@@ -478,7 +477,7 @@ export function PageEditor({
                                 </>
                               )}
 
-                              {(block.block_type === 'image' || block.block_type === 'combined') && (
+                              {block.block_type === 'image' && (
                                 <div>
                                   <label className="block text-xs font-medium mb-1">
                                     Image
@@ -500,19 +499,12 @@ export function PageEditor({
                                       ))}
                                     </SelectContent>
                                   </Select>
-
-                                  {block.image_id && (
+                                  {block.image_id && getSelectedImage(block.image_id) && (
                                     <div className="mt-2">
                                       <img
-                                        src={getSelectedImage(block.image_id)?.url}
-                                        alt="Preview"
-                                        className="w-full max-h-40 object-cover rounded"
-                                      />
-                                      <Input
-                                        value={getSelectedImage(block.image_id)?.alt_text || ''}
-                                        placeholder="Alt text for image"
-                                        className="mt-2 text-xs"
-                                        size="sm"
+                                        src={getSelectedImage(block.image_id)!.url}
+                                        alt="Block preview"
+                                        className="max-h-40 rounded border"
                                       />
                                     </div>
                                   )}
@@ -531,6 +523,77 @@ export function PageEditor({
           )}
         </CardContent>
       </Card>
+
+      {/* Image Selection Dialog */}
+      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select Image for Page Block</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Image Library */}
+            <div>
+              <h3 className="font-semibold text-sm mb-3">Image Library</h3>
+              {availableImages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No images uploaded yet. Upload an image first.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                  {availableImages.map((img) => (
+                    <div
+                      key={img.id}
+                      onClick={() => setSelectedImageForAdd(img.id)}
+                      className={`cursor-pointer border-2 rounded-lg overflow-hidden transition ${
+                        selectedImageForAdd === img.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary'
+                      }`}
+                    >
+                      <img
+                        src={img.url}
+                        alt={img.filename}
+                        className="w-full h-32 object-cover"
+                      />
+                      <div className="p-2">
+                        <p className="text-xs font-medium truncate">{img.filename}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Upload New Image */}
+            <div className="pt-4 border-t">
+              <h3 className="font-semibold text-sm mb-3">Upload New Image</h3>
+              <p className="text-xs text-muted-foreground mb-2">
+                Use the Image Gallery tab to upload a new image, then return here to select it.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowImageDialog(false)
+                  setSelectedImageForAdd(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddImageBlock}
+                disabled={!selectedImageForAdd}
+              >
+                Add Image Block
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
