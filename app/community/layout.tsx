@@ -54,18 +54,21 @@ export default async function CommunityLayout({
       .not('published_at', 'is', null),
   )
 
-  const [biosRes, ...postRes] = await Promise.all([
+  const [biosRes, ...allRes] = await Promise.all([
     biosPromise,
     ...postCountPromises,
     getMenuCustomPages(),
   ])
 
   // Extract custom pages from the last item in the promise array
-  const customPages = postRes.pop() || []
+  const customPagesResult = allRes[allRes.length - 1]
+  const customPages = Array.isArray(customPagesResult) ? customPagesResult : []
+  const postRes = allRes.slice(0, -1)
   
   const counts: Record<string, number> = { bios: biosRes.count ?? 0 }
   postSections.forEach((s, i) => {
-    counts[s.id] = postRes[i].count ?? 0
+    const res = postRes[i] as any
+    counts[s.id] = res?.count ?? 0
   })
 
   return (

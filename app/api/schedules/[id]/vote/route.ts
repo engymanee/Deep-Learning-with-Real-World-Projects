@@ -36,7 +36,7 @@ export async function POST(
       )
     }
 
-    if (new Date(schedule.voting_closes_at) < new Date()) {
+    if (new Date(schedule.voting_closes_at!) < new Date()) {
       return NextResponse.json(
         { error: 'Voting has closed' },
         { status: 400 }
