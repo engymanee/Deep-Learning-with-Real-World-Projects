@@ -16,6 +16,34 @@ export const metadata = {
 export default async function AboutPage() {
   await requireUser()
 
+  const wisdomLabs = [
+    {
+      date: 'November 12',
+      number: 'One',
+      title: 'Wise Leadership Begins with Taking People Seriously as Persons',
+    },
+    {
+      date: 'January 7',
+      number: 'Two',
+      title: 'Ground Your Compass: Finding your True North Amidst Competing Values and Views',
+    },
+    {
+      date: 'February 4',
+      number: 'Three',
+      title: 'Follow the Trailheads',
+    },
+    {
+      date: 'March 4',
+      number: 'Four',
+      title: 'Navigate Challenges to Promote Character',
+    },
+    {
+      date: 'April 8',
+      number: 'Five',
+      title: 'Anticipate and Deal with Magnetic Interference',
+    },
+  ]
+
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
@@ -25,28 +53,21 @@ export default async function AboutPage() {
           <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
             <div className="space-y-6">
               <div>
-                <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4">
+                <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4 text-center">
                   Welcome to the Wisdom at Work Fellows&apos; Portal
                 </h1>
                 <p className="text-lg text-foreground font-medium mb-3 text-center">
-                  Congratulations and welcome to the Wisdom at Work Fellowship!
+                  Congratulations and welcome to the{' '}
+                  <Link href="#" className="underline hover:opacity-80">
+                    Wisdom at Work Fellowship
+                  </Link>
+                  !
                 </p>
                 <p className="text-base text-muted-foreground leading-relaxed text-center">
                   This site is your dashboard for the WAW Syllabus, Learning Journals, Additional Resources.
                 </p>
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* Foundation disclaimer image */}
-        <section className="bg-background">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-            <img
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-H1sYQI5iHCd7niCFvKbRdSYILwL5U1.png"
-              alt="This project was made possible through the support of Grant 63617 from the John Templeton Foundation"
-              className="w-full rounded-lg"
-            />
           </div>
         </section>
 
@@ -61,29 +82,48 @@ export default async function AboutPage() {
           </div>
         </section>
 
-        {/* Three paragraphs about Wisdom at Work initiative */}
-        <section className="border-b border-border bg-card">
+        {/* Deep Learning Labs Section Header */}
+        <section className="bg-background">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-            <div className="prose prose-sm max-w-none space-y-4 text-muted-foreground">
-              <p>
-                School leaders face myriad challenges: handling angry parent emails, managing contentious meetings, and addressing bullying—often before the school day even begins. Each situation demands nuanced thinking and sound judgment, not one-size-fits-all answers. How do school leaders learn to move from reactive mode to calm, wise responses?
-              </p>
-              <p>
-                Our new initiative, Wisdom at Work, aims to answer that question. We view practical wisdom (phronesis)—the disposition to press pause, deliberate, and respond well—as the antidote to reactive decision-making. Practical wisdom enables leaders to attend to context, engage stakeholders meaningfully, and navigate competing priorities—turning everyday challenges into opportunities to foster flourishing.
-              </p>
-              <p>
-                Rooted in innovative, research-based design, the Wisdom at Work Fellowship will equip school leaders and their teams with tools and practices they can use to lead with wisdom, even under pressure. Over few years, we will grow a vibrant Community of Fellows—engaging school leaders not just as participants, but as partners in research and design. Together, we are shaping a fresh, field-tested model of professional development, building evidence-based tools, and cultivating a networked Community of Practice.
-              </p>
+            <h2 className="text-2xl font-bold text-center text-foreground mb-8 tracking-wide">
+              WISDOM AT WORK - DEEP LEARNING LABS
+            </h2>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-12 justify-center">
+              <button className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-blue-800 transition-colors">
+                Click Here for Recurring Zoom Link
+              </button>
+              <button className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-blue-800 transition-colors">
+                📋 View Companion Guide
+              </button>
+            </div>
+
+            {/* Wisdom Labs List */}
+            <div className="space-y-6">
+              {wisdomLabs.map((lab, idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-blue-700 mb-1">
+                      Wisdom Lab {lab.number} - {lab.date}
+                    </h3>
+                    <p className="text-foreground">{lab.title}</p>
+                  </div>
+                  <button className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-800 transition-colors whitespace-nowrap">
+                    Click Here
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Three-year curriculum structure image */}
+        {/* Curriculum structure section */}
         <section className="bg-background">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12 text-center text-sm">
+          <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-b8MnjRcwfx4lrP2uHyE4GYgMWOaAas.png"
-              alt="Wisdom at Work Three-Year Curriculum Structure: Year One Deep Learning, Year Two Execution & Brokering, Year Three WAW Fellows Networked Community of Practice"
+              alt="Wisdom at Work Three-Year Curriculum Structure"
               className="w-full rounded-lg shadow-md"
             />
           </div>
@@ -91,27 +131,20 @@ export default async function AboutPage() {
 
         {/* Foundation attribution section */}
         <section className="border-t border-border bg-card">
-          <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16 text-center">
-            <img
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-kCoiFTogFnqrrOloeNsvOSi9SOMEDN.png"
-              alt="John Templeton Foundation"
-              className="h-32 w-auto inline-block"
-              style={{ fontSize: '20px' }}
-            />
-          </div>
-        </section>
-
-        {/* Call to action footer */}
-        <section className="border-t border-border bg-background">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-6 py-3 font-medium hover:opacity-90 transition-opacity"
-              >
-                Go to Dashboard
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+          <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+              <div className="sm:w-1/2">
+                <p className="text-sm text-muted-foreground italic leading-relaxed">
+                  This project was made possible through the support of Grant 63617 from the John Templeton Foundation. The opinions expressed in this project are those of the grantee and do not necessarily reflect the views of the John Templeton Foundation.
+                </p>
+              </div>
+              <div className="sm:w-1/2 text-center">
+                <img
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-kCoiFTogFnqrrOloeNsvOSi9SOMEDN.png"
+                  alt="John Templeton Foundation"
+                  className="h-40 w-auto inline-block"
+                />
+              </div>
             </div>
           </div>
         </section>
