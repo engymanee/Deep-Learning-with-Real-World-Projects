@@ -1,18 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { format } from 'date-fns'
+import { useRouter } from 'next/navigation'
 import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  RefreshCw,
+  RotateCcw,
   Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  Mail,
-  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,20 +26,19 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import type { EmailLogEntry } from '@/lib/email/types'
+import type { EmailLogEntry } from '@/lib/email/logs'
+import { resendInvitationEmail, resendNotificationEmail } from '@/app/admin/email-logs/actions'
 
 const STATUS_COLORS = {
-  sent: 'bg-green-50 text-green-700 border-green-200',
-  failed: 'bg-red-50 text-red-700 border-red-200',
-  pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  bounced: 'bg-orange-50 text-orange-700 border-orange-200',
+  sent: 'text-green-700',
+  failed: 'text-red-700',
+  pending: 'text-yellow-700',
 }
 
 const STATUS_ICONS = {
   sent: <CheckCircle2 className="h-4 w-4" />,
   failed: <AlertCircle className="h-4 w-4" />,
   pending: <Clock className="h-4 w-4" />,
-  bounced: <AlertCircle className="h-4 w-4" />,
 }
 
 interface EmailLogsClientProps {
@@ -62,10 +56,12 @@ export function EmailLogsClient({
   totalLogs,
   pageCount,
 }: EmailLogsClientProps) {
+  const router = useRouter()
   const [logs, setLogs] = useState<EmailLogEntry[]>(initialLogs)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'sent' | 'failed' | 'pending' | 'bounced'>('all')
-  const [isRetrying, setIsRetrying] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'sent' | 'failed' | 'pending'>('all')
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
@@ -78,36 +74,60 @@ export function EmailLogsClient({
     return matchesSearch && matchesStatus
   })
 
-  const handleRetryFailed = async () => {
-    setIsRetrying(true)
+  const handleResend = async (log: EmailLogEntry) => {
+    setResendingId(log.id)
+    setMessage(null)
+
     try {
-      const response = await fetch('/api/admin/email-logs/retry-failed', {
-        method: 'POST',
-      })
-      if (response.ok) {
-        // Refetch logs
-        window.location.reload()
+      let result
+      if (log.type === 'invitation') {
+        result = await resendInvitationEmail(log.id)
+      } else {
+        result = await resendNotificationEmail(log.id)
       }
+
+      if (result.ok) {
+        setMessage({
+          text: result.message || 'Email resent successfully',
+          type: 'success',
+        })
+        // Update the log in the UI
+        setLogs((prev) =>
+          prev.map((l) =>
+            l.id === log.id
+              ? { ...l, status: 'sent', sent_at: new Date().toISOString(), error_message: null }
+              : l
+          )
+        )
+        setTimeout(() => setMessage(null), 3000)
+      } else {
+        setMessage({
+          text: result.error || 'Failed to resend email',
+          type: 'error',
+        })
+        setTimeout(() => setMessage(null), 5000)
+      }
+    } catch (err) {
+      setMessage({
+        text: 'An error occurred while resending the email',
+        type: 'error',
+      })
+      setTimeout(() => setMessage(null), 5000)
     } finally {
-      setIsRetrying(false)
+      setResendingId(null)
     }
   }
 
-  const handleResendEmail = async (logId: string) => {
-    try {
-      const response = await fetch(`/api/admin/email-logs/${logId}/resend`, {
-        method: 'POST',
-      })
-      if (response.ok) {
-        // Update the log status
-        const updatedLogs = logs.map((log) =>
-          log.id === logId ? { ...log, status: 'pending' as const } : log
-        )
-        setLogs(updatedLogs)
-      }
-    } catch (err) {
-      console.error('[v0] Failed to resend email:', err)
-    }
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Not sent'
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   }
 
   const failedCount = logs.filter((log) => log.status === 'failed').length
@@ -125,7 +145,6 @@ export function EmailLogsClient({
                 <p className="text-sm text-muted-foreground">Total Emails</p>
                 <p className="text-2xl font-bold text-foreground">{totalLogs}</p>
               </div>
-              <Mail className="h-8 w-8 text-muted-foreground/50" />
             </div>
           </CardContent>
         </Card>
@@ -167,24 +186,21 @@ export function EmailLogsClient({
         </Card>
       </div>
 
+      {/* Message Alert */}
+      {message && (
+        <div
+          className={`p-4 rounded-lg ${
+            message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+          }`}
+        >
+          {message.text}
+        </div>
+      )}
+
       {/* Filters & Search */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Email History (Past 7 Days)</span>
-            {failedCount > 0 && (
-              <Button
-                onClick={handleRetryFailed}
-                disabled={isRetrying}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {isRetrying ? 'Retrying...' : `Retry Failed (${failedCount})`}
-              </Button>
-            )}
-          </CardTitle>
+          <CardTitle>Email History (Past 7 Days)</CardTitle>
           <CardDescription>
             View all emails sent in the past 7 days with delivery status
           </CardDescription>
@@ -215,7 +231,6 @@ export function EmailLogsClient({
                 <SelectItem value="sent">Sent</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="bounced">Bounced</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -224,7 +239,6 @@ export function EmailLogsClient({
           <div className="overflow-x-auto">
             {filteredLogs.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8 text-center">
-                <Mail className="mx-auto h-10 w-10 text-muted-foreground/50" />
                 <p className="mt-3 text-sm font-medium text-muted-foreground">No emails found</p>
                 <p className="text-xs text-muted-foreground">
                   Try adjusting your search or filters
@@ -238,9 +252,6 @@ export function EmailLogsClient({
                       Recipient
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Subject
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                       Type
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
@@ -248,6 +259,9 @@ export function EmailLogsClient({
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                       Sent
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Error
                     </th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">
                       Actions
@@ -266,13 +280,8 @@ export function EmailLogsClient({
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="max-w-xs truncate text-foreground" title={log.subject}>
-                          {log.subject}
-                        </p>
-                      </td>
-                      <td className="px-4 py-4">
                         <Badge variant="outline" className="capitalize">
-                          {log.email_type}
+                          {log.type}
                         </Badge>
                       </td>
                       <td className="px-4 py-4">
@@ -285,27 +294,34 @@ export function EmailLogsClient({
                             {log.status}
                           </Badge>
                         </div>
-                        {log.error_message && (
-                          <p className="mt-1 text-xs text-red-600">{log.error_message}</p>
-                        )}
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(log.sent_at || log.created_at), 'MMM d, HH:mm')}
+                          {formatDate(log.sent_at)}
                         </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        {log.error_message && (
+                          <p className="text-xs text-red-600 max-w-xs truncate" title={log.error_message}>
+                            {log.error_message}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex justify-end gap-2">
                           {log.status === 'failed' && (
                             <Button
-                              onClick={() => handleResendEmail(log.id)}
+                              onClick={() => handleResend(log)}
+                              disabled={resendingId === log.id}
                               variant="ghost"
                               size="sm"
                               className="gap-1"
                               title="Resend this email"
                             >
-                              <RefreshCw className="h-3 w-3" />
-                              <span className="hidden sm:inline">Resend</span>
+                              <RotateCcw className="h-3 w-3" />
+                              <span className="hidden sm:inline">
+                                {resendingId === log.id ? 'Sending...' : 'Resend'}
+                              </span>
                             </Button>
                           )}
                         </div>
@@ -327,39 +343,19 @@ export function EmailLogsClient({
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => router.push(`?page=${currentPage - 1}`)}
                   disabled={currentPage === 1}
-                  asChild={currentPage > 1}
                 >
-                  {currentPage > 1 ? (
-                    <a href={`/admin/email-logs?page=${currentPage - 1}`} className="flex items-center gap-1">
-                      <ChevronLeft className="h-4 w-4" />
-                      Previous
-                    </a>
-                  ) : (
-                    <>
-                      <ChevronLeft className="h-4 w-4" />
-                      Previous
-                    </>
-                  )}
+                  Previous
                 </Button>
 
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => router.push(`?page=${currentPage + 1}`)}
                   disabled={currentPage === pageCount}
-                  asChild={currentPage < pageCount}
                 >
-                  {currentPage < pageCount ? (
-                    <a href={`/admin/email-logs?page=${currentPage + 1}`} className="flex items-center gap-1">
-                      Next
-                      <ChevronRight className="h-4 w-4" />
-                    </a>
-                  ) : (
-                    <>
-                      Next
-                      <ChevronRight className="h-4 w-4" />
-                    </>
-                  )}
+                  Next
                 </Button>
               </div>
             </div>
@@ -369,3 +365,4 @@ export function EmailLogsClient({
     </div>
   )
 }
+
