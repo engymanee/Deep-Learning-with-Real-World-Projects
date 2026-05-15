@@ -72,6 +72,7 @@ export default async function AdminSchedulePage() {
     invited_cohorts: string[]
   }) {
     'use server'
+    console.log('[v0] createPoll: Starting poll creation with title:', data.title)
     const supabase = await createClient()
     const admin = await requireAdmin()
 
@@ -91,7 +92,12 @@ export default async function AdminSchedulePage() {
       .select('id')
       .single()
 
-    if (scheduleError) throw scheduleError
+    if (scheduleError) {
+      console.error('[v0] createPoll: Schedule creation error:', scheduleError)
+      throw scheduleError
+    }
+
+    console.log('[v0] createPoll: Schedule created with id:', schedule.id)
 
     // Create schedule options
     const optionsToInsert = data.options.map((opt, index) => ({
@@ -105,30 +111,45 @@ export default async function AdminSchedulePage() {
       .from('schedule_options')
       .insert(optionsToInsert)
 
-    if (optionsError) throw optionsError
+    if (optionsError) {
+      console.error('[v0] createPoll: Options creation error:', optionsError)
+      throw optionsError
+    }
+
+    console.log('[v0] createPoll: Options created, count:', optionsToInsert.length)
 
     // Resolve all recipients: direct fellows + fellows in selected cohorts
     const selectedFellowIds = new Set(data.invited_fellows)
+    console.log('[v0] createPoll: Direct fellows invited:', data.invited_fellows.length)
 
     if (data.invited_cohorts.length > 0) {
+      console.log('[v0] createPoll: Fetching members from cohorts:', data.invited_cohorts.length)
       const { data: cohortMembers } = await supabase
         .from('cohort_members')
         .select('profile_id')
         .in('cohort_id', data.invited_cohorts)
 
+      console.log('[v0] createPoll: Cohort members found:', cohortMembers?.length || 0)
       cohortMembers?.forEach((m) => selectedFellowIds.add(m.profile_id))
     }
 
+    console.log('[v0] createPoll: Total fellows to notify:', selectedFellowIds.size)
+
     // Send notifications to all selected fellows
     if (selectedFellowIds.size > 0) {
+      console.log('[v0] createPoll: Calling createSchedulingNotification...')
       await createSchedulingNotification(
         schedule.id,
         data.title,
         Array.from(selectedFellowIds),
         admin.id
       )
+      console.log('[v0] createPoll: createSchedulingNotification completed')
+    } else {
+      console.warn('[v0] createPoll: No fellows to notify')
     }
 
+    console.log('[v0] createPoll: Poll creation completed, redirecting to detail page')
     redirect(`/admin/schedule/${schedule.id}`)
   }
 
