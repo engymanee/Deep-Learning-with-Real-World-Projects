@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import Markdown from 'react-markdown'
+import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff, AlertCircle, Link as LinkIcon, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -29,6 +30,7 @@ interface PageEditorProps {
   onSave: (page: Partial<CustomPage>) => Promise<void>
   onPublish: (published: boolean) => Promise<void>
   isSaving?: boolean
+  isUploading?: boolean
   isPublished?: boolean
 }
 
@@ -38,6 +40,7 @@ export function PageEditor({
   onSave,
   onPublish,
   isSaving = false,
+  isUploading = false,
   isPublished = false,
 }: PageEditorProps) {
   const [title, setTitle] = useState(page.title)
@@ -51,6 +54,7 @@ export function PageEditor({
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Track if there are unsaved changes
   useEffect(() => {
@@ -163,6 +167,25 @@ export function PageEditor({
   const getSelectedImage = (imageId: string | null) => {
     if (!imageId) return null
     return availableImages.find((img) => img.id === imageId)
+  }
+
+  const copyPageUrl = async () => {
+    if (!page.id || !slug) {
+      alert('Page must be saved before copying URL')
+      return
+    }
+
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://practicalwisdomproject.org'
+    const fullUrl = `${baseUrl}/pages/${slug}`
+
+    try {
+      await navigator.clipboard.writeText(fullUrl)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch (err) {
+      // Fallback: show URL in prompt if clipboard fails
+      prompt('Copy this URL:', fullUrl)
+    }
   }
 
   return (
@@ -282,7 +305,7 @@ export function PageEditor({
           <div className="flex gap-2 pt-2">
             <Button
               onClick={handleSave}
-              disabled={isSaving || !hasUnsavedChanges}
+              disabled={isSaving || isUploading || !hasUnsavedChanges}
               variant={hasUnsavedChanges ? 'default' : 'outline'}
               className="flex-1"
             >
@@ -291,7 +314,7 @@ export function PageEditor({
             <Button
               variant={isPublished ? 'secondary' : 'default'}
               onClick={() => onPublish(!isPublished)}
-              disabled={!page.id || isSaving || hasUnsavedChanges}
+              disabled={!page.id || isSaving || isUploading || hasUnsavedChanges}
               className="gap-2"
             >
               {isPublished ? (
@@ -306,6 +329,21 @@ export function PageEditor({
                 </>
               )}
             </Button>
+            {page.id && (
+              <Button
+                onClick={copyPageUrl}
+                variant="outline"
+                size="icon"
+                title="Copy page URL"
+                className="gap-2"
+              >
+                {linkCopied ? (
+                  <Copy className="h-4 w-4" />
+                ) : (
+                  <LinkIcon className="h-4 w-4" />
+                )}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -424,10 +462,18 @@ export function PageEditor({
                                       onChange={(e) =>
                                         updateBlock(block.id, { content: e.target.value })
                                       }
-                                      placeholder="Enter text content..."
+                                      placeholder="Enter text content (supports Markdown: # Heading, **bold**, - lists, etc.)"
                                       rows={3}
-                                      className="w-full px-2 py-2 border rounded text-sm"
+                                      className="w-full px-2 py-2 border rounded text-sm font-mono text-xs"
                                     />
+                                    {block.content && (
+                                      <div className="mt-2 p-2 bg-muted rounded text-xs border border-border">
+                                        <p className="font-semibold text-foreground mb-1">Preview:</p>
+                                        <div className="prose prose-sm prose-neutral max-w-none text-xs">
+                                          <Markdown>{block.content}</Markdown>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </>
                               )}

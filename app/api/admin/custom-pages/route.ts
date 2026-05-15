@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag, revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 
@@ -75,6 +76,15 @@ export async function POST(request: NextRequest) {
       { error: error instanceof Error ? error.message : 'Failed to create page' },
       { status: 500 }
     )
+  } finally {
+    // Revalidate when a new page is created
+    try {
+      revalidateTag('custom-pages')
+      revalidateTag('navigation')
+      revalidatePath('/', 'layout')
+    } catch (e) {
+      console.warn('[v0] Revalidation failed:', e)
+    }
   }
 }
 
@@ -195,6 +205,15 @@ export async function PATCH(request: NextRequest) {
       { error: error instanceof Error ? error.message : 'Failed to update page' },
       { status: 500 }
     )
+  } finally {
+    // Revalidate navigation and page caches whenever a page is updated
+    try {
+      revalidateTag('custom-pages')
+      revalidateTag('navigation')
+      revalidatePath('/', 'layout')
+    } catch (e) {
+      console.warn('[v0] Revalidation failed:', e)
+    }
   }
 }
 
