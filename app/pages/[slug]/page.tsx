@@ -1,7 +1,13 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/auth-server'
 import { PageRenderer } from '@/components/custom-pages/page-renderer'
 import { InlinePageEditor } from '@/components/custom-pages/inline-page-editor'
+import { TopBar } from '@/components/top-bar'
+import { Footer } from '@/components/footer'
+
+// Skip prerendering since this page requires authentication
+export const dynamic = 'force-dynamic'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -36,6 +42,8 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function PublicPage({ params }: PageProps) {
+  await requireUser()
+  
   const { slug } = await params
   const supabase = await createClient()
 
@@ -79,11 +87,15 @@ export default async function PublicPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {userIsAdmin ? (
-        <InlinePageEditor page={pageWithBlocks} />
-      ) : (
-        <PageRenderer page={pageWithBlocks} />
-      )}
+      <TopBar />
+      <main className="w-full">
+        {userIsAdmin ? (
+          <InlinePageEditor page={pageWithBlocks} />
+        ) : (
+          <PageRenderer page={pageWithBlocks} />
+        )}
+        <Footer />
+      </main>
     </div>
   )
 }
