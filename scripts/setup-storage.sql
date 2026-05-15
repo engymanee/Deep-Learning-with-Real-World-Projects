@@ -10,8 +10,7 @@ ON CONFLICT (id) DO NOTHING;
 CREATE POLICY "Public read access to custom-page-images" 
 ON storage.objects 
 FOR SELECT 
-USING (bucket_id = 'custom-page-images')
-ON CONFLICT DO NOTHING;
+USING (bucket_id = 'custom-page-images');
 
 -- 3. Allow authenticated admin users to upload (INSERT)
 CREATE POLICY "Admin users can upload to custom-page-images"
@@ -23,10 +22,9 @@ WITH CHECK (
   AND (
     SELECT role FROM public.user_profiles WHERE id = auth.uid()
   ) = 'admin'
-)
-ON CONFLICT DO NOTHING;
+);
 
--- 4. Allow authenticated users to delete their own uploads
+-- 4. Allow authenticated admin users to delete
 CREATE POLICY "Admin users can delete from custom-page-images"
 ON storage.objects
 FOR DELETE
@@ -36,5 +34,5 @@ USING (
   AND (
     SELECT role FROM public.user_profiles WHERE id = auth.uid()
   ) = 'admin'
-)
-ON CONFLICT DO NOTHING;
+);
+
