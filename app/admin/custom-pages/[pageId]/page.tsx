@@ -24,6 +24,7 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
     slug: '',
     description: '',
     is_published: false,
+    show_in_menu: true,
     blocks: [],
     created_by: '',
     created_at: new Date().toISOString(),
@@ -89,6 +90,7 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
         slug: updates.slug || page.slug,
         description: updates.description || page.description,
         is_published: updates.is_published ?? page.is_published,
+        show_in_menu: updates.show_in_menu ?? page.show_in_menu,
         blocks: updates.blocks || page.blocks,
       }
 

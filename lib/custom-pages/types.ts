@@ -32,6 +32,7 @@ export interface CustomPage {
   slug: string
   description: string | null
   is_published: boolean
+  show_in_menu: boolean
   blocks?: PageBlock[]
   created_by: string
   created_at: string

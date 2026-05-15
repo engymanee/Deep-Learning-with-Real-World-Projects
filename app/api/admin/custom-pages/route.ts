@@ -85,7 +85,7 @@ export async function PATCH(request: NextRequest) {
     const supabase = await createClient()
     const body = await request.json()
 
-    const { pageId, title, slug, description, is_published, blocks } = body
+    const { pageId, title, slug, description, is_published, show_in_menu, blocks } = body
 
     if (!pageId) {
       return NextResponse.json(
@@ -102,6 +102,7 @@ export async function PATCH(request: NextRequest) {
         slug,
         description: description || null,
         is_published,
+        show_in_menu: show_in_menu ?? true,
         updated_at: new Date().toISOString(),
       })
       .eq('id', pageId)
