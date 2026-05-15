@@ -73,26 +73,17 @@ export async function POST(request: NextRequest) {
 
     console.log('[v0] Image uploaded to Blob:', blob.url)
 
-    // Log to database
+    // Log to database - only insert url field to avoid schema issues
     console.log('[v0] Logging image to database...')
     
-    // Build insert object with only the most essential fields first
-    const imageData: any = {
+    // Start with minimal required field
+    const insertPayload = {
       url: blob.url,
-    }
-    
-    // Try to add optional fields, catching if columns don't exist
-    try {
-      imageData.filename = file.name
-      imageData.size_bytes = file.size
-      imageData.mime_type = file.type
-    } catch (e) {
-      // Fields might not exist in schema yet
     }
 
     const { data: imageRecord, error: dbError } = await supabase
       .from('page_images')
-      .insert(imageData)
+      .insert(insertPayload)
       .select()
       .single()
 
@@ -115,10 +106,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: imageRecord.id,
       url: imageRecord.url,
-      filename: imageRecord?.filename || file.name,
-      width: imageRecord?.width || null,
-      height: imageRecord?.height || null,
-      size_bytes: imageRecord?.size_bytes || file.size,
+      filename: file.name,
+      width: null,
+      height: null,
+      size_bytes: file.size,
     })
   } catch (error) {
     console.error('[v0] Image upload error:', error)
