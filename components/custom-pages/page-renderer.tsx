@@ -16,7 +16,8 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
   const blocks = page.blocks || []
   
   // Determine if we have any headers to render
-  const hasAnyHeader = page.header1 || page.header2 || page.header3
+  // Only render database headers if we have NO blocks (blocks contain their own header sections)
+  const hasAnyHeader = (page.header1 || page.header2 || page.header3) && blocks.length === 0
 
   // Render header based on position
   const renderHeader = (content: string | null, position: string | undefined, size: 'large' | 'medium' | 'small') => {
@@ -56,10 +57,10 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
         </section>
       )}
       
-      {/* Headers positioned BEFORE blocks */}
-      {page.header1_position === 'before' && renderHeader(page.header1, 'before', 'large')}
-      {page.header2_position === 'before' && renderHeader(page.header2, 'before', 'medium')}
-      {page.header3_position === 'before' && renderHeader(page.header3, 'before', 'small')}
+      {/* Headers positioned BEFORE blocks - only render if no blocks exist */}
+      {blocks.length === 0 && page.header1_position === 'before' && renderHeader(page.header1, 'before', 'large')}
+      {blocks.length === 0 && page.header2_position === 'before' && renderHeader(page.header2, 'before', 'medium')}
+      {blocks.length === 0 && page.header3_position === 'before' && renderHeader(page.header3, 'before', 'small')}
 
       {/* Body Content Blocks */}
       {blocks.length === 0 ? (
@@ -78,10 +79,10 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
         </div>
       )}
 
-      {/* Headers positioned AFTER blocks */}
-      {page.header1_position === 'after' && renderHeader(page.header1, 'after', 'large')}
-      {page.header2_position === 'after' && renderHeader(page.header2, 'after', 'medium')}
-      {page.header3_position === 'after' && renderHeader(page.header3, 'after', 'small')}
+      {/* Headers positioned AFTER blocks - only render if no blocks exist */}
+      {blocks.length === 0 && page.header1_position === 'after' && renderHeader(page.header1, 'after', 'large')}
+      {blocks.length === 0 && page.header2_position === 'after' && renderHeader(page.header2, 'after', 'medium')}
+      {blocks.length === 0 && page.header3_position === 'after' && renderHeader(page.header3, 'after', 'small')}
 
       {/* Optional Subtitle Section - Only show if description exists */}
       {page.description && (
