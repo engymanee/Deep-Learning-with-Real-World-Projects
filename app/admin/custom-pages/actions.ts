@@ -30,9 +30,6 @@ export async function getCustomPages(page: number = 1, pageSize: number = 20) {
   }
 }
 
-/**
- * Get a single custom page with its blocks
- */
 export async function getCustomPage(pageId: string) {
   const admin = createAdminClient()
 
@@ -45,22 +42,38 @@ export async function getCustomPage(pageId: string) {
 
     if (pageError) throw pageError
 
-    // Try to select with image join, but handle gracefully if column doesn't exist
-    let blocksData = null
-    const { data: blocks, error: blocksError } = await admin
-      .from('page_blocks')
-      .select('*')
-      .eq('page_id', pageId)
-      .order('order_number', { ascending: true })
+    // Fetch blocks with fallback handling for missing columns
+    let blocks: PageBlock[] = []
+    try {
+      const { data: blocksData, error: blocksError } = await admin
+        .from('page_blocks')
+        .select('*')
+        .eq('page_id', pageId)
 
-    if (blocksError) throw blocksError
+      if (blocksError) {
+        console.warn('[v0] Failed to fetch page blocks:', blocksError)
+        blocks = []
+      } else {
+        blocks = (blocksData || []) as PageBlock[]
+        // Sort by order_number if it exists, otherwise by creation date
+        blocks = blocks.sort((a: any, b: any) => {
+          if (a.order_number !== undefined && b.order_number !== undefined) {
+            return a.order_number - b.order_number
+          }
+          return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        })
+      }
+    } catch (err) {
+      console.error('[v0] Error fetching page blocks:', err)
+      blocks = []
+    }
 
     return {
       page: page as CustomPage,
-      blocks: (blocks || []) as PageBlock[],
+      blocks,
     }
   } catch (err) {
-    console.error('[v0] Failed to get custom page:', err)
+    console.error('[v0] Error fetching page:', err)
     return { page: null, blocks: [] }
   }
 }
