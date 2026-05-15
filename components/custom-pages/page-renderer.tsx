@@ -12,27 +12,60 @@ interface PageRendererProps {
 
 export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
   const blocks = page.blocks || []
+  
+  // Determine if we have any headers to render
+  const hasAnyHeader = page.header1 || page.header2 || page.header3
 
   return (
     <main className="w-full">
-      {/* Title Section - Centered */}
-      <section className="border-b border-border bg-card">
-        <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
-          <div className="text-center space-y-4">
-            <h1 className="font-serif text-4xl sm:text-5xl text-foreground font-bold">
-              {page.title}
-            </h1>
+      {/* Header1 - Largest (matches About page H1 style) */}
+      {page.header1 && (
+        <section className="border-b border-border bg-card">
+          <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
+            <div className="text-center space-y-4">
+              <h1 className="font-serif text-4xl sm:text-5xl text-foreground font-bold">
+                {page.header1}
+              </h1>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Header2 - Medium size */}
+      {page.header2 && (
+        <section className="border-b border-border bg-card">
+          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
+            <div className="text-center space-y-4">
+              <h2 className="font-serif text-2xl sm:text-3xl text-foreground font-bold">
+                {page.header2}
+              </h2>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Header3 - Smaller (matches About page smaller header style) */}
+      {page.header3 && (
+        <section className="border-b border-border bg-card">
+          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
+            <div className="text-center space-y-4">
+              <h3 className="font-serif text-lg sm:text-xl text-foreground font-bold">
+                {page.header3}
+              </h3>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Body Content Blocks */}
       {blocks.length === 0 ? (
-        <section className="bg-background">
-          <div className="py-12 text-center text-muted-foreground max-w-4xl mx-auto">
-            <p>No content available for this page.</p>
-          </div>
-        </section>
+        hasAnyHeader ? null : (
+          <section className="bg-background">
+            <div className="py-12 text-center text-muted-foreground max-w-4xl mx-auto">
+              <p>No content available for this page.</p>
+            </div>
+          </section>
+        )
       ) : (
         <div>
           {blocks.map((block) => (
