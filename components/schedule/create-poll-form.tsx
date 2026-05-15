@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -93,36 +95,43 @@ export function CreatePollForm({
     e.preventDefault()
     
     if (invitedFellows.length === 0 && invitedCohorts.length === 0) {
-      alert('Please select at least one fellow or team to invite')
+      toast.error('Please select at least one fellow or team to invite')
       return
     }
 
     if (options.some((opt) => !opt.start_time || !opt.end_time)) {
-      alert('Please fill in all time option start and end times')
+      toast.error('Please fill in all time option start and end times')
       return
     }
 
-    await onSubmit({
-      title,
-      description,
-      location,
-      meeting_link: meetingLink,
-      voting_closes_at: votingClosesAt,
-      options,
-      invited_fellows: invitedFellows,
-      invited_cohorts: invitedCohorts,
-    })
+    try {
+      await onSubmit({
+        title,
+        description,
+        location,
+        meeting_link: meetingLink,
+        voting_closes_at: votingClosesAt,
+        options,
+        invited_fellows: invitedFellows,
+        invited_cohorts: invitedCohorts,
+      })
 
-    // Reset form
-    setTitle('')
-    setDescription('')
-    setLocation('')
-    setMeetingLink('')
-    setVotingClosesAt('')
-    setOptions([{ start_time: '', end_time: '' }])
-    setInvitedFellows([])
-    setInvitedCohorts([])
-    setOpen(false)
+      toast.success('Poll created successfully! Redirecting to results...')
+
+      // Reset form
+      setTitle('')
+      setDescription('')
+      setLocation('')
+      setMeetingLink('')
+      setVotingClosesAt('')
+      setOptions([{ start_time: '', end_time: '' }])
+      setInvitedFellows([])
+      setInvitedCohorts([])
+      setOpen(false)
+    } catch (error) {
+      console.error('[v0] Error creating poll:', error)
+      toast.error('Failed to create poll. Please try again.')
+    }
   }
 
   const totalInvitees = invitedFellows.length + invitedCohorts.length
