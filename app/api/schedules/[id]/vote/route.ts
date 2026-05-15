@@ -4,12 +4,13 @@ import { NextResponse } from 'next/server'
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireUser()
+    const { id } = await params
     const supabase = await createClient()
-    const scheduleId = params.id
+    const scheduleId = id
 
     const body = await req.json()
     const { preferred_option_id } = body
