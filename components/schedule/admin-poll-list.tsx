@@ -135,7 +135,7 @@ export function AdminPollList({ schedules }: AdminPollListProps) {
                       </p>
                     )}
 
-                    <Link href={`/schedule/${schedule.id}`}>
+                    <Link href={`/admin/schedule/${schedule.id}`}>
                       <Button size="sm" variant="outline">
                         View Results
                       </Button>
