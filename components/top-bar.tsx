@@ -18,6 +18,7 @@ import { useMaybeUser } from '@/lib/user-context'
 import { createClient } from '@/lib/supabase/client'
 import { roleLabels } from '@/lib/roles'
 import { NotificationsBell } from '@/components/notifications/notifications-bell'
+import type { CustomPage } from '@/lib/custom-pages/types'
 
 export function TopBar() {
   const { user } = useMaybeUser()
@@ -30,12 +31,14 @@ export function TopBar() {
     library: 'Library',
     community: 'Community',
   })
+  const [customPages, setCustomPages] = useState<CustomPage[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Load labels from API on mount
   useEffect(() => {
-    const loadLabels = async () => {
+    const loadData = async () => {
       try {
+        // Load navigation labels
         const response = await fetch('/api/admin/navigation-labels')
         if (response.ok) {
           const data = await response.json()
@@ -46,14 +49,21 @@ export function TopBar() {
             community: data.community || 'Community',
           })
         }
+
+        // Load custom pages that should show in menu
+        const pagesResponse = await fetch('/api/custom-pages?menu=true')
+        if (pagesResponse.ok) {
+          const pages = await pagesResponse.json()
+          setCustomPages(Array.isArray(pages) ? pages : [])
+        }
       } catch (error) {
-        console.error('[v0] Error loading navigation labels:', error)
+        console.error('[v0] Error loading navigation data:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadLabels()
+    loadData()
   }, [])
 
   const handleSignOut = async () => {
@@ -287,6 +297,17 @@ export function TopBar() {
             </Link>
           )}
         </div>
+
+        {/* Custom Pages */}
+        {customPages.map((page) => (
+          <Link
+            key={page.id}
+            href={`/pages/${page.slug}`}
+            className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+          >
+            {page.title}
+          </Link>
+        ))}
 
         {user?.role === 'admin' && (
           <Link
