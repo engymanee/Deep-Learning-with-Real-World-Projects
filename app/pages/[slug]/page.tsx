@@ -6,6 +6,9 @@ interface PageProps {
   params: Promise<{ slug: string }>
 }
 
+// Revalidate every 10 seconds to ensure changes appear immediately
+export const revalidate = 10
+
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
   const supabase = await createClient()
@@ -55,8 +58,8 @@ export default async function PublicPage({ params }: PageProps) {
     .order('order_number', { ascending: true })
 
   return (
-    <main className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <PageRenderer page={{ ...page, blocks }} />
-    </main>
+    </div>
   )
 }
