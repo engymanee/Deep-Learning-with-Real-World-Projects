@@ -3,8 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import { PageRenderer } from '@/components/custom-pages/page-renderer'
 import { InlinePageEditor } from '@/components/custom-pages/inline-page-editor'
-import { TopBar } from '@/components/top-bar'
-import { Footer } from '@/components/footer'
+import { CustomPageTemplate } from '@/components/custom-pages/page-template'
 
 // Skip prerendering since this page requires authentication
 export const dynamic = 'force-dynamic'
@@ -86,16 +85,12 @@ export default async function PublicPage({ params }: PageProps) {
   const pageWithBlocks = { ...page, blocks }
 
   return (
-    <div className="min-h-screen bg-background">
-      <TopBar />
-      <main className="w-full">
-        {userIsAdmin ? (
-          <InlinePageEditor page={pageWithBlocks} />
-        ) : (
-          <PageRenderer page={pageWithBlocks} />
-        )}
-        <Footer />
-      </main>
-    </div>
+    <CustomPageTemplate>
+      {userIsAdmin ? (
+        <InlinePageEditor page={pageWithBlocks} />
+      ) : (
+        <PageRenderer page={pageWithBlocks} />
+      )}
+    </CustomPageTemplate>
   )
 }
