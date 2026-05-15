@@ -1,58 +1,64 @@
+import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageRenderer } from '@/components/custom-pages/page-renderer'
-import { notFound } from 'next/navigation'
+import { InlinePageEditor } from '@/components/custom-pages/inline-page-editor'
+
+export const metadata = {
+  title: 'About the WaW Fellows Portal | Wisdom at Work',
+  description:
+    'Learn about the Wisdom at Work Fellowship Portal - your dashboard for the WAW Syllabus, Learning Journals, and Additional Resources.',
+}
 
 export default async function AboutPage() {
-  try {
-    const supabase = await createClient()
-    
-    // Fetch the about custom page
-    const { data: page, error } = await supabase
-      .from('custom_pages')
-      .select(`
-        id,
-        title,
-        slug,
-        description,
-        header1,
-        header1_position,
-        header2,
-        header2_position,
-        header3,
-        header3_position,
-        cover_image_url,
-        is_published,
-        show_in_menu,
-        blocks:page_blocks (
-          id,
-          page_id,
-          block_type,
-          order_number,
-          title,
-          content,
-          image_id,
-          metadata,
-          created_at,
-          updated_at
-        ),
-        created_by,
-        created_at,
-        updated_at
-      `)
-      .eq('slug', 'about')
-      .eq('is_published', true)
-      .single()
+  const supabase = await createClient()
 
-    if (error || !page) {
-      // If the about page doesn't exist, show 404
-      // Admins can create it at /admin/custom-pages
-      notFound()
-    }
+  // Fetch the about page using the exact same pattern as /pages/[slug]/page.tsx
+  const { data: page, error: pageError } = await supabase
+    .from('custom_pages')
+    .select('*')
+    .eq('slug', 'about')
+    .eq('is_published', true)
+    .single()
 
-    return <PageRenderer page={page} />
-  } catch (error) {
-    console.error('[v0] Error loading about page:', error)
+  if (pageError || !page) {
     notFound()
   }
+
+  // Fetch page blocks separately
+  const { data: blocks = [] } = await supabase
+    .from('page_blocks')
+    .select('*')
+    .eq('page_id', page.id)
+    .order('order_number', { ascending: true })
+
+  // Check if user is admin for inline editing
+  let userIsAdmin = false
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      // Check if user has admin role
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      userIsAdmin = profile?.role === 'admin'
+    }
+  } catch {
+    // User not authenticated or profile check failed
+  }
+
+  const pageWithBlocks = { ...page, blocks }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {userIsAdmin ? (
+        <InlinePageEditor page={pageWithBlocks} />
+      ) : (
+        <PageRenderer page={pageWithBlocks} />
+      )}
+    </div>
+  )
 }
+
 
