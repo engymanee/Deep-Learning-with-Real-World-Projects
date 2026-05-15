@@ -50,12 +50,23 @@ export function PageEditor({
 
   // Track if there are unsaved changes
   useEffect(() => {
+    // Normalize blocks for comparison - exclude fields that change during save
+    const normalizeBlock = (block: PageBlock) => ({
+      page_id: block.page_id,
+      block_type: block.block_type,
+      order_number: block.order_number,
+      title: block.title,
+      content: block.content,
+      metadata: block.metadata,
+      image_id: block.image_id,
+    })
+
     const currentContent = {
       title,
       slug,
       description,
       showInMenu,
-      blocks: JSON.stringify(blocks),
+      blocks: JSON.stringify(blocks.map(normalizeBlock)),
     }
 
     const savedContent = {
@@ -63,7 +74,7 @@ export function PageEditor({
       slug: page.slug,
       description: page.description || '',
       showInMenu: page.show_in_menu ?? true,
-      blocks: JSON.stringify(page.blocks || []),
+      blocks: JSON.stringify((page.blocks || []).map(normalizeBlock)),
     }
 
     const hasChanges =
