@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import Markdown from 'react-markdown'
 import { ArrowRight } from 'lucide-react'
 import { CustomPage, PageBlock } from '@/lib/custom-pages/types'
@@ -42,6 +43,19 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
 
   return (
     <main className="w-full">
+      {/* Cover Image - Display at top if available */}
+      {page.cover_image_url && (
+        <section className="w-full relative h-64 sm:h-96 bg-muted overflow-hidden">
+          <Image
+            src={page.cover_image_url}
+            alt={page.title}
+            fill
+            className="object-cover"
+            priority
+          />
+        </section>
+      )}
+      
       {/* Headers positioned BEFORE blocks */}
       {page.header1_position === 'before' && renderHeader(page.header1, 'before', 'large')}
       {page.header2_position === 'before' && renderHeader(page.header2, 'before', 'medium')}
