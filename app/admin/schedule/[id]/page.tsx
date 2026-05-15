@@ -12,6 +12,8 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { DeletePollModal } from '@/components/schedule/delete-poll-modal'
 
 export default async function AdminScheduleDetailPage({
   params,
@@ -20,6 +22,30 @@ export default async function AdminScheduleDetailPage({
 }) {
   await requireAdmin()
   const supabase = await createClient()
+
+  async function deletePoll(scheduleId: string) {
+    'use server'
+    const supabase = await createClient()
+    const admin = await requireAdmin()
+
+    // Verify the poll belongs to this admin
+    const { data: schedule } = await supabase
+      .from('schedules')
+      .select('id, created_by_admin')
+      .eq('id', scheduleId)
+      .single()
+
+    if (!schedule || schedule.created_by_admin !== admin.id) {
+      throw new Error('Unauthorized to delete this poll')
+    }
+
+    // Delete the schedule - cascading deletes will remove options and votes
+    const { error } = await supabase.from('schedules').delete().eq('id', scheduleId)
+
+    if (error) throw error
+
+    redirect('/admin/schedule')
+  }
 
   try {
     // Fetch schedule with options and vote counts
@@ -71,7 +97,7 @@ export default async function AdminScheduleDetailPage({
     return (
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="flex-1">
             <h1 className="font-serif text-3xl font-bold text-foreground">
               {schedule.title}
             </h1>
@@ -81,17 +107,25 @@ export default async function AdminScheduleDetailPage({
               </p>
             )}
           </div>
-          <Badge
-            variant={
-              schedule.status === 'polling' ? 'default' : 'secondary'
-            }
-          >
-            {schedule.status === 'polling'
-              ? 'Voting Open'
-              : schedule.status === 'scheduled'
-              ? 'Scheduled'
-              : 'Completed'}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge
+              variant={
+                schedule.status === 'polling' ? 'default' : 'secondary'
+              }
+            >
+              {schedule.status === 'polling'
+                ? 'Voting Open'
+                : schedule.status === 'scheduled'
+                ? 'Scheduled'
+                : 'Completed'}
+            </Badge>
+            <DeletePollModal
+              scheduleId={schedule.id}
+              scheduleTitle={schedule.title}
+              deletePoll={deletePoll}
+              variant="button"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

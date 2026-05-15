@@ -132,6 +132,28 @@ export default async function AdminSchedulePage() {
     redirect(`/admin/schedule/${schedule.id}`)
   }
 
+  async function deletePoll(scheduleId: string) {
+    'use server'
+    const supabase = await createClient()
+    const admin = await requireAdmin()
+
+    // Verify the poll belongs to this admin
+    const { data: schedule } = await supabase
+      .from('schedules')
+      .select('id, created_by_admin')
+      .eq('id', scheduleId)
+      .single()
+
+    if (!schedule || schedule.created_by_admin !== admin.id) {
+      throw new Error('Unauthorized to delete this poll')
+    }
+
+    // Delete the schedule - cascading deletes will remove options and votes
+    const { error } = await supabase.from('schedules').delete().eq('id', scheduleId)
+
+    if (error) throw error
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -175,7 +197,10 @@ export default async function AdminSchedulePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <AdminPollList schedules={schedules || []} />
+            <AdminPollList 
+              schedules={schedules || []}
+              onDeletePoll={deletePoll}
+            />
           </CardContent>
         </Card>
       </div>

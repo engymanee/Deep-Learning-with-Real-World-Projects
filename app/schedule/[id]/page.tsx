@@ -94,72 +94,80 @@ export default async function ScheduleVotingPage({
     }
 
     return (
-      <div className="min-h-screen bg-background">
-        <main className="w-full">
-          <section className="border-b border-border">
-            <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
-              <h1 className="font-serif text-3xl font-bold text-foreground mb-2">
+      <div className="min-h-screen bg-background flex flex-col">
+        <main className="w-full flex-1 flex flex-col">
+          {/* Header Section */}
+          <section className="border-b border-border bg-card">
+            <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 text-center">
+              <h1 className="font-serif text-4xl font-bold text-foreground mb-3">
                 {schedule.title}
               </h1>
               {schedule.description && (
-                <p className="text-muted-foreground">{schedule.description}</p>
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                  {schedule.description}
+                </p>
               )}
             </div>
           </section>
 
-          <section className="bg-background">
+          {/* Content Section */}
+          <section className="flex-1 bg-background">
             <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 space-y-6">
-              <Card>
+              {/* Meeting Details */}
+              <Card className="border border-border/50">
                 <CardHeader>
-                  <CardTitle>Meeting Details</CardTitle>
+                  <CardTitle className="text-lg">Meeting Details</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Location</p>
-                    <p className="font-medium">{schedule.location}</p>
-                  </div>
+                <CardContent className="space-y-4">
+                  {schedule.location && (
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-1">Location</p>
+                      <p className="text-foreground font-medium">{schedule.location}</p>
+                    </div>
+                  )}
                   {schedule.meeting_link && (
                     <div>
-                      <p className="text-sm text-muted-foreground">Meeting Link</p>
+                      <p className="text-sm font-medium text-muted-foreground mb-1">Meeting Link</p>
                       <a
                         href={schedule.meeting_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-medium text-blue-600 hover:underline break-all"
+                        className="text-blue-600 hover:underline break-all font-medium"
                       >
                         {schedule.meeting_link}
                       </a>
                     </div>
                   )}
                   <div>
-                    <p className="text-sm text-muted-foreground">Voting Closes</p>
-                    <p className="font-medium">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Voting Closes</p>
+                    <p className="text-foreground font-medium">
                       {new Date(schedule.voting_closes_at).toLocaleString()}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                <CardTitle>Select Your Availability</CardTitle>
-                <CardDescription>
-                  Choose the time slot(s) when you are available
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScheduleVotingForm
-                  scheduleId={schedule.id}
-                  options={schedule.schedule_options || []}
-                  existingVoteOptionId={existingVote?.option_id}
-                  onSubmit={submitVote}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-      </main>
-    </div>
+              {/* Voting Form */}
+              <Card className="border border-border/50 shadow-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg">Your Availability</CardTitle>
+                  <CardDescription className="text-base">
+                    Select the time slot when you can attend
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScheduleVotingForm
+                    scheduleId={schedule.id}
+                    options={schedule.schedule_options || []}
+                    existingVoteOptionId={existingVote?.option_id}
+                    onSubmit={submitVote}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        </main>
+      </div>
     )
   } catch (error) {
     console.error('[v0] Error in schedule page:', error)
