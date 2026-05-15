@@ -55,13 +55,13 @@ export default async function AboutPage() {
           <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
             <div className="prose prose-sm max-w-none space-y-4 text-muted-foreground">
               <p>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+School leaders face myriad challenges: handling angry parent emails, managing contentious meetings, and addressing bullying—often before the school day even begins. Each situation demands nuanced thinking and sound judgment, not one-size-fits-all answers. How do school leaders learn to move from reactive mode to calm, wise responses?
               </p>
               <p>
-                Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+Our new initiative, Wisdom at Work, aims to answer that question. We view practical wisdom (phronesis)—the disposition to press pause, deliberate, and respond well—as the antidote to reactive decision-making. Practical wisdom enables leaders to attend to context, engage stakeholders meaningfully, and navigate competing priorities—turning everyday challenges into opportunities to foster flourishing.
               </p>
               <p>
-                Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
+Rooted in innovative, research-based design, the Wisdom at Work Fellowship will equip school leaders and their teams with tools and practices they can use to lead with wisdom, even under pressure. Over few years, we will grow a vibrant Community of Fellows—engaging school leaders not just as participants, but as partners in research and design. Together, we are shaping a fresh, field-tested model of professional development, building evidence-based tools, and cultivating a networked Community of Practice.
               </p>
             </div>
           </div>
