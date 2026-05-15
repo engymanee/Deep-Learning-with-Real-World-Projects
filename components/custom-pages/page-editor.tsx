@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff } from 'lucide-react'
+import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -46,6 +46,35 @@ export function PageEditor({
   const [showInMenu, setShowInMenu] = useState(page.show_in_menu ?? true)
   const [blocks, setBlocks] = useState<PageBlock[]>(page.blocks || [])
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  // Track if there are unsaved changes
+  useEffect(() => {
+    const currentContent = {
+      title,
+      slug,
+      description,
+      showInMenu,
+      blocks: JSON.stringify(blocks),
+    }
+
+    const savedContent = {
+      title: page.title,
+      slug: page.slug,
+      description: page.description || '',
+      showInMenu: page.show_in_menu ?? true,
+      blocks: JSON.stringify(page.blocks || []),
+    }
+
+    const hasChanges =
+      currentContent.title !== savedContent.title ||
+      currentContent.slug !== savedContent.slug ||
+      currentContent.description !== savedContent.description ||
+      currentContent.showInMenu !== savedContent.showInMenu ||
+      currentContent.blocks !== savedContent.blocks
+
+    setHasUnsavedChanges(hasChanges)
+  }, [title, slug, description, showInMenu, blocks, page])
 
   const addBlock = (type: PageBlockType) => {
     const newBlock: PageBlock = {
@@ -177,10 +206,19 @@ export function PageEditor({
             </Alert>
           )}
 
+          {hasUnsavedChanges && page.id && (
+            <Alert className="mt-4 bg-amber-50 border-amber-200">
+              <AlertCircle className="h-4 w-4 inline mr-2 text-amber-900" />
+              <AlertDescription className="text-amber-900">
+                You have unsaved changes. Save to enable publishing these updates.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex gap-2 pt-2">
             <Button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !hasUnsavedChanges}
               className="flex-1"
             >
               {isSaving ? 'Saving...' : 'Save Draft'}
@@ -188,7 +226,7 @@ export function PageEditor({
             <Button
               variant={isPublished ? 'secondary' : 'default'}
               onClick={() => onPublish(!isPublished)}
-              disabled={!page.id || isSaving}
+              disabled={!page.id || isSaving || hasUnsavedChanges}
               className="gap-2"
             >
               {isPublished ? (
