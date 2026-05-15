@@ -120,12 +120,24 @@ export function PageEditor({
   }
 
   const handleSave = async () => {
+    // Prepare blocks with image URLs populated in content field for image blocks
+    const blocksWithImageContent = blocks.map((block) => {
+      if (block.block_type === 'image' && block.image_id) {
+        const image = getSelectedImage(block.image_id)
+        return {
+          ...block,
+          content: image?.url || block.content,
+        }
+      }
+      return block
+    })
+
     await onSave({
       title,
       slug,
       description,
       show_in_menu: showInMenu,
-      blocks,
+      blocks: blocksWithImageContent,
     })
   }
 
@@ -219,6 +231,7 @@ export function PageEditor({
             <Button
               onClick={handleSave}
               disabled={isSaving || !hasUnsavedChanges}
+              variant={hasUnsavedChanges ? 'default' : 'outline'}
               className="flex-1"
             >
               {isSaving ? 'Saving...' : 'Save Draft'}
