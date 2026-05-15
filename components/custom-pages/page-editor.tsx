@@ -219,6 +219,7 @@ export function PageEditor({
             <Button
               onClick={handleSave}
               disabled={isSaving || !hasUnsavedChanges}
+              variant={hasUnsavedChanges ? 'default' : 'outline'}
               className="flex-1"
             >
               {isSaving ? 'Saving...' : 'Save Draft'}

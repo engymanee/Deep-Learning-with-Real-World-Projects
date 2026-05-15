@@ -127,7 +127,7 @@ export async function PATCH(request: NextRequest) {
         .from('page_blocks')
         .insert(
           blocks.map((block: any, index: number) => ({
-            page_id: pageId,
+            page_id: page.id,
             block_type: block.block_type,
             title: block.title || null,
             content: block.content || null,
@@ -142,7 +142,28 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(page)
+    // Fetch the updated page with blocks to return consistent response
+    const { data: pageWithBlocks } = await supabase
+      .from('custom_pages')
+      .select(
+        `
+        *,
+        page_blocks (
+          id,
+          page_id,
+          block_type,
+          order_number,
+          title,
+          content,
+          metadata,
+          image_id
+        )
+      `
+      )
+      .eq('id', pageId)
+      .single()
+
+    return NextResponse.json(pageWithBlocks || page)
   } catch (error) {
     console.error('[v0] Page update error:', error)
     return NextResponse.json(
