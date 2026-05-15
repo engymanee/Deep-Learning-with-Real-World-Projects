@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { PageEditor } from '@/components/custom-pages/page-editor'
 import { ImageGallery } from '@/components/custom-pages/image-gallery'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle } from 'lucide-react'
 import type { CustomPage, PageImage, PageBlock } from '@/lib/custom-pages/types'
@@ -282,13 +281,10 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
         </Alert>
       )}
 
-      <Tabs defaultValue="content" className="w-full">
-        <TabsList>
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="images">Images</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="content" className="space-y-6">
+      <div className="space-y-12">
+        {/* Page Content Editor */}
+        <section>
+          <h2 className="text-xl font-semibold mb-4">Page Content</h2>
           <PageEditor
             page={page}
             availableImages={images}
@@ -298,9 +294,11 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
             isUploading={isUploading}
             isPublished={page.is_published}
           />
-        </TabsContent>
+        </section>
 
-        <TabsContent value="images" className="space-y-6">
+        {/* Image Gallery */}
+        <section>
+          <h2 className="text-xl font-semibold mb-4">Image Library</h2>
           <ImageGallery
             images={images}
             onUpload={handleUploadImage}
@@ -308,8 +306,8 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
             onUpdateAlt={handleUpdateImageAlt}
             isUploading={isUploading}
           />
-        </TabsContent>
-      </Tabs>
+        </section>
+      </div>
     </div>
   )
 }
