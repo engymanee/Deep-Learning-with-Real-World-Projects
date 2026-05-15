@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Markdown from 'react-markdown'
 import { ArrowRight } from 'lucide-react'
 import { CustomPage, PageBlock } from '@/lib/custom-pages/types'
 import { Footer } from '@/components/footer'
@@ -160,15 +161,12 @@ function RenderBlock({ block }: RenderBlockProps) {
           </section>
         )
       } else {
-        // Default text rendering - matches About page prose style
+        // Default text rendering with Markdown support
         return (
           <section className="border-b border-border bg-card">
             <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-              <div className="prose prose-sm max-w-none space-y-4 text-muted-foreground">
-                {block.content &&
-                  block.content.split('\n\n').map((para, i) => (
-                    <p key={i}>{para}</p>
-                  ))}
+              <div className="prose prose-neutral prose-sm max-w-none">
+                <Markdown>{block.content || ''}</Markdown>
               </div>
             </div>
           </section>

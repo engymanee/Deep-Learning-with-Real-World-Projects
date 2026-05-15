@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { PageEditor } from '@/components/custom-pages/page-editor'
 import { ImageGallery } from '@/components/custom-pages/image-gallery'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -115,16 +116,21 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
         blocks: savedPage.page_blocks || updates.blocks || page.blocks,
       })
 
+      // Show success toast
+      toast.success('Draft saved successfully')
+
       if (isNewPage) {
+        // Redirect to edit the new page
         router.push(`/admin/custom-pages/${savedPage.id}`)
       } else {
-        // Refresh to update UI and show publish button
+        // Refresh to update UI and enable publish button
         router.refresh()
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save page'
       console.error('[v0] Error saving page:', message)
       setError(message)
+      toast.error(message)
     } finally {
       setIsSaving(false)
     }
@@ -162,12 +168,16 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
         blocks: updated.page_blocks || page.blocks,
       })
       
+      // Show success toast
+      toast.success(published ? 'Page published successfully' : 'Page unpublished successfully')
+      
       // Refresh to trigger revalidation and update navigation
       router.refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update publish status'
       console.error('[v0] Error publishing:', message)
       setError(message)
+      toast.error(message)
     } finally {
       setIsSaving(false)
     }
@@ -190,10 +200,13 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
       }
 
       const uploadedImage = await response.json()
-      setImages([...images, uploadedImage])
+      // Use functional setState to avoid stale closure
+      setImages((prevImages) => [...prevImages, uploadedImage])
+      toast.success('Image uploaded successfully')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed'
       console.error('[v0] Upload error:', message)
+      toast.error(message)
       throw new Error(message)
     } finally {
       setIsUploading(false)
@@ -279,6 +292,7 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
             onSave={handleSavePage}
             onPublish={handlePublish}
             isSaving={isSaving}
+            isUploading={isUploading}
             isPublished={page.is_published}
           />
         </TabsContent>

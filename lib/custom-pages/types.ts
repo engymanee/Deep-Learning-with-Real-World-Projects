@@ -35,6 +35,7 @@ export interface CustomPage {
   header1: string | null
   header2: string | null
   header3: string | null
+  cover_image_url?: string | null
   is_published: boolean
   show_in_menu: boolean
   blocks?: PageBlock[]

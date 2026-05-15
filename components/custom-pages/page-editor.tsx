@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import Markdown from 'react-markdown'
 import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff, AlertCircle, Link as LinkIcon, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +30,7 @@ interface PageEditorProps {
   onSave: (page: Partial<CustomPage>) => Promise<void>
   onPublish: (published: boolean) => Promise<void>
   isSaving?: boolean
+  isUploading?: boolean
   isPublished?: boolean
 }
 
@@ -38,6 +40,7 @@ export function PageEditor({
   onSave,
   onPublish,
   isSaving = false,
+  isUploading = false,
   isPublished = false,
 }: PageEditorProps) {
   const [title, setTitle] = useState(page.title)
@@ -302,7 +305,7 @@ export function PageEditor({
           <div className="flex gap-2 pt-2">
             <Button
               onClick={handleSave}
-              disabled={isSaving || !hasUnsavedChanges}
+              disabled={isSaving || isUploading || !hasUnsavedChanges}
               variant={hasUnsavedChanges ? 'default' : 'outline'}
               className="flex-1"
             >
@@ -311,7 +314,7 @@ export function PageEditor({
             <Button
               variant={isPublished ? 'secondary' : 'default'}
               onClick={() => onPublish(!isPublished)}
-              disabled={!page.id || isSaving || hasUnsavedChanges}
+              disabled={!page.id || isSaving || isUploading || hasUnsavedChanges}
               className="gap-2"
             >
               {isPublished ? (
@@ -459,10 +462,18 @@ export function PageEditor({
                                       onChange={(e) =>
                                         updateBlock(block.id, { content: e.target.value })
                                       }
-                                      placeholder="Enter text content..."
+                                      placeholder="Enter text content (supports Markdown: # Heading, **bold**, - lists, etc.)"
                                       rows={3}
-                                      className="w-full px-2 py-2 border rounded text-sm"
+                                      className="w-full px-2 py-2 border rounded text-sm font-mono text-xs"
                                     />
+                                    {block.content && (
+                                      <div className="mt-2 p-2 bg-muted rounded text-xs border border-border">
+                                        <p className="font-semibold text-foreground mb-1">Preview:</p>
+                                        <div className="prose prose-sm prose-neutral max-w-none text-xs">
+                                          <Markdown>{block.content}</Markdown>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </>
                               )}
