@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     if (options && options.length > 0) {
       const optionsData = options.map(
         (opt: { start_time: string; end_time: string }, index: number) => ({
-          schedule_id: schedule.id,
+          schedule_id: schedule!.id,
           start_time: opt.start_time,
           end_time: opt.end_time,
           order_number: index + 1,

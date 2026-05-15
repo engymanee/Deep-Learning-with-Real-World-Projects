@@ -48,8 +48,11 @@ export function PageEditor({
   const [slug, setSlug] = useState(page.slug)
   const [description, setDescription] = useState(page.description || '')
   const [header1, setHeader1] = useState(page.header1 || '')
+  const [header1Position, setHeader1Position] = useState<any>(page.header1_position || 'before')
   const [header2, setHeader2] = useState(page.header2 || '')
+  const [header2Position, setHeader2Position] = useState<any>(page.header2_position || 'before')
   const [header3, setHeader3] = useState(page.header3 || '')
+  const [header3Position, setHeader3Position] = useState<any>(page.header3_position || 'before')
   const [showInMenu, setShowInMenu] = useState(page.show_in_menu ?? true)
   const [blocks, setBlocks] = useState<PageBlock[]>(page.blocks || [])
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
@@ -180,8 +183,11 @@ export function PageEditor({
       slug,
       description,
       header1,
+      header1_position: header1Position,
       header2,
+      header2_position: header2Position,
       header3,
+      header3_position: header3Position,
       show_in_menu: showInMenu,
       blocks: blocksWithImageContent,
     })
@@ -265,15 +271,15 @@ export function PageEditor({
             <div>
               <label className="block text-sm font-medium mb-1">Header 1 (Largest)</label>
               <Input
-                value={page.header1 || ''}
-                onChange={(e) => setPage({ ...page, header1: e.target.value })}
+                value={header1}
+                onChange={(e) => setHeader1(e.target.value)}
                 placeholder="Main header - largest size"
               />
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Position:</span>
                 <select
-                  value={page.header1_position || 'before'}
-                  onChange={(e) => setPage({ ...page, header1_position: e.target.value as any })}
+                  value={header1Position}
+                  onChange={(e) => setHeader1Position(e.target.value)}
                   className="px-2 py-1 border rounded text-sm"
                 >
                   <option value="before">Before blocks</option>
@@ -286,15 +292,15 @@ export function PageEditor({
             <div className="mt-4">
               <label className="block text-sm font-medium mb-1">Header 2 (Medium)</label>
               <Input
-                value={page.header2 || ''}
-                onChange={(e) => setPage({ ...page, header2: e.target.value })}
+                value={header2}
+                onChange={(e) => setHeader2(e.target.value)}
                 placeholder="Secondary header - medium size"
               />
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Position:</span>
                 <select
-                  value={page.header2_position || 'before'}
-                  onChange={(e) => setPage({ ...page, header2_position: e.target.value as any })}
+                  value={header2Position}
+                  onChange={(e) => setHeader2Position(e.target.value)}
                   className="px-2 py-1 border rounded text-sm"
                 >
                   <option value="before">Before blocks</option>
@@ -307,15 +313,15 @@ export function PageEditor({
             <div className="mt-4">
               <label className="block text-sm font-medium mb-1">Header 3 (Small)</label>
               <Input
-                value={page.header3 || ''}
-                onChange={(e) => setPage({ ...page, header3: e.target.value })}
+                value={header3}
+                onChange={(e) => setHeader3(e.target.value)}
                 placeholder="Tertiary header - small size"
               />
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Position:</span>
                 <select
-                  value={page.header3_position || 'before'}
-                  onChange={(e) => setPage({ ...page, header3_position: e.target.value as any })}
+                  value={header3Position}
+                  onChange={(e) => setHeader3Position(e.target.value)}
                   className="px-2 py-1 border rounded text-sm"
                 >
                   <option value="before">Before blocks</option>

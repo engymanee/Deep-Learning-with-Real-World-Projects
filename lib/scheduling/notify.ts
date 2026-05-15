@@ -70,9 +70,9 @@ export async function createSchedulingNotification(
         votingUrl,
       )
 
-      if (result.id) {
+      if (result.ok) {
         console.log(`[v0] Sent scheduling email to ${fellow.email} (id: ${result.id})`)
-      } else if (result.error) {
+      } else {
         console.error(
           `[v0] Failed to send scheduling email to ${fellow.email}:`,
           result.error,

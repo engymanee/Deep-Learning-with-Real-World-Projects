@@ -78,13 +78,13 @@ export default async function ScheduleVotingPage({
     } else {
       // Otherwise, create a new vote
       await supabase.from('schedule_votes').insert({
-        schedule_id: schedule.id,
+        schedule_id: schedule!.id,
         user_id: user.id,
         option_id: optionId,
       })
     }
 
-    redirect(`/schedule/${schedule.id}/thank-you`)
+    redirect(`/schedule/${schedule!.id}/thank-you`)
   }
 
   return (

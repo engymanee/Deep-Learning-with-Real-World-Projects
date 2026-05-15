@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Revalidate the specific page route
-    revalidateTag(`page-${slug}`)
+    revalidateTag(`page-${slug}`, 'hours')
 
     return NextResponse.json({ revalidated: true })
   } catch (error) {

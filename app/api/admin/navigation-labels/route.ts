@@ -123,7 +123,7 @@ export async function PUT(request: Request) {
     console.log('[v0] Successfully saved labels:', result.data)
     
     // Revalidate cache for navigation labels
-    revalidateTag('navigation-labels')
+    revalidateTag('navigation-labels', 'hours')
 
     const response = NextResponse.json(result.data)
     response.headers.set('Cache-Control', 'no-store')

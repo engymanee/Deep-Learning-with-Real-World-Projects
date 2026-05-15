@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth-server'
 import { NextResponse } from 'next/server'
-import { generateCalendarInvite } from '@/lib/ics'
 
 export async function POST(
   req: Request,

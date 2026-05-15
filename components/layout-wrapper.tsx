@@ -9,7 +9,20 @@ export async function LayoutWrapper({ children }: { children: React.ReactNode })
     const supabase = await createClient()
     const { data: pages } = await supabase
       .from('custom_pages')
-      .select('id, title, slug, description, is_published, show_in_menu')
+      .select(`
+        id,
+        title,
+        slug,
+        description,
+        header1,
+        header2,
+        header3,
+        is_published,
+        show_in_menu,
+        created_by,
+        created_at,
+        updated_at
+      `)
       .eq('is_published', true)
       .eq('show_in_menu', true)
       .order('created_at', { ascending: false })

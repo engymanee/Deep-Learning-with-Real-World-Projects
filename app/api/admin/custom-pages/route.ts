@@ -79,8 +79,8 @@ export async function POST(request: NextRequest) {
   } finally {
     // Revalidate when a new page is created
     try {
-      revalidateTag('custom-pages')
-      revalidateTag('navigation')
+      revalidateTag('custom-pages', 'hours')
+      revalidateTag('navigation', 'hours')
       revalidatePath('/', 'layout')
     } catch (e) {
       console.warn('[v0] Revalidation failed:', e)
@@ -208,8 +208,8 @@ export async function PATCH(request: NextRequest) {
   } finally {
     // Revalidate navigation and page caches whenever a page is updated
     try {
-      revalidateTag('custom-pages')
-      revalidateTag('navigation')
+      revalidateTag('custom-pages', 'hours')
+      revalidateTag('navigation', 'hours')
       revalidatePath('/', 'layout')
     } catch (e) {
       console.warn('[v0] Revalidation failed:', e)
