@@ -65,8 +65,8 @@ export function EmailLogsClient({
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
-      log.recipient_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.recipient_email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (log.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
       (log.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
 
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter
