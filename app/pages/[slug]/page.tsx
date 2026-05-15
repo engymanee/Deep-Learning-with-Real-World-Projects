@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageRenderer } from '@/components/custom-pages/page-renderer'
+import { InlinePageEditor } from '@/components/custom-pages/inline-page-editor'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -57,9 +58,32 @@ export default async function PublicPage({ params }: PageProps) {
     .eq('page_id', page.id)
     .order('order_number', { ascending: true })
 
+  // Check if user is admin for inline editing
+  let userIsAdmin = false
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      // Check if user has admin role
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      userIsAdmin = profile?.role === 'admin'
+    }
+  } catch {
+    // User not authenticated or profile check failed
+  }
+
+  const pageWithBlocks = { ...page, blocks }
+
   return (
     <div className="min-h-screen bg-background">
-      <PageRenderer page={{ ...page, blocks }} />
+      {userIsAdmin ? (
+        <InlinePageEditor page={pageWithBlocks} />
+      ) : (
+        <PageRenderer page={pageWithBlocks} />
+      )}
     </div>
   )
 }
