@@ -2,8 +2,7 @@ import type { ReactNode } from 'react'
 import { requireAdmin } from '@/lib/auth-server'
 import { TopBar } from '@/components/top-bar'
 import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb'
-import { createClient } from '@/lib/supabase/server'
-import type { CustomPage } from '@/lib/custom-pages/types'
+import { getMenuCustomPages } from '@/lib/custom-pages/menu'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   // requireAdmin always evaluates the real underlying account, ignoring
@@ -11,22 +10,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   // reachable even while the admin is currently previewing the platform
   // as a fellow on other surfaces.
   await requireAdmin()
-
-  // Fetch custom pages server-side
-  let customPages: CustomPage[] = []
-  try {
-    const supabase = await createClient()
-    const { data: pages } = await supabase
-      .from('custom_pages')
-      .select('id, title, slug, description, is_published, show_in_menu')
-      .eq('is_published', true)
-      .eq('show_in_menu', true)
-      .order('created_at', { ascending: false })
-    
-    customPages = pages || []
-  } catch (error) {
-    console.error('[v0] Error fetching custom pages:', error)
-  }
+  const customPages = await getMenuCustomPages()
 
   return (
     <div className="min-h-screen bg-background">

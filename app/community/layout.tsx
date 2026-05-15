@@ -3,7 +3,7 @@ import { CommunitySidebar } from '@/components/community/community-sidebar'
 import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
 import { COMMUNITY_SECTIONS } from '@/lib/community/sections'
-import type { CustomPage } from '@/lib/custom-pages/types'
+import { getMenuCustomPages } from '@/lib/custom-pages/menu'
 
 export const metadata = {
   title: 'Community | Leadership Fellowship',
@@ -57,27 +57,16 @@ export default async function CommunityLayout({
   const [biosRes, ...postRes] = await Promise.all([
     biosPromise,
     ...postCountPromises,
+    getMenuCustomPages(),
   ])
 
+  // Extract custom pages from the last item in the promise array
+  const customPages = postRes.pop() || []
+  
   const counts: Record<string, number> = { bios: biosRes.count ?? 0 }
   postSections.forEach((s, i) => {
     counts[s.id] = postRes[i].count ?? 0
   })
-
-  // Fetch custom pages server-side
-  let customPages: CustomPage[] = []
-  try {
-    const { data: pages } = await supabase
-      .from('custom_pages')
-      .select('id, title, slug, description, is_published, show_in_menu')
-      .eq('is_published', true)
-      .eq('show_in_menu', true)
-      .order('created_at', { ascending: false })
-    
-    customPages = pages || []
-  } catch (error) {
-    console.error('[v0] Error fetching custom pages:', error)
-  }
 
   return (
     <div className="min-h-screen bg-background">
