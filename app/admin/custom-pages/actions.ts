@@ -45,9 +45,11 @@ export async function getCustomPage(pageId: string) {
 
     if (pageError) throw pageError
 
+    // Try to select with image join, but handle gracefully if column doesn't exist
+    let blocksData = null
     const { data: blocks, error: blocksError } = await admin
       .from('page_blocks')
-      .select('*, page_images(*)')
+      .select('*')
       .eq('page_id', pageId)
       .order('order_number', { ascending: true })
 
@@ -55,7 +57,7 @@ export async function getCustomPage(pageId: string) {
 
     return {
       page: page as CustomPage,
-      blocks: blocks as (PageBlock & { page_images: any })[],
+      blocks: (blocks || []) as PageBlock[],
     }
   } catch (err) {
     console.error('[v0] Failed to get custom page:', err)
@@ -155,12 +157,24 @@ export async function addPageBlock(
   const admin = createAdminClient()
 
   try {
+    // Build insert object, excluding image_id if not provided
+    const insertData: any = {
+      page_id: pageId,
+      block_type: block.block_type,
+      order_number: block.order_number,
+      title: block.title ?? null,
+      content: block.content ?? null,
+      metadata: block.metadata ?? null,
+    }
+
+    // Only include image_id if it's provided and not null
+    if (block.image_id) {
+      insertData.image_id = block.image_id
+    }
+
     const { data, error } = await admin
       .from('page_blocks')
-      .insert({
-        page_id: pageId,
-        ...block,
-      })
+      .insert(insertData)
       .select()
       .single()
 
@@ -184,12 +198,21 @@ export async function updatePageBlock(
   const admin = createAdminClient()
 
   try {
+    // Build update object, only including fields that are provided
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (block.block_type !== undefined) updateData.block_type = block.block_type
+    if (block.order_number !== undefined) updateData.order_number = block.order_number
+    if (block.title !== undefined) updateData.title = block.title
+    if (block.content !== undefined) updateData.content = block.content
+    if (block.metadata !== undefined) updateData.metadata = block.metadata
+    if (block.image_id !== undefined) updateData.image_id = block.image_id
+
     const { data, error } = await admin
       .from('page_blocks')
-      .update({
-        ...block,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', blockId)
       .select()
       .single()

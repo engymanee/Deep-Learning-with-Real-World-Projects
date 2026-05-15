@@ -35,7 +35,6 @@ CREATE TABLE IF NOT EXISTS page_blocks (
   title TEXT,
   content TEXT,
   metadata JSONB,
-  image_id UUID REFERENCES page_images(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

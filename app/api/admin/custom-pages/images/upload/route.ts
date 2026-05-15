@@ -49,9 +49,19 @@ export async function POST(request: NextRequest) {
     // Upload to Vercel Blob
     let blob
     try {
+      const token = process.env.BLOB_READ_WRITE_TOKEN
+      if (!token) {
+        console.error('[v0] BLOB_READ_WRITE_TOKEN not found in environment')
+        return NextResponse.json(
+          { error: 'Blob storage token not configured. Contact administrator.' },
+          { status: 500 }
+        )
+      }
+
       blob = await put(filename, file, {
         access: 'public',
         contentType: file.type,
+        token,
       })
     } catch (blobError) {
       console.error('[v0] Blob upload failed:', blobError)
