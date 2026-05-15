@@ -16,34 +16,6 @@ export const metadata = {
 export default async function AboutPage() {
   await requireUser()
 
-  const wisdomLabs = [
-    {
-      date: 'November 12',
-      number: 'One',
-      title: 'Wise Leadership Begins with Taking People Seriously as Persons',
-    },
-    {
-      date: 'January 7',
-      number: 'Two',
-      title: 'Ground Your Compass: Finding your True North Amidst Competing Values and Views',
-    },
-    {
-      date: 'February 4',
-      number: 'Three',
-      title: 'Follow the Trailheads',
-    },
-    {
-      date: 'March 4',
-      number: 'Four',
-      title: 'Navigate Challenges to Promote Character',
-    },
-    {
-      date: 'April 8',
-      number: 'Five',
-      title: 'Anticipate and Deal with Magnetic Interference',
-    },
-  ]
-
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
@@ -79,42 +51,6 @@ export default async function AboutPage() {
               alt="Wisdom at Work Fellows in collaborative discussion"
               className="w-full rounded-lg shadow-md"
             />
-          </div>
-        </section>
-
-        {/* Deep Learning Labs Section Header */}
-        <section className="bg-background">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-            <h2 className="text-2xl font-bold text-center text-foreground mb-8 tracking-wide">
-              WISDOM AT WORK - DEEP LEARNING LABS
-            </h2>
-
-            {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-12 justify-center">
-              <button className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-blue-800 transition-colors">
-                Click Here for Recurring Zoom Link
-              </button>
-              <button className="bg-blue-700 text-white px-6 py-2 rounded hover:bg-blue-800 transition-colors">
-                📋 View Companion Guide
-              </button>
-            </div>
-
-            {/* Wisdom Labs List */}
-            <div className="space-y-6">
-              {wisdomLabs.map((lab, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-blue-700 mb-1">
-                      Wisdom Lab {lab.number} - {lab.date}
-                    </h3>
-                    <p className="text-foreground">{lab.title}</p>
-                  </div>
-                  <button className="bg-blue-700 text-white px-4 py-2 rounded hover:bg-blue-800 transition-colors whitespace-nowrap">
-                    Click Here
-                  </button>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 
