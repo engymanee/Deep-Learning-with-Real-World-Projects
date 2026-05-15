@@ -166,7 +166,15 @@ function RenderBlock({ block }: RenderBlockProps) {
           <section className="border-b border-border bg-card">
             <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
               <div className="prose prose-neutral prose-sm max-w-none">
-                <Markdown>{block.content || ''}</Markdown>
+                <Markdown
+                  components={{
+                    h3: ({ children }) => (
+                      <h3 className="text-center">{children}</h3>
+                    ),
+                  }}
+                >
+                  {block.content || ''}
+                </Markdown>
               </div>
             </div>
           </section>

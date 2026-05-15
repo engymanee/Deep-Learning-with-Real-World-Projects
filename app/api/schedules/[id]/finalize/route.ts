@@ -5,10 +5,11 @@ import { generateCalendarInvite } from '@/lib/ics'
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireUser()
+    const { id } = await params
 
     // Only admins can finalize
     if (user.role !== 'admin') {
@@ -19,7 +20,7 @@ export async function POST(
     }
 
     const supabase = await createClient()
-    const scheduleId = params.id
+    const scheduleId = id
 
     const body = await req.json()
     const { selected_option_id } = body

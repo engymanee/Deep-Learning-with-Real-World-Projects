@@ -469,7 +469,15 @@ export function PageEditor({
                                       <div className="mt-2 p-2 bg-muted rounded text-xs border border-border">
                                         <p className="font-semibold text-foreground mb-1">Preview:</p>
                                         <div className="prose prose-sm prose-neutral max-w-none text-xs">
-                                          <Markdown>{block.content}</Markdown>
+                                          <Markdown
+                                            components={{
+                                              h3: ({ children }) => (
+                                                <h3 className="text-center">{children}</h3>
+                                              ),
+                                            }}
+                                          >
+                                            {block.content}
+                                          </Markdown>
                                         </div>
                                       </div>
                                     )}

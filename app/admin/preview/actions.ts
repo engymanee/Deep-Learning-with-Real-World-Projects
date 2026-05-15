@@ -71,7 +71,7 @@ export async function startPreviewAsCohort(formData: FormData): Promise<void> {
 export async function endPreview(formData: FormData): Promise<void> {
   // Get the stored referrer from the preview cookie before clearing it
   const user = await getCurrentUser()
-  const referrer = user?.preview?.referrer || '/admin'
+  const referrer = (user?.preview as any)?.referrer || '/admin'
   
   // Clearing the cookie is safe even for non-admins (it's a no-op for
   // them since they wouldn't have one), so we don't gate this. We do

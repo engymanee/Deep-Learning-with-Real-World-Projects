@@ -4,12 +4,13 @@ import { NextResponse } from 'next/server'
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireUser()
+    const { id } = await params
     const supabase = await createClient()
-    const scheduleId = params.id
+    const scheduleId = id
 
     // Get schedule details
     const { data: schedule, error: scheduleError } = await supabase
