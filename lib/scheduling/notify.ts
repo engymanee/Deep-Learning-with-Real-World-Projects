@@ -65,40 +65,43 @@ export async function createSchedulingNotification(
 
   console.log(`[v0] Found ${fellows.length} fellows to notify`)
 
-  const votingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://leadership.app'}/schedule/${scheduleId}/vote`
+  const votingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://leadership.app'}/schedule/${scheduleId}`
   console.log(`[v0] Voting URL: ${votingUrl}`)
 
-  // Send emails to all fellows
+  // Send emails to all fellows and track results
   console.log(`[v0] Starting email sending for ${fellows.length} fellows`)
-  const emailPromises = fellows.map(async (fellow) => {
-    if (!fellow.email) {
-      console.warn(`[v0] Fellow ${fellow.id} (${fellow.full_name}) has no email address`)
-      return
-    }
-
-    console.log(`[v0] Sending email to ${fellow.email}`)
-    try {
-      const result = await sendSchedulingInviteEmail(
-        fellow.email,
-        fellow.full_name,
-        scheduleTitle,
-        votingUrl,
-      )
-
-      if (result.ok) {
-        console.log(`[v0] ✓ Sent scheduling email to ${fellow.email} (id: ${result.id})`)
-      } else {
-        console.error(
-          `[v0] ✗ Failed to send scheduling email to ${fellow.email}:`,
-          result.error,
-        )
+  const emailResults = await Promise.all(
+    fellows.map(async (fellow) => {
+      if (!fellow.email) {
+        console.warn(`[v0] Fellow ${fellow.id} (${fellow.full_name}) has no email address`)
+        return { fellowId: fellow.id, success: false, providerId: null }
       }
-    } catch (err) {
-      console.error(`[v0] Exception sending scheduling email to ${fellow.email}:`, err)
-    }
-  })
 
-  await Promise.all(emailPromises)
+      console.log(`[v0] Sending email to ${fellow.email}`)
+      try {
+        const result = await sendSchedulingInviteEmail(
+          fellow.email,
+          fellow.full_name,
+          scheduleTitle,
+          votingUrl,
+        )
+
+        if (result.ok) {
+          console.log(`[v0] ✓ Sent scheduling email to ${fellow.email} (id: ${result.id})`)
+          return { fellowId: fellow.id, success: true, providerId: result.id }
+        } else {
+          console.error(
+            `[v0] ✗ Failed to send scheduling email to ${fellow.email}:`,
+            result.error,
+          )
+          return { fellowId: fellow.id, success: false, providerId: null }
+        }
+      } catch (err) {
+        console.error(`[v0] Exception sending scheduling email to ${fellow.email}:`, err)
+        return { fellowId: fellow.id, success: false, providerId: null }
+      }
+    })
+  )
   console.log('[v0] Email sending completed')
 
   // Create in-app notifications for all fellows
@@ -125,12 +128,20 @@ export async function createSchedulingNotification(
 
     console.log(`[v0] Created notification with id: ${notification.id}`)
 
-    // Create notification_recipients for each fellow
-    const recipientInserts = fellows.map((fellow) => ({
-      notification_id: notification.id,
-      profile_id: fellow.id,
-      read_at: null,
-    }))
+    // Create notification_recipients for each fellow with email tracking
+    const recipientInserts = fellows.map((fellow) => {
+      const emailResult = emailResults.find((r) => r.fellowId === fellow.id)
+      const emailSuccess = emailResult?.success ?? false
+      
+      return {
+        notification_id: notification.id,
+        profile_id: fellow.id,
+        read_at: null,
+        email_status: emailSuccess ? 'sent' : 'failed',
+        email_provider_id: emailResult?.providerId || null,
+        email_sent_at: emailSuccess ? new Date().toISOString() : null,
+      }
+    })
 
     const { error: recipientError } = await supabase
       .from('notification_recipients')
