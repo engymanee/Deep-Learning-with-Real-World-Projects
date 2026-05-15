@@ -1,4 +1,5 @@
 import { TopBar } from '@/components/top-bar'
+import { Footer } from '@/components/footer'
 import { getMenuCustomPages } from '@/lib/custom-pages/menu'
 
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,7 @@ export default async function PagesLayout({
     <div className="min-h-screen bg-background">
       <TopBar customPages={customPages} />
       {children}
+      <Footer />
     </div>
   )
 }
