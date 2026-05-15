@@ -242,6 +242,28 @@ function RenderBlock({ block }: RenderBlockProps) {
       )
     }
 
+    case 'cta': {
+      const containerClass = metadata.containerClass || 'py-8 sm:py-12'
+      const sectionClass = metadata.section || 'bg-background'
+      const href = metadata.href || '#'
+      
+      return (
+        <section className={sectionClass}>
+          <div className={`mx-auto max-w-4xl px-4 ${containerClass}`}>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href={href}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground px-6 py-3 font-medium hover:opacity-90 transition-opacity"
+              >
+                {block.content}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )
+    }
+
     default:
       return null
   }

@@ -4,9 +4,9 @@ import { PageRenderer } from '@/components/custom-pages/page-renderer'
 import { InlinePageEditor } from '@/components/custom-pages/inline-page-editor'
 
 export const metadata = {
-  title: 'About the WaW Fellows Portal | Wisdom at Work',
+  title: 'WaW Fellowship | Wisdom at Work',
   description:
-    'Learn about the Wisdom at Work Fellowship Portal - your dashboard for the WAW Syllabus, Learning Journals, and Additional Resources.',
+    'Welcome to the Wisdom at Work Fellowship Portal - your dashboard for the WAW Syllabus, Learning Journals, and Additional Resources.',
 }
 
 /**
@@ -50,9 +50,10 @@ async function seedAboutPageIfNeeded(supabase: any) {
     // Create blocks matching the EXACT original layout:
     // 1. Welcome header section (h1 + 2 paragraphs)
     // 2. First image - team collaboration
-    // 3. Lorem Ipsum text (3 paragraphs)
+    // 3. Three paragraphs about Wisdom at Work initiative
     // 4. Curriculum image section
     // 5. Foundation logo section
+    // 6. Call to action button
     const blocks = [
       // Block 1: Welcome header section (h1 + 2 paragraphs combined)
       {
@@ -79,13 +80,13 @@ async function seedAboutPageIfNeeded(supabase: any) {
           containerClass: 'py-8 sm:py-12'
         },
       },
-      // Block 3: Lorem Ipsum placeholder text (3 paragraphs)
+      // Block 3: Three paragraphs about Wisdom at Work initiative
       {
         page_id: page.id,
         block_type: 'text',
         order_number: 3,
         title: null,
-        content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\n\nSed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.',
+        content: 'School leaders face myriad challenges: handling angry parent emails, managing contentious meetings, and addressing bullying—often before the school day even begins. Each situation demands nuanced thinking and sound judgment, not one-size-fits-all answers. How do school leaders learn to move from reactive mode to calm, wise responses?\n\nOur new initiative, Wisdom at Work, aims to answer that question. We view practical wisdom (phronesis)—the disposition to press pause, deliberate, and respond well—as the antidote to reactive decision-making. Practical wisdom enables leaders to attend to context, engage stakeholders meaningfully, and navigate competing priorities—turning everyday challenges into opportunities to foster flourishing.\n\nRooted in innovative, research-based design, the Wisdom at Work Fellowship will equip school leaders and their teams with tools and practices they can use to lead with wisdom, even under pressure. Over few years, we will grow a vibrant Community of Fellows—engaging school leaders not just as participants, but as partners in research and design. Together, we are shaping a fresh, field-tested model of professional development, building evidence-based tools, and cultivating a networked Community of Practice.',
         metadata: {
           format: 'prose_section',
         },
@@ -117,6 +118,20 @@ async function seedAboutPageIfNeeded(supabase: any) {
           section: 'border-t border-border bg-card',
           containerClass: 'py-12 sm:py-16 text-center',
           style: { fontSize: '20px' }
+        },
+      },
+      // Block 6: Call to action button (Go to Dashboard)
+      {
+        page_id: page.id,
+        block_type: 'cta',
+        order_number: 6,
+        title: null,
+        content: 'Go to Dashboard',
+        metadata: {
+          href: '/dashboard',
+          icon: 'ArrowRight',
+          section: 'border-t border-border bg-background',
+          containerClass: 'py-8 sm:py-12',
         },
       },
     ]
