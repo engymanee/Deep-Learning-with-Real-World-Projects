@@ -64,10 +64,12 @@ export function EmailLogsClient({
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   const filteredLogs = logs.filter((log) => {
+    const searchLower = (searchTerm || '').toLowerCase()
+    
     const matchesSearch =
-      (log.recipient_email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-      (log.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-      (log.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+      (log.recipient_email?.toLowerCase().includes(searchLower) ?? false) ||
+      (log.subject?.toLowerCase().includes(searchLower) ?? false) ||
+      (log.recipient_name?.toLowerCase().includes(searchLower) ?? false)
 
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter
 
