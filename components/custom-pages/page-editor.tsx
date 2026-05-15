@@ -43,6 +43,7 @@ export function PageEditor({
   const [title, setTitle] = useState(page.title)
   const [slug, setSlug] = useState(page.slug)
   const [description, setDescription] = useState(page.description || '')
+  const [showInMenu, setShowInMenu] = useState(page.show_in_menu ?? true)
   const [blocks, setBlocks] = useState<PageBlock[]>(page.blocks || [])
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
 
@@ -94,6 +95,7 @@ export function PageEditor({
       title,
       slug,
       description,
+      show_in_menu: showInMenu,
       blocks,
     })
   }
@@ -147,6 +149,24 @@ export function PageEditor({
               rows={3}
               className="w-full px-3 py-2 border rounded-lg"
             />
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+            <input
+              type="checkbox"
+              id="show_in_menu"
+              checked={showInMenu}
+              onChange={(e) => setShowInMenu(e.target.checked)}
+              className="w-4 h-4 rounded"
+            />
+            <label htmlFor="show_in_menu" className="flex-1 cursor-pointer">
+              <div className="font-medium text-sm">Add to Navigation Menu</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {showInMenu
+                  ? 'This page will appear in the main navigation menu'
+                  : 'This page will be hidden from the menu (still accessible via direct link)'}
+              </p>
+            </label>
           </div>
 
           {!page.id && (

@@ -116,6 +116,7 @@ export async function updateCustomPage(
     slug?: string
     description?: string
     is_published?: boolean
+    show_in_menu?: boolean
   }
 ) {
   const admin = createAdminClient()
