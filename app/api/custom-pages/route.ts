@@ -14,7 +14,20 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('custom_pages')
-      .select('id, title, slug, description, is_published, show_in_menu, created_at')
+      .select(`
+        id,
+        title,
+        slug,
+        description,
+        header1,
+        header2,
+        header3,
+        is_published,
+        show_in_menu,
+        created_by,
+        created_at,
+        updated_at
+      `)
       .eq('is_published', true)
 
     // Filter by show_in_menu if requested
