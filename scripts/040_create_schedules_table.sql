@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.schedule_options (
 -- Create schedule_votes table
 CREATE TABLE IF NOT EXISTS public.schedule_votes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.auth.users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   schedule_id UUID NOT NULL REFERENCES public.schedules(id) ON DELETE CASCADE,
   preferred_option_id UUID NOT NULL REFERENCES public.schedule_options(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
