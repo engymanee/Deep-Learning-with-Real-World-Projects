@@ -17,10 +17,8 @@ export async function GET(request: NextRequest) {
     // Check for pageId query parameter
     const pageId = request.nextUrl.searchParams.get('pageId')
 
-    let query = supabase.from('page_images').select('*')
-
-    // If pageId is provided, filter by pages that use these images
     if (pageId) {
+      // If pageId is provided, filter by pages that use these images
       // Get blocks for this page that have image_id
       const { data: blocks } = await supabase
         .from('page_blocks')
@@ -36,10 +34,21 @@ export async function GET(request: NextRequest) {
       }
 
       // Get those specific images
-      query = supabase.from('page_images').select('*').in('id', imageIds)
+      const { data: images, error } = await supabase
+        .from('page_images')
+        .select('*')
+        .in('id', imageIds)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return NextResponse.json(images || [])
     }
 
-    const { data: images, error } = await query.order('created_at', { ascending: false })
+    // No pageId - return all images (for the image library/picker)
+    const { data: images, error } = await supabase
+      .from('page_images')
+      .select('*')
+      .order('created_at', { ascending: false })
 
     if (error) throw error
 

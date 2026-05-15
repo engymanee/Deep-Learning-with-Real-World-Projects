@@ -15,25 +15,18 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
 
   return (
     <main className="w-full">
-      {/* Welcome header section - matches About page */}
+      {/* Title Section - Centered */}
       <section className="border-b border-border bg-card">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
-          <div className="space-y-6">
-            <div>
-              <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4">
-                {page.title}
-              </h1>
-              {page.description && (
-                <p className="text-base text-muted-foreground leading-relaxed text-center">
-                  {page.description}
-                </p>
-              )}
-            </div>
+          <div className="text-center space-y-4">
+            <h1 className="font-serif text-4xl sm:text-5xl text-foreground font-bold">
+              {page.title}
+            </h1>
           </div>
         </div>
       </section>
 
-      {/* Content Blocks */}
+      {/* Body Content Blocks */}
       {blocks.length === 0 ? (
         <section className="bg-background">
           <div className="py-12 text-center text-muted-foreground max-w-4xl mx-auto">
@@ -46,6 +39,17 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
             <RenderBlock key={block.id} block={block} />
           ))}
         </div>
+      )}
+
+      {/* Optional Subtitle Section - Only show if description exists */}
+      {page.description && (
+        <section className="border-t border-border bg-card">
+          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
+            <p className="text-base text-muted-foreground leading-relaxed text-center italic">
+              {page.description}
+            </p>
+          </div>
+        </section>
       )}
 
       {/* Call to action footer - matches About page */}
@@ -90,9 +94,9 @@ function RenderBlock({ block }: RenderBlockProps) {
             <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
               <div className="space-y-6">
                 <div>
-                  <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4">
+                  <h2 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4 text-center">
                     {block.content}
-                  </h1>
+                  </h2>
                 </div>
               </div>
             </div>
@@ -142,7 +146,7 @@ function RenderBlock({ block }: RenderBlockProps) {
     case 'image':
       return (
         <section className="bg-background">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12 text-center text-sm">
+          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
             <img
               src={block.content || ''}
               alt={metadata.alt || 'Page image'}
