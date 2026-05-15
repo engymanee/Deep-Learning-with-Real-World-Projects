@@ -16,45 +16,60 @@ export async function GET(req: Request) {
       )
     }
 
-    let query = supabase
-      .from('schedules')
-      .select(
+    try {
+      let query = supabase
+        .from('schedules')
+        .select(
+          `
+          id,
+          title,
+          description,
+          location,
+          meeting_link,
+          status,
+          is_poll,
+          voting_closes_at,
+          created_by_admin,
+          event_date,
+          start_time,
+          end_time,
+          created_at
         `
-        id,
-        title,
-        description,
-        location,
-        meeting_link,
-        status,
-        is_poll,
-        voting_closes_at,
-        created_by_admin,
-        event_date,
-        start_time,
-        end_time,
-        created_at
-      `
-      )
+        )
 
-    if (adminOnly) {
-      // Show all polls and scheduled events for admin
-      query = query.in('status', ['polling', 'scheduled'])
-    } else {
-      // Show only scheduled events for fellows
-      query = query.eq('status', 'scheduled')
+      if (adminOnly) {
+        // Show all polls and scheduled events for admin
+        query = query.in('status', ['polling', 'scheduled'])
+      } else {
+        // Show only scheduled events for fellows
+        query = query.eq('status', 'scheduled')
+      }
+
+      const { data, error } = await query.order('event_date', {
+        ascending: true,
+      })
+
+      // Handle table not found error
+      if (error?.code === 'PGRST205') {
+        console.log('[v0] Schedules table does not exist yet')
+        return NextResponse.json({ schedules: [] })
+      }
+
+      if (error) {
+        console.error('[v0] Error fetching schedules:', error)
+        return NextResponse.json(
+          { error: 'Failed to fetch schedules' },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({ schedules: data })
+    } catch (dbError) {
+      console.error('[v0] Database error:', dbError)
+      return NextResponse.json({ schedules: [] })
     }
-
-    const { data, error } = await query.order('event_date', {
-      ascending: true,
-    })
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ schedules: data })
   } catch (error) {
-    console.error('[v0] Error fetching schedules:', error)
+    console.error('[v0] Error in schedules GET:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
