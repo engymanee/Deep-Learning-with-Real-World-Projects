@@ -39,6 +39,9 @@ export default async function AdminSchedulePage() {
       id,
       title,
       description,
+      location,
+      event_date,
+      start_time,
       status,
       is_poll,
       voting_closes_at,
@@ -155,7 +158,7 @@ export default async function AdminSchedulePage() {
                 cohorts?.map((c) => ({
                   id: c.id,
                   name: c.name,
-                  schoolName: c.school?.name,
+                  schoolName: (c.school as any)?.name,
                 })) || []
               }
             />

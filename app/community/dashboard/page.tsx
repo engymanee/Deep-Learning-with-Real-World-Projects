@@ -11,6 +11,7 @@ import {
 import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
 import { ASK_CATEGORY_BY_VALUE } from '@/lib/community/ask-categories'
+import { loadCommunityDashboard } from '@/lib/community/load-dashboard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'

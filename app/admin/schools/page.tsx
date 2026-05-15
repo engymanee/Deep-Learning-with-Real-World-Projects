@@ -19,7 +19,7 @@ type CohortRow = {
 type MemberRow = {
   cohort_id: string
   profile_id: string
-  profiles: { id: string; full_name: string | null; title: string | null } | null
+  profiles: { id: string; full_name: string | null; title: string | null }[] | null
 }
 type FellowRow = {
   id: string
@@ -256,7 +256,7 @@ export default async function AdminSchoolsPage() {
                             ) : (
                               <div className="space-y-2 mb-4">
                                 {cohortMembers.map((m) => {
-                                  const fullName = m.profiles?.full_name ?? 'Unknown'
+                                  const fullName = m.profiles?.[0]?.full_name ?? 'Unknown'
                                   return (
                                     <div
                                       key={m.profile_id}
@@ -272,9 +272,9 @@ export default async function AdminSchoolsPage() {
                                           <p className="text-sm font-medium text-foreground truncate">
                                             {fullName}
                                           </p>
-                                          {m.profiles?.title && (
+                                          {m.profiles?.[0]?.title && (
                                             <p className="text-xs text-muted-foreground truncate">
-                                              {m.profiles.title}
+                                              {m.profiles[0].title}
                                             </p>
                                           )}
                                         </div>
