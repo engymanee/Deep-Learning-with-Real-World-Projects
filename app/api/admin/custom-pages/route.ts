@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const body = await request.json()
 
-    const { title, slug, description, blocks } = body
+    const { title, slug, description, header1, header2, header3, blocks } = body
 
     if (!title || !slug) {
       return NextResponse.json(
@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
         title,
         slug,
         description: description || null,
+        header1: header1 || null,
+        header2: header2 || null,
+        header3: header3 || null,
         is_published: false,
         created_by: user.id,
       })
@@ -85,7 +88,7 @@ export async function PATCH(request: NextRequest) {
     const supabase = await createClient()
     const body = await request.json()
 
-    const { pageId, title, slug, description, is_published, show_in_menu, blocks } = body
+    const { pageId, title, slug, description, header1, header2, header3, is_published, show_in_menu, blocks } = body
 
     if (!pageId) {
       return NextResponse.json(
@@ -101,6 +104,9 @@ export async function PATCH(request: NextRequest) {
         title,
         slug,
         description: description || null,
+        header1: header1 || null,
+        header2: header2 || null,
+        header3: header3 || null,
         is_published,
         show_in_menu: show_in_menu ?? true,
         updated_at: new Date().toISOString(),

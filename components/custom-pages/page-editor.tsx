@@ -43,6 +43,9 @@ export function PageEditor({
   const [title, setTitle] = useState(page.title)
   const [slug, setSlug] = useState(page.slug)
   const [description, setDescription] = useState(page.description || '')
+  const [header1, setHeader1] = useState(page.header1 || '')
+  const [header2, setHeader2] = useState(page.header2 || '')
+  const [header3, setHeader3] = useState(page.header3 || '')
   const [showInMenu, setShowInMenu] = useState(page.show_in_menu ?? true)
   const [blocks, setBlocks] = useState<PageBlock[]>(page.blocks || [])
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
@@ -77,11 +80,14 @@ export function PageEditor({
       title !== page.title ||
       slug !== page.slug ||
       description !== (page.description || '') ||
+      header1 !== (page.header1 || '') ||
+      header2 !== (page.header2 || '') ||
+      header3 !== (page.header3 || '') ||
       showInMenu !== (page.show_in_menu ?? true) ||
       currentBlocks !== savedBlocks
 
     setHasUnsavedChanges(hasChanges)
-  }, [title, slug, description, showInMenu, blocks, page, justSaved])
+  }, [title, slug, description, header1, header2, header3, showInMenu, blocks, page, justSaved])
 
   const addBlock = (type: PageBlockType) => {
     const newBlock: PageBlock = {
@@ -146,6 +152,9 @@ export function PageEditor({
       title,
       slug,
       description,
+      header1,
+      header2,
+      header3,
       show_in_menu: showInMenu,
       blocks: blocksWithImageContent,
     })
@@ -200,6 +209,39 @@ export function PageEditor({
               rows={3}
               className="w-full px-3 py-2 border rounded-lg"
             />
+          </div>
+
+          {/* Headers Section */}
+          <div className="pt-2 border-t">
+            <h3 className="text-sm font-semibold mb-3">Page Headers (optional)</h3>
+            <p className="text-xs text-muted-foreground mb-3">Add up to 3 headers with different sizes. Leave blank to skip.</p>
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">Header 1 (Largest)</label>
+              <Input
+                value={header1}
+                onChange={(e) => setHeader1(e.target.value)}
+                placeholder="Main header - largest size"
+              />
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-sm font-medium mb-1">Header 2 (Medium)</label>
+              <Input
+                value={header2}
+                onChange={(e) => setHeader2(e.target.value)}
+                placeholder="Secondary header - medium size"
+              />
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-sm font-medium mb-1">Header 3 (Small)</label>
+              <Input
+                value={header3}
+                onChange={(e) => setHeader3(e.target.value)}
+                placeholder="Tertiary header - small size"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">

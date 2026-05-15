@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Upload, Trash2, Copy, Edit2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,10 +42,10 @@ export function ImageGallery({
   const [isOpen, setIsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.currentTarget.files?.[0]
-    const inputElement = e.currentTarget
     setError(null)
     setSuccess(null)
 
@@ -55,9 +55,9 @@ export function ImageGallery({
       console.log('[v0] Starting file upload:', file.name)
       await onUpload(file)
       setSuccess(`Image ${file.name} uploaded successfully!`)
-      // Clear the input value safely
-      if (inputElement) {
-        inputElement.value = ''
+      // Clear the input value using ref
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
       }
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000)
@@ -65,9 +65,9 @@ export function ImageGallery({
       const message = err instanceof Error ? err.message : 'Upload failed'
       console.error('[v0] Upload failed:', message)
       setError(message)
-      // Clear the input value safely on error too
-      if (inputElement) {
-        inputElement.value = ''
+      // Clear the input value using ref on error too
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
       }
     }
   }
@@ -101,6 +101,7 @@ export function ImageGallery({
         </div>
         <label>
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/*"
             onChange={handleFileSelect}
@@ -141,6 +142,7 @@ export function ImageGallery({
             </p>
             <label>
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleFileSelect}

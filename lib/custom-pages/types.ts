@@ -31,6 +31,10 @@ export interface CustomPage {
   title: string
   slug: string
   description: string | null
+  // New header fields - replacing single title for rendered content
+  header1: string | null
+  header2: string | null
+  header3: string | null
   is_published: boolean
   show_in_menu: boolean
   blocks?: PageBlock[]
@@ -38,3 +42,4 @@ export interface CustomPage {
   created_at: string
   updated_at: string
 }
+
