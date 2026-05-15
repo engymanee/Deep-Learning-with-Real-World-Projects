@@ -12,6 +12,42 @@ export async function setupCustomPagesDatabase() {
   try {
     console.log('[v0] Setting up custom pages database...')
 
+    // First, ensure the custom-page-images storage bucket exists
+    console.log('[v0] Checking for custom-page-images bucket...')
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets()
+
+    if (listError) {
+      console.error('[v0] Error listing buckets:', listError)
+      return {
+        success: false,
+        message: 'Failed to list storage buckets',
+        error: listError.message,
+      }
+    }
+
+    const bucketExists = buckets?.some((b: any) => b.name === 'custom-page-images')
+
+    if (!bucketExists) {
+      console.log('[v0] Creating custom-page-images bucket...')
+      const { error: createError } = await supabase.storage.createBucket('custom-page-images', {
+        public: true,
+        fileSizeLimit: 5242880, // 5MB
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+      })
+
+      if (createError && !createError.message.includes('already exists')) {
+        console.error('[v0] Error creating bucket:', createError)
+        return {
+          success: false,
+          message: 'Failed to create storage bucket',
+          error: createError.message,
+        }
+      }
+      console.log('[v0] custom-page-images bucket is ready')
+    } else {
+      console.log('[v0] custom-page-images bucket already exists')
+    }
+
     // Check if custom_pages table exists by trying to query it
     const { data: existingPages, error: queryError } = await supabase
       .from('custom_pages')

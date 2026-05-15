@@ -17,46 +17,35 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
   // Determine if we have any headers to render
   const hasAnyHeader = page.header1 || page.header2 || page.header3
 
+  // Render header based on position
+  const renderHeader = (content: string | null, position: string | undefined, size: 'large' | 'medium' | 'small') => {
+    if (!content || position === 'hidden') return null
+
+    const sizeClasses = {
+      large: 'text-4xl sm:text-5xl',
+      medium: 'text-2xl sm:text-3xl',
+      small: 'text-lg sm:text-xl',
+    }
+
+    return (
+      <section className="border-b border-border bg-card">
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
+          <div className="text-center space-y-4">
+            <h2 className={`font-serif ${sizeClasses[size]} text-foreground font-bold`}>
+              {content}
+            </h2>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <main className="w-full">
-      {/* Header1 - Largest (matches About page H1 style) */}
-      {page.header1 && (
-        <section className="border-b border-border bg-card">
-          <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
-            <div className="text-center space-y-4">
-              <h1 className="font-serif text-4xl sm:text-5xl text-foreground font-bold">
-                {page.header1}
-              </h1>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Header2 - Medium size */}
-      {page.header2 && (
-        <section className="border-b border-border bg-card">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-            <div className="text-center space-y-4">
-              <h2 className="font-serif text-2xl sm:text-3xl text-foreground font-bold">
-                {page.header2}
-              </h2>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Header3 - Smaller (matches About page smaller header style) */}
-      {page.header3 && (
-        <section className="border-b border-border bg-card">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-            <div className="text-center space-y-4">
-              <h3 className="font-serif text-lg sm:text-xl text-foreground font-bold">
-                {page.header3}
-              </h3>
-            </div>
-          </div>
-        </section>
-      )}
+      {/* Headers positioned BEFORE blocks */}
+      {page.header1_position === 'before' && renderHeader(page.header1, 'before', 'large')}
+      {page.header2_position === 'before' && renderHeader(page.header2, 'before', 'medium')}
+      {page.header3_position === 'before' && renderHeader(page.header3, 'before', 'small')}
 
       {/* Body Content Blocks */}
       {blocks.length === 0 ? (
@@ -74,6 +63,11 @@ export function PageRenderer({ page, showCTA = true }: PageRendererProps) {
           ))}
         </div>
       )}
+
+      {/* Headers positioned AFTER blocks */}
+      {page.header1_position === 'after' && renderHeader(page.header1, 'after', 'large')}
+      {page.header2_position === 'after' && renderHeader(page.header2, 'after', 'medium')}
+      {page.header3_position === 'after' && renderHeader(page.header3, 'after', 'small')}
 
       {/* Optional Subtitle Section - Only show if description exists */}
       {page.description && (

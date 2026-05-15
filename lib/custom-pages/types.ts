@@ -1,5 +1,7 @@
 export type PageBlockType = 'text' | 'image' | 'combined'
 
+export type HeaderPosition = 'before' | 'after' | 'hidden'
+
 export interface PageImage {
   id: string
   url: string
@@ -31,10 +33,13 @@ export interface CustomPage {
   title: string
   slug: string
   description: string | null
-  // New header fields - replacing single title for rendered content
+  // Header fields with position controls
   header1: string | null
+  header1_position?: HeaderPosition
   header2: string | null
+  header2_position?: HeaderPosition
   header3: string | null
+  header3_position?: HeaderPosition
   cover_image_url?: string | null
   is_published: boolean
   show_in_menu: boolean
@@ -43,4 +48,5 @@ export interface CustomPage {
   created_at: string
   updated_at: string
 }
+
 

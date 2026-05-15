@@ -260,33 +260,69 @@ export function PageEditor({
           {/* Headers Section */}
           <div className="pt-2 border-t">
             <h3 className="text-sm font-semibold mb-3">Page Headers (optional)</h3>
-            <p className="text-xs text-muted-foreground mb-3">Add up to 3 headers with different sizes. Leave blank to skip.</p>
+            <p className="text-xs text-muted-foreground mb-3">Add up to 3 headers with different sizes. Choose where each appears.</p>
             
             <div>
               <label className="block text-sm font-medium mb-1">Header 1 (Largest)</label>
               <Input
-                value={header1}
-                onChange={(e) => setHeader1(e.target.value)}
+                value={page.header1 || ''}
+                onChange={(e) => setPage({ ...page, header1: e.target.value })}
                 placeholder="Main header - largest size"
               />
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Position:</span>
+                <select
+                  value={page.header1_position || 'before'}
+                  onChange={(e) => setPage({ ...page, header1_position: e.target.value as any })}
+                  className="px-2 py-1 border rounded text-sm"
+                >
+                  <option value="before">Before blocks</option>
+                  <option value="after">After blocks</option>
+                  <option value="hidden">Hidden</option>
+                </select>
+              </div>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-4">
               <label className="block text-sm font-medium mb-1">Header 2 (Medium)</label>
               <Input
-                value={header2}
-                onChange={(e) => setHeader2(e.target.value)}
+                value={page.header2 || ''}
+                onChange={(e) => setPage({ ...page, header2: e.target.value })}
                 placeholder="Secondary header - medium size"
               />
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Position:</span>
+                <select
+                  value={page.header2_position || 'before'}
+                  onChange={(e) => setPage({ ...page, header2_position: e.target.value as any })}
+                  className="px-2 py-1 border rounded text-sm"
+                >
+                  <option value="before">Before blocks</option>
+                  <option value="after">After blocks</option>
+                  <option value="hidden">Hidden</option>
+                </select>
+              </div>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-4">
               <label className="block text-sm font-medium mb-1">Header 3 (Small)</label>
               <Input
-                value={header3}
-                onChange={(e) => setHeader3(e.target.value)}
+                value={page.header3 || ''}
+                onChange={(e) => setPage({ ...page, header3: e.target.value })}
                 placeholder="Tertiary header - small size"
               />
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Position:</span>
+                <select
+                  value={page.header3_position || 'before'}
+                  onChange={(e) => setPage({ ...page, header3_position: e.target.value as any })}
+                  className="px-2 py-1 border rounded text-sm"
+                >
+                  <option value="before">Before blocks</option>
+                  <option value="after">After blocks</option>
+                  <option value="hidden">Hidden</option>
+                </select>
+              </div>
             </div>
           </div>
 
