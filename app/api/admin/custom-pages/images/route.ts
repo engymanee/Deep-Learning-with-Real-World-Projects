@@ -7,21 +7,43 @@ export const runtime = 'nodejs'
 
 /**
  * GET /api/admin/custom-pages/images
- * List all uploaded images
+ * List all uploaded images or images for a specific page
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await requireAdmin()
     const supabase = await createClient()
 
-    const { data: images, error } = await supabase
-      .from('page_images')
-      .select('*')
-      .order('created_at', { ascending: false })
+    // Check for pageId query parameter
+    const pageId = request.nextUrl.searchParams.get('pageId')
+
+    let query = supabase.from('page_images').select('*')
+
+    // If pageId is provided, filter by pages that use these images
+    if (pageId) {
+      // Get blocks for this page that have image_id
+      const { data: blocks } = await supabase
+        .from('page_blocks')
+        .select('image_id')
+        .eq('page_id', pageId)
+        .not('image_id', 'is', null)
+
+      const imageIds = blocks?.map((b: any) => b.image_id).filter(Boolean) || []
+
+      // If no images used, return empty array
+      if (imageIds.length === 0) {
+        return NextResponse.json([])
+      }
+
+      // Get those specific images
+      query = supabase.from('page_images').select('*').in('id', imageIds)
+    }
+
+    const { data: images, error } = await query.order('created_at', { ascending: false })
 
     if (error) throw error
 
-    return NextResponse.json({ images: images || [] })
+    return NextResponse.json(images || [])
   } catch (error) {
     console.error('[v0] Error fetching images:', error)
     return NextResponse.json(

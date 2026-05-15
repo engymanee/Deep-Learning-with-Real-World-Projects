@@ -59,6 +59,18 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
         ...fetchedPage,
         blocks: fetchedPage.page_blocks || [],
       })
+
+      // Fetch page images
+      try {
+        const imagesResponse = await fetch(`/api/admin/custom-pages/images?pageId=${params.pageId}`)
+        if (imagesResponse.ok) {
+          const fetchedImages = await imagesResponse.json()
+          setImages(fetchedImages || [])
+        }
+      } catch (imageErr) {
+        console.warn('[v0] Failed to fetch page images:', imageErr)
+        // Don't fail the whole page load if images fail
+      }
     } catch (err) {
       console.error('[v0] Error fetching page:', err)
       setError(err instanceof Error ? err.message : 'Failed to load page')
