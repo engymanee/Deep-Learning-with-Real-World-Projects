@@ -99,6 +99,43 @@ export async function createCustomPage(data: { title: string; slug: string; desc
 
     if (error) throw error
 
+    // Create default template blocks for new page
+    const defaultBlocks = [
+      {
+        page_id: page.id,
+        block_type: 'text',
+        order_number: 1,
+        title: data.title,
+        content: data.title,
+        metadata: { heading: true, size: 'large' },
+      },
+      {
+        page_id: page.id,
+        block_type: 'text',
+        order_number: 2,
+        title: null,
+        content: 'Add your introduction here. This is the perfect place to welcome visitors and explain the purpose of this page.',
+        metadata: { size: 'medium' },
+      },
+      {
+        page_id: page.id,
+        block_type: 'text',
+        order_number: 3,
+        title: null,
+        content: 'Start creating your content by adding more text blocks, images, or combining them for a rich page layout.',
+        metadata: { size: 'small' },
+      },
+    ]
+
+    const { error: blocksError } = await admin
+      .from('page_blocks')
+      .insert(defaultBlocks)
+
+    if (blocksError) {
+      console.warn('[v0] Failed to create default blocks:', blocksError)
+      // Don't fail the whole operation if blocks fail
+    }
+
     revalidateTag('custom-pages', 'max')
     return { success: true, page: page as CustomPage }
   } catch (err) {

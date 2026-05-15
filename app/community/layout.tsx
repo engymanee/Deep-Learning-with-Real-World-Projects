@@ -3,6 +3,7 @@ import { CommunitySidebar } from '@/components/community/community-sidebar'
 import { requireUser } from '@/lib/auth-server'
 import { createClient } from '@/lib/supabase/server'
 import { COMMUNITY_SECTIONS } from '@/lib/community/sections'
+import type { CustomPage } from '@/lib/custom-pages/types'
 
 export const metadata = {
   title: 'Community | Leadership Fellowship',
@@ -63,9 +64,24 @@ export default async function CommunityLayout({
     counts[s.id] = postRes[i].count ?? 0
   })
 
+  // Fetch custom pages server-side
+  let customPages: CustomPage[] = []
+  try {
+    const { data: pages } = await supabase
+      .from('custom_pages')
+      .select('id, title, slug, description, is_published, show_in_menu')
+      .eq('is_published', true)
+      .eq('show_in_menu', true)
+      .order('created_at', { ascending: false })
+    
+    customPages = pages || []
+  } catch (error) {
+    console.error('[v0] Error fetching custom pages:', error)
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <TopBar />
+      <TopBar customPages={customPages} />
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:py-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
           <CommunitySidebar counts={counts} />
