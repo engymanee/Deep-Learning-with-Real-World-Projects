@@ -1,4 +1,4 @@
-export type PageBlockType = 'text' | 'image' | 'combined'
+export type PageBlockType = 'text' | 'image' | 'combined' | 'cta'
 
 export type HeaderPosition = 'before' | 'after' | 'hidden'
 
