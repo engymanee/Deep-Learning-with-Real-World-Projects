@@ -47,45 +47,41 @@ export function PageEditor({
   const [blocks, setBlocks] = useState<PageBlock[]>(page.blocks || [])
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
 
   // Track if there are unsaved changes
   useEffect(() => {
+    // If we just saved, don't immediately show unsaved changes
+    // This gives the parent component time to update the page prop
+    if (justSaved) {
+      setJustSaved(false)
+      return
+    }
+
     // Normalize blocks for comparison - exclude fields that change during save
-    const normalizeBlock = (block: PageBlock) => ({
-      page_id: block.page_id,
-      block_type: block.block_type,
-      order_number: block.order_number,
-      title: block.title,
-      content: block.content,
-      metadata: block.metadata,
-      image_id: block.image_id,
-    })
-
-    const currentContent = {
-      title,
-      slug,
-      description,
-      showInMenu,
-      blocks: JSON.stringify(blocks.map(normalizeBlock)),
+    const normalizeBlock = (block: PageBlock) => {
+      return {
+        block_type: block.block_type,
+        order_number: block.order_number,
+        title: block.title || null,
+        content: block.content || null,
+        metadata: block.metadata || null,
+        image_id: block.image_id || null,
+      }
     }
 
-    const savedContent = {
-      title: page.title,
-      slug: page.slug,
-      description: page.description || '',
-      showInMenu: page.show_in_menu ?? true,
-      blocks: JSON.stringify((page.blocks || []).map(normalizeBlock)),
-    }
+    const currentBlocks = JSON.stringify(blocks.map(normalizeBlock))
+    const savedBlocks = JSON.stringify((page.blocks || []).map(normalizeBlock))
 
     const hasChanges =
-      currentContent.title !== savedContent.title ||
-      currentContent.slug !== savedContent.slug ||
-      currentContent.description !== savedContent.description ||
-      currentContent.showInMenu !== savedContent.showInMenu ||
-      currentContent.blocks !== savedContent.blocks
+      title !== page.title ||
+      slug !== page.slug ||
+      description !== (page.description || '') ||
+      showInMenu !== (page.show_in_menu ?? true) ||
+      currentBlocks !== savedBlocks
 
     setHasUnsavedChanges(hasChanges)
-  }, [title, slug, description, showInMenu, blocks, page])
+  }, [title, slug, description, showInMenu, blocks, page, justSaved])
 
   const addBlock = (type: PageBlockType) => {
     const newBlock: PageBlock = {
@@ -143,6 +139,9 @@ export function PageEditor({
       return block
     })
 
+    // Set flag to skip change detection on next render
+    setJustSaved(true)
+    
     await onSave({
       title,
       slug,
