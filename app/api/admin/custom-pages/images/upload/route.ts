@@ -1,4 +1,3 @@
-import { put } from '@vercel/blob'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
@@ -7,7 +6,7 @@ export const runtime = 'nodejs'
 
 /**
  * POST /api/admin/custom-pages/images/upload
- * Upload an image for custom pages with validation
+ * Upload an image for custom pages to Supabase Storage
  */
 export async function POST(request: NextRequest) {
   try {
@@ -38,61 +37,57 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate unique filename
-    const timestamp = Date.now()
-    const random = Math.random().toString(36).substring(2, 8)
+    // Generate unique filename using crypto.randomUUID
     const ext = file.name.split('.').pop() || 'jpg'
-    const filename = `custom-pages/${timestamp}-${random}.${ext}`
+    const filename = `${crypto.randomUUID()}.${ext}`
+    const filePath = `custom-page-images/${filename}`
 
-    console.log('[v0] Uploading image to Vercel Blob:', filename)
+    console.log('[v0] Uploading image to Supabase Storage:', filePath)
 
-    // Upload to Vercel Blob
-    let blob
-    try {
-      const token = process.env.BLOB_READ_WRITE_TOKEN
-      if (!token) {
-        console.error('[v0] BLOB_READ_WRITE_TOKEN not found in environment')
-        return NextResponse.json(
-          { error: 'Blob storage token not configured. Contact administrator.' },
-          { status: 500 }
-        )
-      }
-
-      blob = await put(filename, file, {
-        access: 'public',
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('custom-page-images')
+      .upload(filePath, file, {
         contentType: file.type,
-        token,
+        upsert: false,
       })
-    } catch (blobError) {
-      console.error('[v0] Blob upload failed:', blobError)
+
+    if (uploadError) {
+      console.error('[v0] Supabase Storage upload failed:', uploadError)
       return NextResponse.json(
-        { error: 'Failed to upload to blob storage. Check BLOB_READ_WRITE_TOKEN env var.' },
+        { error: 'Failed to upload image to storage' },
         { status: 500 }
       )
     }
 
-    console.log('[v0] Image uploaded to Blob:', blob.url)
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('custom-page-images')
+      .getPublicUrl(filePath)
 
-    // Log to database - only insert url field to avoid schema issues
-    console.log('[v0] Logging image to database...')
-    
-    // Start with minimal required field
-    const insertPayload = {
-      url: blob.url,
-    }
+    const imageUrl = publicUrlData.publicUrl
+
+    console.log('[v0] Image uploaded to Supabase Storage:', imageUrl)
+
+    // Log to database
+    console.log('[v0] Logging image metadata to database...')
 
     const { data: imageRecord, error: dbError } = await supabase
       .from('page_images')
-      .insert(insertPayload)
+      .insert({
+        url: imageUrl,
+        filename: file.name,
+        size_bytes: file.size,
+      })
       .select()
       .single()
 
     if (dbError) {
       console.error('[v0] Error logging image to database:', dbError)
-      // If we can't log to DB, at least return the blob URL
+      // If we can't log to DB, at least return the storage URL
       return NextResponse.json({
-        id: `temp-${timestamp}`,
-        url: blob.url,
+        id: `temp-${Date.now()}`,
+        url: imageUrl,
         filename: file.name,
         width: null,
         height: null,
@@ -106,10 +101,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: imageRecord.id,
       url: imageRecord.url,
-      filename: file.name,
+      filename: imageRecord.filename,
       width: null,
       height: null,
-      size_bytes: file.size,
+      size_bytes: imageRecord.size_bytes,
     })
   } catch (error) {
     console.error('[v0] Image upload error:', error)
