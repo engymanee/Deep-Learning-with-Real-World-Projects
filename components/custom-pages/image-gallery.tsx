@@ -45,6 +45,7 @@ export function ImageGallery({
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.currentTarget.files?.[0]
+    const inputElement = e.currentTarget
     setError(null)
     setSuccess(null)
 
@@ -54,13 +55,20 @@ export function ImageGallery({
       console.log('[v0] Starting file upload:', file.name)
       await onUpload(file)
       setSuccess(`Image ${file.name} uploaded successfully!`)
-      e.currentTarget.value = ''
+      // Clear the input value safely
+      if (inputElement) {
+        inputElement.value = ''
+      }
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed'
       console.error('[v0] Upload failed:', message)
       setError(message)
+      // Clear the input value safely on error too
+      if (inputElement) {
+        inputElement.value = ''
+      }
     }
   }
 
