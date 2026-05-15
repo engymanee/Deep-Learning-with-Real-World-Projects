@@ -56,85 +56,93 @@ function buildUserFromProfile(
  * `preview` marker - so the rest of the app renders fellow-side UI.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) return null
+    if (!user) return null
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select(
-      'id, full_name, email, title, avatar_url, role, school_id, deactivated_at, cohort, schools(name)',
-    )
-    .eq('id', user.id)
-    .maybeSingle<ProfileRow>()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select(
+        'id, full_name, email, title, avatar_url, role, school_id, deactivated_at, cohort, schools(name)',
+      )
+      .eq('id', user.id)
+      .maybeSingle<ProfileRow>()
 
-  // No profile row yet - minimal fallback so the UI can still render.
-  if (!profile) {
-    return {
-      id: user.id,
-      email: user.email ?? '',
-      fullName:
-        (user.user_metadata?.full_name as string | undefined) ??
-        (user.email ?? 'Unknown User'),
-      role: 'fellow',
-      schoolName: '',
-    }
-  }
-
-  // Admins may be in a preview session impersonating a fellow.
-  if (profile.role === 'admin') {
-    const preview = await readPreviewCookie()
-    if (preview) {
-      const meta: Omit<PreviewMeta, 'label' | 'mode'> = {
-        actualAdminId: profile.id,
-        actualAdminName: profile.full_name ?? user.email ?? 'Admin',
-      }
-
-      if (preview.type === 'by_fellow') {
-        const { data: target } = await supabase
-          .from('profiles')
-          .select(
-            'id, full_name, email, title, avatar_url, role, school_id, deactivated_at, cohort, schools(name)',
-          )
-          .eq('id', preview.fellowId)
-          .maybeSingle<ProfileRow>()
-
-        if (target && target.role === 'fellow') {
-          return buildUserFromProfile(target, target.email ?? '', {
-            ...meta,
-            mode: 'by_fellow',
-            label: target.full_name ?? target.email ?? 'Fellow',
-          })
-        }
-        // Falls through if the target is missing or no longer a fellow.
-      }
-
-      if (preview.type === 'by_cohort') {
-        // Synthesize a generic fellow in the requested cohort. No real
-        // ID, no progress, no school - just enough for cohort gating.
-        const synthetic: CurrentUser = {
-          id: '__preview__',
-          email: profile.email ?? user.email ?? '',
-          fullName: `Cohort ${preview.cohort} preview`,
-          role: 'fellow',
-          schoolName: '',
-          cohort: preview.cohort,
-          preview: {
-            ...meta,
-            mode: 'by_cohort',
-            label: `Cohort ${preview.cohort}`,
-          },
-        }
-        return synthetic
+    // No profile row yet - minimal fallback so the UI can still render.
+    if (!profile) {
+      return {
+        id: user.id,
+        email: user.email ?? '',
+        fullName:
+          (user.user_metadata?.full_name as string | undefined) ??
+          (user.email ?? 'Unknown User'),
+        role: 'fellow',
+        schoolName: '',
       }
     }
-  }
 
-  return buildUserFromProfile(profile, user.email ?? '')
+    // Admins may be in a preview session impersonating a fellow.
+    if (profile.role === 'admin') {
+      const preview = await readPreviewCookie()
+      if (preview) {
+        const meta: Omit<PreviewMeta, 'label' | 'mode'> = {
+          actualAdminId: profile.id,
+          actualAdminName: profile.full_name ?? user.email ?? 'Admin',
+        }
+
+        if (preview.type === 'by_fellow') {
+          const { data: target } = await supabase
+            .from('profiles')
+            .select(
+              'id, full_name, email, title, avatar_url, role, school_id, deactivated_at, cohort, schools(name)',
+            )
+            .eq('id', preview.fellowId)
+            .maybeSingle<ProfileRow>()
+
+          if (target && target.role === 'fellow') {
+            return buildUserFromProfile(target, target.email ?? '', {
+              ...meta,
+              mode: 'by_fellow',
+              label: target.full_name ?? target.email ?? 'Fellow',
+            })
+          }
+          // Falls through if the target is missing or no longer a fellow.
+        }
+
+        if (preview.type === 'by_cohort') {
+          // Synthesize a generic fellow in the requested cohort. No real
+          // ID, no progress, no school - just enough for cohort gating.
+          const synthetic: CurrentUser = {
+            id: '__preview__',
+            email: profile.email ?? user.email ?? '',
+            fullName: `Cohort ${preview.cohort} preview`,
+            role: 'fellow',
+            schoolName: '',
+            cohort: preview.cohort,
+            preview: {
+              ...meta,
+              mode: 'by_cohort',
+              label: `Cohort ${preview.cohort}`,
+            },
+          }
+          return synthetic
+        }
+      }
+    }
+
+    return buildUserFromProfile(profile, user.email ?? '')
+  } catch (error) {
+    // If Supabase client initialization fails (e.g., missing env vars or during build),
+    // log the error and return null. This allows the app to render without crashing
+    // even if Supabase is temporarily unavailable.
+    console.error('[v0] Error in getCurrentUser:', error instanceof Error ? error.message : String(error))
+    return null
+  }
 })
 
 /** Server-side guard: redirect to /auth/login if unauthenticated. */

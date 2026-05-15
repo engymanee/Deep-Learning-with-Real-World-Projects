@@ -47,21 +47,32 @@ export default function AcceptInvitePage() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const supabase = createClient()
-      const { data } = await supabase.auth.getUser()
-      if (cancelled) return
-      if (!data.user) {
-        setBootstrapError(
-          'Your invite link is no longer valid. Ask your program admin to resend it.',
-        )
+      try {
+        const supabase = createClient()
+        const { data } = await supabase.auth.getUser()
+        if (cancelled) return
+        if (!data.user) {
+          setBootstrapError(
+            'Your invite link is no longer valid. Ask your program admin to resend it.',
+          )
+          setBootstrapped(true)
+          return
+        }
+        const meta = (data.user.user_metadata ?? {}) as { full_name?: string }
+        const first = meta.full_name?.trim().split(/\s+/)[0] ?? null
+        setFirstName(first)
+        setEmail(data.user.email ?? null)
         setBootstrapped(true)
-        return
+      } catch (err) {
+        // If Supabase client creation fails (e.g., during build or with missing env vars),
+        // set a bootstrap error. This is safe because useEffect only runs on client-side.
+        if (!cancelled) {
+          setBootstrapError(
+            'Unable to initialize. Please refresh the page.',
+          )
+          setBootstrapped(true)
+        }
       }
-      const meta = (data.user.user_metadata ?? {}) as { full_name?: string }
-      const first = meta.full_name?.trim().split(/\s+/)[0] ?? null
-      setFirstName(first)
-      setEmail(data.user.email ?? null)
-      setBootstrapped(true)
     })()
     return () => {
       cancelled = true

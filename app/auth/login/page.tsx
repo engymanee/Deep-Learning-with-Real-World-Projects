@@ -124,11 +124,11 @@ function LoginForm() {
 
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
     try {
+      const supabase = createClient()
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       // `router.replace` (instead of `push`) keeps /auth/login out of

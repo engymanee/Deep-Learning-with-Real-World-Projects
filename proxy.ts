@@ -1,4 +1,4 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/proxy'
 
 /**
@@ -13,8 +13,16 @@ import { updateSession } from '@/lib/supabase/proxy'
  * Auth enforcement still also happens inside `requireUser()` per page
  * as a second line of defense - the proxy is for performance, not
  * primary authorization.
+ * 
+ * Note: Cron routes are exempted from session refresh and allowed to pass through
+ * with their own Authorization header validation.
  */
 export async function proxy(request: NextRequest): Promise<Response> {
+  // Skip session update for cron routes - they have their own auth via CRON_SECRET
+  if (request.nextUrl.pathname.startsWith('/api/cron/')) {
+    return NextResponse.next()
+  }
+  
   return await updateSession(request)
 }
 
