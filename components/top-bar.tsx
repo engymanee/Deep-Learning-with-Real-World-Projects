@@ -24,7 +24,7 @@ interface TopBarProps {
   customPages?: CustomPage[]
 }
 
-export function TopBar({ customPages = [] }: TopBarProps) {
+export function TopBar({ customPages: initialCustomPages = [] }: TopBarProps) {
   const { user } = useMaybeUser()
   const router = useRouter()
   const [editingLabel, setEditingLabel] = useState<string | null>(null)
@@ -35,6 +35,7 @@ export function TopBar({ customPages = [] }: TopBarProps) {
     library: 'Library',
     community: 'Community',
   })
+  const [customPages, setCustomPages] = useState<CustomPage[]>(initialCustomPages)
   const [isLoading, setIsLoading] = useState(true)
 
   // Load labels from API on mount
@@ -60,6 +61,23 @@ export function TopBar({ customPages = [] }: TopBarProps) {
 
     loadLabels()
   }, [])
+
+  // Fetch custom pages when user changes (e.g., after login/logout or role change)
+  useEffect(() => {
+    const loadCustomPages = async () => {
+      try {
+        const response = await fetch('/api/custom-pages?menu=true')
+        if (response.ok) {
+          const pages = await response.json()
+          setCustomPages(Array.isArray(pages) ? pages : [])
+        }
+      } catch (error) {
+        console.error('[v0] Error loading custom pages:', error)
+      }
+    }
+
+    loadCustomPages()
+  }, [user?.id, user?.role])
 
   const handleSignOut = async () => {
     const supabase = createClient()
