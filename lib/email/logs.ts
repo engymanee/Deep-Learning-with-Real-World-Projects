@@ -1,85 +1,23 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import type { EmailLogEntry } from '@/lib/email/types'
+import { createAdminClient } from '@/lib/supabase/admin'
 
-/**
- * Log an email send attempt to the email_logs table.
- * Called after attempting to send an email via Resend.
- */
-export async function logEmail(data: {
-  recipientEmail: string
-  recipientName?: string | null
+export interface EmailLogEntry {
+  id: string
+  type: 'invitation' | 'notification'
+  recipient_email: string
+  recipient_name: string | null
   subject: string
-  emailType: 'invitation' | 'notification' | 'scheduling' | 'announcement' | 'other'
-  status: 'pending' | 'sent' | 'failed' | 'bounced'
-  resendId?: string | null
-  errorMessage?: string | null
-  sentAt?: string | null
-  metadata?: Record<string, any> | null
-}): Promise<void> {
-  try {
-    const supabase = await createClient()
-    
-    const { error } = await supabase.from('email_logs').insert({
-      recipient_email: data.recipientEmail,
-      recipient_name: data.recipientName ?? null,
-      subject: data.subject,
-      email_type: data.emailType,
-      status: data.status,
-      resend_id: data.resendId ?? null,
-      error_message: data.errorMessage ?? null,
-      sent_at: data.sentAt,
-      metadata: data.metadata ?? null,
-    })
-
-    if (error) {
-      console.error('[v0] Failed to log email:', error.message)
-    }
-  } catch (err) {
-    console.error('[v0] Exception logging email:', err)
-  }
-}
-
-/**
- * Update an email log entry status (e.g., from pending to sent or failed).
- */
-export async function updateEmailLogStatus(
-  emailLogId: string,
-  status: 'sent' | 'failed' | 'bounced',
-  updates?: {
-    resendId?: string
-    errorMessage?: string
-    sentAt?: string
-  }
-): Promise<void> {
-  try {
-    const supabase = await createClient()
-    
-    const updateData: any = {
-      status,
-      updated_at: new Date().toISOString(),
-    }
-    
-    if (updates?.resendId) updateData.resend_id = updates.resendId
-    if (updates?.errorMessage) updateData.error_message = updates.errorMessage
-    if (updates?.sentAt) updateData.sent_at = updates.sentAt
-
-    const { error } = await supabase
-      .from('email_logs')
-      .update(updateData)
-      .eq('id', emailLogId)
-
-    if (error) {
-      console.error('[v0] Failed to update email log:', error.message)
-    }
-  } catch (err) {
-    console.error('[v0] Exception updating email log:', err)
-  }
+  status: 'sent' | 'failed' | 'pending'
+  error_message: string | null
+  provider_id: string | null
+  sent_at: string | null
+  created_at: string
 }
 
 /**
  * Get email logs from the past week, with pagination.
+ * Combines invitations and notification_recipients for a unified view.
  */
 export async function getRecentEmailLogs(
   page: number = 1,
@@ -89,26 +27,82 @@ export async function getRecentEmailLogs(
   total: number
   pageCount: number
 }> {
-  const supabase = await createClient()
-  const oneWeekAgo = new Date()
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+  const admin = createAdminClient()
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data, count, error } = await supabase
-    .from('email_logs')
-    .select('*', { count: 'exact' })
-    .gte('created_at', oneWeekAgo.toISOString())
-    .order('created_at', { ascending: false })
-    .range((page - 1) * pageSize, page * pageSize - 1)
+  try {
+    // Query both invitations and notification_recipients
+    const [invitations, notifications] = await Promise.all([
+      admin
+        .from('invitations')
+        .select('id, email, full_name, status, last_error, email_provider_id, last_sent_at, created_at')
+        .gte('created_at', oneWeekAgo)
+        .order('created_at', { ascending: false }),
+      admin
+        .from('notification_recipients')
+        .select('id, email, email_status, email_error, email_provider_id, email_sent_at, created_at')
+        .gte('created_at', oneWeekAgo)
+        .order('created_at', { ascending: false }),
+    ])
 
-  if (error) {
-    console.error('[v0] Failed to fetch email logs:', error.message)
+    if (invitations.error) throw invitations.error
+    if (notifications.error) throw notifications.error
+
+    const logs: EmailLogEntry[] = []
+
+    // Map invitations
+    if (invitations.data) {
+      logs.push(
+        ...invitations.data.map((row: any) => ({
+          id: row.id,
+          type: 'invitation' as const,
+          recipient_email: row.email,
+          recipient_name: row.full_name,
+          subject: 'Invitation',
+          status: (row.status === 'sent' ? 'sent' : row.status === 'failed' ? 'failed' : 'pending') as 'sent' | 'failed' | 'pending',
+          error_message: row.last_error,
+          provider_id: row.email_provider_id,
+          sent_at: row.last_sent_at,
+          created_at: row.created_at,
+        }))
+      )
+    }
+
+    // Map notification recipients
+    if (notifications.data) {
+      logs.push(
+        ...notifications.data.map((row: any) => ({
+          id: row.id,
+          type: 'notification' as const,
+          recipient_email: row.email,
+          recipient_name: null,
+          subject: 'Notification',
+          status: (row.email_status === 'sent' ? 'sent' : row.email_status === 'failed' ? 'failed' : 'pending') as 'sent' | 'failed' | 'pending',
+          error_message: row.email_error,
+          provider_id: row.email_provider_id,
+          sent_at: row.email_sent_at,
+          created_at: row.created_at,
+        }))
+      )
+    }
+
+    // Sort by created_at descending
+    logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    // Paginate
+    const total = logs.length
+    const pageCount = Math.ceil(total / pageSize)
+    const start = (page - 1) * pageSize
+    const end = start + pageSize
+
+    return {
+      logs: logs.slice(start, end),
+      total,
+      pageCount,
+    }
+  } catch (err) {
+    console.error('[v0] Failed to fetch email logs:', err)
     return { logs: [], total: 0, pageCount: 0 }
-  }
-
-  return {
-    logs: (data as EmailLogEntry[]) ?? [],
-    total: count ?? 0,
-    pageCount: Math.ceil((count ?? 0) / pageSize),
   }
 }
 
@@ -116,22 +110,70 @@ export async function getRecentEmailLogs(
  * Get failed emails from the past week for retry.
  */
 export async function getFailedEmailsForRetry(limit: number = 50): Promise<EmailLogEntry[]> {
-  const supabase = await createClient()
-  const oneWeekAgo = new Date()
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+  const admin = createAdminClient()
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data, error } = await supabase
-    .from('email_logs')
-    .select('*')
-    .eq('status', 'failed')
-    .gte('created_at', oneWeekAgo.toISOString())
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  try {
+    const [failedInvitations, failedNotifications] = await Promise.all([
+      admin
+        .from('invitations')
+        .select('id, email, full_name, status, last_error, email_provider_id, last_sent_at, created_at')
+        .eq('status', 'failed')
+        .gte('created_at', oneWeekAgo)
+        .order('last_sent_at', { ascending: true })
+        .limit(limit),
+      admin
+        .from('notification_recipients')
+        .select('id, email, email_status, email_error, email_provider_id, email_sent_at, created_at')
+        .eq('email_status', 'failed')
+        .gte('created_at', oneWeekAgo)
+        .order('email_sent_at', { ascending: true })
+        .limit(limit),
+    ])
 
-  if (error) {
-    console.error('[v0] Failed to fetch failed emails:', error.message)
+    if (failedInvitations.error) throw failedInvitations.error
+    if (failedNotifications.error) throw failedNotifications.error
+
+    const logs: EmailLogEntry[] = []
+
+    if (failedInvitations.data) {
+      logs.push(
+        ...failedInvitations.data.map((row: any) => ({
+          id: row.id,
+          type: 'invitation' as const,
+          recipient_email: row.email,
+          recipient_name: row.full_name,
+          subject: 'Invitation',
+          status: 'failed' as const,
+          error_message: row.last_error,
+          provider_id: row.email_provider_id,
+          sent_at: row.last_sent_at,
+          created_at: row.created_at,
+        }))
+      )
+    }
+
+    if (failedNotifications.data) {
+      logs.push(
+        ...failedNotifications.data.map((row: any) => ({
+          id: row.id,
+          type: 'notification' as const,
+          recipient_email: row.email,
+          recipient_name: null,
+          subject: 'Notification',
+          status: 'failed' as const,
+          error_message: row.email_error,
+          provider_id: row.email_provider_id,
+          sent_at: row.email_sent_at,
+          created_at: row.created_at,
+        }))
+      )
+    }
+
+    return logs.sort((a, b) => new Date(b.sent_at || 0).getTime() - new Date(a.sent_at || 0).getTime()).slice(0, limit)
+  } catch (err) {
+    console.error('[v0] Failed to fetch failed emails:', err)
     return []
   }
-
-  return (data as EmailLogEntry[]) ?? []
 }
+
