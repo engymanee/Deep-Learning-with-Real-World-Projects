@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidateTag } from 'next/cache'
+import { revalidatePath } from 'next/cache'
 import type { CustomPage, PageBlock } from '@/lib/custom-pages/types'
 
 /**
@@ -134,7 +135,15 @@ export async function updateCustomPage(
 
     if (error) throw error
 
+    // Invalidate cache for both admin and public pages
     revalidateTag('custom-pages', 'max')
+    // Revalidate the public page route if it was published/unpublished
+    if (page?.slug) {
+      revalidatePath(`/pages/${page.slug}`)
+    }
+    // Revalidate the pages list layout which shows in the menu
+    revalidatePath('/', 'layout')
+
     return { success: true, page: page as CustomPage }
   } catch (err) {
     console.error('[v0] Failed to update custom page:', err)
@@ -149,11 +158,26 @@ export async function deleteCustomPage(pageId: string) {
   const admin = createAdminClient()
 
   try {
+    // Fetch the page first to get the slug for revalidation
+    const { data: page } = await admin
+      .from('custom_pages')
+      .select('slug')
+      .eq('id', pageId)
+      .single()
+
     const { error } = await admin.from('custom_pages').delete().eq('id', pageId)
 
     if (error) throw error
 
+    // Invalidate cache
     revalidateTag('custom-pages', 'max')
+    // Revalidate the deleted page route
+    if (page?.slug) {
+      revalidatePath(`/pages/${page.slug}`)
+    }
+    // Revalidate the pages list layout which shows in the menu
+    revalidatePath('/', 'layout')
+
     return { success: true }
   } catch (err) {
     console.error('[v0] Failed to delete custom page:', err)

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
+import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
@@ -11,37 +12,41 @@ export async function GET() {
       .select('*')
       .limit(1)
 
+    const defaultLabels = {
+      dashboard: 'Dashboard',
+      about: 'About',
+      library: 'Library',
+      community: 'Community',
+    }
+
     if (error) {
       console.error('[v0] Error fetching navigation labels:', error)
-      // Return defaults if any error
-      return Response.json({
-        dashboard: 'Dashboard',
-        about: 'About',
-        library: 'Library',
-        community: 'Community',
-      })
+      const response = NextResponse.json(defaultLabels)
+      response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+      return response
     }
 
     // If we have data, return the first row
     if (data && data.length > 0) {
-      return Response.json(data[0])
+      const response = NextResponse.json(data[0])
+      response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+      return response
     }
 
     // Return defaults if empty
-    return Response.json({
-      dashboard: 'Dashboard',
-      about: 'About',
-      library: 'Library',
-      community: 'Community',
-    })
+    const response = NextResponse.json(defaultLabels)
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+    return response
   } catch (error) {
     console.error('[v0] Error in navigation labels GET:', error)
-    return Response.json({
+    const response = NextResponse.json({
       dashboard: 'Dashboard',
       about: 'About',
       library: 'Library',
       community: 'Community',
     })
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+    return response
   }
 }
 

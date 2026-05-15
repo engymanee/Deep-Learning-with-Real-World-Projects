@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 /**
  * GET /api/custom-pages
  * List published custom pages, optionally filtered for menu display
+ * Cache is kept short (10 seconds) to ensure quick updates when pages are published
  */
 export async function GET(request: Request) {
   try {
@@ -28,7 +29,10 @@ export async function GET(request: Request) {
       return NextResponse.json([])
     }
 
-    return NextResponse.json(pages || [])
+    // Set cache headers: revalidate every 10 seconds to ensure updates appear quickly
+    const response = NextResponse.json(pages || [])
+    response.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30')
+    return response
   } catch (error) {
     console.error('[v0] Error in custom pages API:', error)
     return NextResponse.json([])
