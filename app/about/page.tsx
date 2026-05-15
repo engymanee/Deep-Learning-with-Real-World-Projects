@@ -29,9 +29,9 @@ async function seedAboutPageIfNeeded(supabase: any) {
     const { data: page, error: pageError } = await supabase
       .from('custom_pages')
       .insert({
-        title: 'About the WaW Fellows Portal',
+        title: 'About',
         slug: 'about',
-        description: 'Learn about the Wisdom at Work Fellowship Portal and the curriculum',
+        description: null,
         header1: null,
         header2: null,
         header3: null,
@@ -47,39 +47,77 @@ async function seedAboutPageIfNeeded(supabase: any) {
       return
     }
 
-    // Create the original About page blocks
+    // Create blocks matching the EXACT original layout:
+    // 1. Welcome header section (h1 + 2 paragraphs)
+    // 2. First image - team collaboration
+    // 3. Lorem Ipsum text (3 paragraphs)
+    // 4. Curriculum image section
+    // 5. Foundation logo section
     const blocks = [
+      // Block 1: Welcome header section (h1 + 2 paragraphs combined)
       {
         page_id: page.id,
         block_type: 'text',
         order_number: 1,
         title: null,
-        content: 'Welcome to the Wisdom at Work Fellows\' Portal',
-        metadata: { heading: true, size: 'large' },
+        content: 'Welcome to the Wisdom at Work Fellows\' Portal\n\nCongratulations and welcome to the Wisdom at Work Fellowship!\n\nThis site is your dashboard for the WAW Syllabus, Learning Journals, Additional Resources.',
+        metadata: {
+          format: 'header_section',
+        },
       },
+      // Block 2: First image - team collaboration
       {
         page_id: page.id,
-        block_type: 'text',
+        block_type: 'image',
         order_number: 2,
         title: null,
-        content: 'Congratulations and welcome to the Wisdom at Work Fellowship!',
-        metadata: { size: 'medium' },
+        content: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-yk9hNgyQQIeZ2sMEpmaQzrCr1BlN8x.png',
+        metadata: {
+          alt: 'Wisdom at Work Fellows in collaborative discussion',
+          className: 'w-full rounded-lg shadow-md',
+          section: 'bg-background',
+          containerClass: 'py-8 sm:py-12'
+        },
       },
+      // Block 3: Lorem Ipsum placeholder text (3 paragraphs)
       {
         page_id: page.id,
         block_type: 'text',
         order_number: 3,
         title: null,
-        content: 'This site is your dashboard for the WAW Syllabus, Learning Journals, Additional Resources.',
-        metadata: { size: 'small' },
+        content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\n\nSed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.',
+        metadata: {
+          format: 'prose_section',
+        },
       },
+      // Block 4: Curriculum structure image (centered, 2/3 width)
       {
         page_id: page.id,
-        block_type: 'text',
+        block_type: 'image',
         order_number: 4,
         title: null,
-        content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
-        metadata: {},
+        content: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-Q4wysyC8JWLi02dGNyrSqptIHF6gYQ.png',
+        metadata: {
+          alt: 'Wisdom at Work Three-Year Curriculum Structure',
+          className: 'w-2/3 rounded-lg shadow-md mx-auto',
+          section: 'bg-background',
+          containerClass: 'py-8 sm:py-12 text-center text-sm'
+        },
+      },
+      // Block 5: Foundation logo section
+      {
+        page_id: page.id,
+        block_type: 'image',
+        order_number: 5,
+        title: null,
+        content: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-kCoiFTogFnqrrOloeNsvOSi9SOMEDN.png',
+        metadata: {
+          alt: 'John Templeton Foundation',
+          className: 'h-32 w-auto inline-block',
+          section: 'border-t border-border bg-card',
+          containerClass: 'py-12 sm:py-16 text-center',
+          style: { fontSize: '20px' }
+        },
       },
     ]
 

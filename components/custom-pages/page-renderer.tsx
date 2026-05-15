@@ -126,21 +126,58 @@ function RenderBlock({ block }: RenderBlockProps) {
 
   switch (block.block_type) {
     case 'text': {
-      // Check if this is a heading based on metadata
-      const isHeading = metadata.heading
+      const format = metadata.format
       const size = metadata.size
-
-      if (isHeading && size === 'large') {
+      
+      // Special format: header section (welcome section with h1 + 2 paragraphs)
+      if (format === 'header_section') {
+        const lines = (block.content || '').split('\n\n').filter(Boolean)
+        const [h1, p1, p2] = lines
+        
         return (
           <section className="border-b border-border bg-card">
             <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
               <div className="space-y-6">
                 <div>
-                  <h2 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4 text-center">
-                    {block.content}
-                  </h2>
+                  <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4 text-center">
+                    {h1}
+                  </h1>
+                  <p className="text-lg text-foreground font-medium mb-3 text-center">
+                    {p1}
+                  </p>
+                  <p className="text-base text-muted-foreground leading-relaxed text-center">
+                    {p2}
+                  </p>
                 </div>
               </div>
+            </div>
+          </section>
+        )
+      }
+      
+      // Special format: prose section (multiple paragraphs)
+      if (format === 'prose_section') {
+        return (
+          <section className="border-b border-border bg-card">
+            <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
+              <div className="prose prose-sm max-w-none space-y-4 text-muted-foreground">
+                {(block.content || '').split('\n\n').map((paragraph, idx) => (
+                  <p key={idx}>{paragraph}</p>
+                ))}
+              </div>
+            </div>
+          </section>
+        )
+      }
+
+      // Size-based text rendering (for backward compatibility)
+      if (size === 'large') {
+        return (
+          <section className="border-b border-border bg-card">
+            <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
+              <h2 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4 text-center">
+                {block.content}
+              </h2>
             </div>
           </section>
         )
@@ -148,13 +185,9 @@ function RenderBlock({ block }: RenderBlockProps) {
         return (
           <section className="border-b border-border bg-card">
             <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-              <div className="space-y-6">
-                <div>
-                  <p className="text-lg text-foreground font-medium mb-3 text-center">
-                    {block.content}
-                  </p>
-                </div>
-              </div>
+              <p className="text-lg text-foreground font-medium mb-3 text-center">
+                {block.content}
+              </p>
             </div>
           </section>
         )
@@ -190,18 +223,24 @@ function RenderBlock({ block }: RenderBlockProps) {
       }
     }
 
-    case 'image':
+    case 'image': {
+      const containerClass = metadata.containerClass || 'py-8 sm:py-12'
+      const imageClass = metadata.className || 'w-full rounded-lg shadow-md'
+      const sectionClass = metadata.section || 'bg-background'
+      
       return (
-        <section className="bg-background">
-          <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
+        <section className={sectionClass}>
+          <div className={`mx-auto max-w-4xl px-4 ${containerClass}`}>
             <img
               src={block.content || ''}
               alt={metadata.alt || 'Page image'}
-              className="w-full rounded-lg shadow-md"
+              className={imageClass}
+              style={metadata.style}
             />
           </div>
         </section>
       )
+    }
 
     default:
       return null
