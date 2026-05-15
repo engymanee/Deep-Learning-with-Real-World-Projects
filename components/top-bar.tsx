@@ -68,7 +68,9 @@ export function TopBar({ customPages = [] }: TopBarProps) {
     router.refresh()
   }
 
-  const handleEditStart = (key: string, currentLabel: string) => {
+  const handleEditStart = (key: string, currentLabel: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     setEditingLabel(key)
     setEditValue(currentLabel)
   }
@@ -94,6 +96,7 @@ export function TopBar({ customPages = [] }: TopBarProps) {
       if (response.ok) {
         const data = await response.json()
         setLabels(newLabels)
+        console.log('[v0] Navigation labels updated successfully')
       } else {
         console.error('[v0] Failed to save navigation label')
       }
@@ -105,7 +108,11 @@ export function TopBar({ customPages = [] }: TopBarProps) {
     setEditValue('')
   }
 
-  const handleEditCancel = () => {
+  const handleEditCancel = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     setEditingLabel(null)
     setEditValue('')
   }
@@ -146,27 +153,30 @@ export function TopBar({ customPages = [] }: TopBarProps) {
                 <Check className="h-4 w-4 text-green-300" />
               </button>
               <button
-                onClick={handleEditCancel}
+                onClick={(e) => handleEditCancel(e)}
                 className="p-1 hover:bg-primary-light rounded"
               >
                 <X className="h-4 w-4 text-red-300" />
               </button>
             </div>
           ) : (
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1 group/nav"
-            >
-              {labels.dashboard}
+            <div className="flex items-center gap-1 group/nav">
+              <Link
+                href="/dashboard"
+                className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+              >
+                {labels.dashboard}
+              </Link>
               {user?.role === 'admin' && (
                 <button
-                  onClick={() => handleEditStart('dashboard', labels.dashboard)}
-                  className="opacity-0 group-hover/nav:opacity-100 hover:bg-primary-light p-0.5 rounded transition-opacity"
+                  onClick={(e) => handleEditStart('dashboard', labels.dashboard, e)}
+                  className="p-0.5 hover:bg-primary-light rounded transition-opacity"
+                  title="Edit label"
                 >
-                  <Edit2 className="h-3 w-3" />
+                  <Edit2 className="h-3 w-3 text-white/60" />
                 </button>
               )}
-            </Link>
+            </div>
           )}
         </div>
 
@@ -187,27 +197,30 @@ export function TopBar({ customPages = [] }: TopBarProps) {
                 <Check className="h-4 w-4 text-green-300" />
               </button>
               <button
-                onClick={handleEditCancel}
+                onClick={(e) => handleEditCancel(e)}
                 className="p-1 hover:bg-primary-light rounded"
               >
                 <X className="h-4 w-4 text-red-300" />
               </button>
             </div>
           ) : (
-            <Link
-              href="/about"
-              className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1 group/nav"
-            >
-              {labels.about}
+            <div className="flex items-center gap-1 group/nav">
+              <Link
+                href="/about"
+                className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+              >
+                {labels.about}
+              </Link>
               {user?.role === 'admin' && (
                 <button
-                  onClick={() => handleEditStart('about', labels.about)}
-                  className="opacity-0 group-hover/nav:opacity-100 hover:bg-primary-light p-0.5 rounded transition-opacity"
+                  onClick={(e) => handleEditStart('about', labels.about, e)}
+                  className="p-0.5 hover:bg-primary-light rounded transition-opacity"
+                  title="Edit label"
                 >
-                  <Edit2 className="h-3 w-3" />
+                  <Edit2 className="h-3 w-3 text-white/60" />
                 </button>
               )}
-            </Link>
+            </div>
           )}
         </div>
 
@@ -228,27 +241,30 @@ export function TopBar({ customPages = [] }: TopBarProps) {
                 <Check className="h-4 w-4 text-green-300" />
               </button>
               <button
-                onClick={handleEditCancel}
+                onClick={(e) => handleEditCancel(e)}
                 className="p-1 hover:bg-primary-light rounded"
               >
                 <X className="h-4 w-4 text-red-300" />
               </button>
             </div>
           ) : (
-            <Link
-              href="/resources"
-              className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1 group/nav"
-            >
-              {labels.library}
+            <div className="flex items-center gap-1 group/nav">
+              <Link
+                href="/resources"
+                className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+              >
+                {labels.library}
+              </Link>
               {user?.role === 'admin' && (
                 <button
-                  onClick={() => handleEditStart('library', labels.library)}
-                  className="opacity-0 group-hover/nav:opacity-100 hover:bg-primary-light p-0.5 rounded transition-opacity"
+                  onClick={(e) => handleEditStart('library', labels.library, e)}
+                  className="p-0.5 hover:bg-primary-light rounded transition-opacity"
+                  title="Edit label"
                 >
-                  <Edit2 className="h-3 w-3" />
+                  <Edit2 className="h-3 w-3 text-white/60" />
                 </button>
               )}
-            </Link>
+            </div>
           )}
         </div>
 
@@ -269,27 +285,30 @@ export function TopBar({ customPages = [] }: TopBarProps) {
                 <Check className="h-4 w-4 text-green-300" />
               </button>
               <button
-                onClick={handleEditCancel}
+                onClick={(e) => handleEditCancel(e)}
                 className="p-1 hover:bg-primary-light rounded"
               >
                 <X className="h-4 w-4 text-red-300" />
               </button>
             </div>
           ) : (
-            <Link
-              href="/community"
-              className="text-sm font-medium text-white/80 hover:text-white transition-colors flex items-center gap-1 group/nav"
-            >
-              {labels.community}
+            <div className="flex items-center gap-1 group/nav">
+              <Link
+                href="/community"
+                className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+              >
+                {labels.community}
+              </Link>
               {user?.role === 'admin' && (
                 <button
-                  onClick={() => handleEditStart('community', labels.community)}
-                  className="opacity-0 group-hover/nav:opacity-100 hover:bg-primary-light p-0.5 rounded transition-opacity"
+                  onClick={(e) => handleEditStart('community', labels.community, e)}
+                  className="p-0.5 hover:bg-primary-light rounded transition-opacity"
+                  title="Edit label"
                 >
-                  <Edit2 className="h-3 w-3" />
+                  <Edit2 className="h-3 w-3 text-white/60" />
                 </button>
               )}
-            </Link>
+            </div>
           )}
         </div>
 

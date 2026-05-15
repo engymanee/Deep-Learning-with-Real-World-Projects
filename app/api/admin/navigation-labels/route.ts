@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 
 export async function GET() {
   try {
@@ -65,7 +66,10 @@ export async function PUT(request: Request) {
       !labels.library ||
       !labels.community
     ) {
-      return Response.json({ error: 'All labels are required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'All labels are required' },
+        { status: 400 }
+      )
     }
 
     // Get existing record
@@ -117,10 +121,16 @@ export async function PUT(request: Request) {
     }
 
     console.log('[v0] Successfully saved labels:', result.data)
-    return Response.json(result.data)
+    
+    // Revalidate cache for navigation labels
+    revalidateTag('navigation-labels')
+
+    const response = NextResponse.json(result.data)
+    response.headers.set('Cache-Control', 'no-store')
+    return response
   } catch (error) {
     console.error('[v0] Error in navigation labels PUT:', error)
-    return Response.json(
+    return NextResponse.json(
       { error: 'Failed to update navigation labels' },
       { status: 500 }
     )
