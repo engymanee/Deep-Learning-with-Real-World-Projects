@@ -83,7 +83,7 @@ export async function createCustomPage(data: { title: string; slug: string; desc
 
     if (error) throw error
 
-    revalidateTag('custom-pages')
+    revalidateTag('custom-pages', 'max')
     return { success: true, page: page as CustomPage }
   } catch (err) {
     console.error('[v0] Failed to create custom page:', err)
@@ -118,7 +118,7 @@ export async function updateCustomPage(
 
     if (error) throw error
 
-    revalidateTag('custom-pages')
+    revalidateTag('custom-pages', 'max')
     return { success: true, page: page as CustomPage }
   } catch (err) {
     console.error('[v0] Failed to update custom page:', err)
@@ -137,7 +137,7 @@ export async function deleteCustomPage(pageId: string) {
 
     if (error) throw error
 
-    revalidateTag('custom-pages')
+    revalidateTag('custom-pages', 'max')
     return { success: true }
   } catch (err) {
     console.error('[v0] Failed to delete custom page:', err)
@@ -166,7 +166,7 @@ export async function addPageBlock(
 
     if (error) throw error
 
-    revalidateTag('custom-pages')
+    revalidateTag('custom-pages', 'max')
     return { success: true, block: data as PageBlock }
   } catch (err) {
     console.error('[v0] Failed to add page block:', err)
@@ -196,7 +196,7 @@ export async function updatePageBlock(
 
     if (error) throw error
 
-    revalidateTag('custom-pages')
+    revalidateTag('custom-pages', 'max')
     return { success: true, block: data as PageBlock }
   } catch (err) {
     console.error('[v0] Failed to update page block:', err)
@@ -215,7 +215,7 @@ export async function deletePageBlock(blockId: string) {
 
     if (error) throw error
 
-    revalidateTag('custom-pages')
+    revalidateTag('custom-pages', 'max')
     return { success: true }
   } catch (err) {
     console.error('[v0] Failed to delete page block:', err)
@@ -246,7 +246,7 @@ export async function reorderPageBlocks(pageId: string, blockIds: string[]) {
 
     await Promise.all(promises)
 
-    revalidateTag('custom-pages')
+    revalidateTag('custom-pages', 'max')
     return { success: true }
   } catch (err) {
     console.error('[v0] Failed to reorder page blocks:', err)
