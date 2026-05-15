@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-server'
 
@@ -195,6 +196,14 @@ export async function PATCH(request: NextRequest) {
       { error: error instanceof Error ? error.message : 'Failed to update page' },
       { status: 500 }
     )
+  } finally {
+    // Revalidate navigation and page caches whenever a page is updated
+    try {
+      revalidateTag('custom-pages')
+      revalidateTag('navigation')
+    } catch (e) {
+      console.warn('[v0] Revalidation failed:', e)
+    }
   }
 }
 

@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       }
 
       blob = await put(filename, file, {
-        access: 'private',
+        access: 'public',
         contentType: file.type,
         token,
       })

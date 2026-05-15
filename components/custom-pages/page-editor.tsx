@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Upload, GripVertical, Eye, EyeOff, AlertCircle, Link as LinkIcon, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -51,6 +51,7 @@ export function PageEditor({
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Track if there are unsaved changes
   useEffect(() => {
@@ -163,6 +164,25 @@ export function PageEditor({
   const getSelectedImage = (imageId: string | null) => {
     if (!imageId) return null
     return availableImages.find((img) => img.id === imageId)
+  }
+
+  const copyPageUrl = async () => {
+    if (!page.id || !slug) {
+      alert('Page must be saved before copying URL')
+      return
+    }
+
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://practicalwisdomproject.org'
+    const fullUrl = `${baseUrl}/pages/${slug}`
+
+    try {
+      await navigator.clipboard.writeText(fullUrl)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch (err) {
+      // Fallback: show URL in prompt if clipboard fails
+      prompt('Copy this URL:', fullUrl)
+    }
   }
 
   return (
@@ -306,6 +326,21 @@ export function PageEditor({
                 </>
               )}
             </Button>
+            {page.id && (
+              <Button
+                onClick={copyPageUrl}
+                variant="outline"
+                size="icon"
+                title="Copy page URL"
+                className="gap-2"
+              >
+                {linkCopied ? (
+                  <Copy className="h-4 w-4" />
+                ) : (
+                  <LinkIcon className="h-4 w-4" />
+                )}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

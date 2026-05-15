@@ -89,6 +89,9 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
         title: updates.title || page.title,
         slug: updates.slug || page.slug,
         description: updates.description || page.description,
+        header1: updates.header1 || page.header1,
+        header2: updates.header2 || page.header2,
+        header3: updates.header3 || page.header3,
         is_published: updates.is_published ?? page.is_published,
         show_in_menu: updates.show_in_menu ?? page.show_in_menu,
         blocks: updates.blocks || page.blocks,
@@ -114,6 +117,9 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
 
       if (isNewPage) {
         router.push(`/admin/custom-pages/${savedPage.id}`)
+      } else {
+        // Refresh to update UI and show publish button
+        router.refresh()
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save page'
@@ -136,7 +142,11 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
           title: page.title || 'Untitled Page',
           slug: page.slug || 'untitled-page',
           description: page.description || '',
+          header1: page.header1 || null,
+          header2: page.header2 || null,
+          header3: page.header3 || null,
           is_published: published,
+          show_in_menu: page.show_in_menu ?? true,
           blocks: page.blocks || [],
         }),
       })
@@ -151,6 +161,9 @@ export default function PageEditorPageClient({ params: paramPromise }: PageEdito
         ...updated,
         blocks: updated.page_blocks || page.blocks,
       })
+      
+      // Refresh to trigger revalidation and update navigation
+      router.refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update publish status'
       console.error('[v0] Error publishing:', message)

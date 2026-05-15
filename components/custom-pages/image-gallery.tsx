@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Upload, Trash2, Copy, Edit2, AlertCircle } from 'lucide-react'
+import { Upload, Trash2, Copy, Edit2, AlertCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -122,6 +122,14 @@ export function ImageGallery({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {isUploading && (
+          <div className="border-2 border-dashed border-primary rounded-lg p-8 text-center">
+            <Loader2 className="h-8 w-8 text-primary mx-auto mb-3 animate-spin" />
+            <p className="text-sm font-medium text-foreground">Uploading image...</p>
+            <p className="text-xs text-muted-foreground mt-1">Please wait while your image is being processed</p>
+          </div>
+        )}
+
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -135,7 +143,7 @@ export function ImageGallery({
           </Alert>
         )}
 
-        {images.length === 0 ? (
+        {!isUploading && images.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">
               No images uploaded yet. Upload one to get started.
