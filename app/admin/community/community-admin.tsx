@@ -445,7 +445,7 @@ function AddPostDialog() {
                 key={opt.value}
                 type="button"
                 size="sm"
-                variant={kind === opt.value ? 'default' : 'outline'}
+                variant={kind === opt.value ? 'primary' : 'outline'}
                 onClick={() => setKind(opt.value)}
               >
                 <FileText className="h-4 w-4" />
