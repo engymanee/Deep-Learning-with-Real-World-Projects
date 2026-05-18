@@ -38,54 +38,74 @@ export async function createSchedulingNotification(
   fellowIds: string[],
   adminId: string,
 ): Promise<void> {
-  if (fellowIds.length === 0) return
+  if (fellowIds.length === 0) {
+    console.log('[v0] createSchedulingNotification: No fellows provided')
+    return
+  }
+
+  console.log(`[v0] createSchedulingNotification: Starting for schedule ${scheduleId}, fellows: ${fellowIds.length}`)
 
   const supabase = await createClient()
 
   // Fetch fellow details including emails
-  const { data: fellows } = await supabase
+  const { data: fellows, error: fetchError } = await supabase
     .from('profiles')
     .select('id, full_name, email')
     .in('id', fellowIds)
+
+  if (fetchError) {
+    console.error('[v0] Error fetching fellows for notification:', fetchError)
+    return
+  }
 
   if (!fellows || fellows.length === 0) {
     console.log('[v0] No fellows found for scheduling notification:', fellowIds)
     return
   }
 
-  const votingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://leadership.app'}/schedule/${scheduleId}/vote`
+  console.log(`[v0] Found ${fellows.length} fellows to notify`)
 
-  // Send emails to all fellows
-  const emailPromises = fellows.map(async (fellow) => {
-    if (!fellow.email) {
-      console.warn(`[v0] Fellow ${fellow.id} (${fellow.full_name}) has no email address`)
-      return
-    }
+  const votingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://leadership.app'}/schedule/${scheduleId}`
+  console.log(`[v0] Voting URL: ${votingUrl}`)
 
-    try {
-      const result = await sendSchedulingInviteEmail(
-        fellow.email,
-        fellow.full_name,
-        scheduleTitle,
-        votingUrl,
-      )
-
-      if (result.ok) {
-        console.log(`[v0] Sent scheduling email to ${fellow.email} (id: ${result.id})`)
-      } else {
-        console.error(
-          `[v0] Failed to send scheduling email to ${fellow.email}:`,
-          result.error,
-        )
+  // Send emails to all fellows and track results
+  console.log(`[v0] Starting email sending for ${fellows.length} fellows`)
+  const emailResults = await Promise.all(
+    fellows.map(async (fellow) => {
+      if (!fellow.email) {
+        console.warn(`[v0] Fellow ${fellow.id} (${fellow.full_name}) has no email address`)
+        return { fellowId: fellow.id, success: false, providerId: null }
       }
-    } catch (err) {
-      console.error(`[v0] Exception sending scheduling email to ${fellow.email}:`, err)
-    }
-  })
 
-  await Promise.all(emailPromises)
+      console.log(`[v0] Sending email to ${fellow.email}`)
+      try {
+        const result = await sendSchedulingInviteEmail(
+          fellow.email,
+          fellow.full_name,
+          scheduleTitle,
+          votingUrl,
+        )
+
+        if (result.ok) {
+          console.log(`[v0] ✓ Sent scheduling email to ${fellow.email} (id: ${result.id})`)
+          return { fellowId: fellow.id, success: true, providerId: result.id }
+        } else {
+          console.error(
+            `[v0] ✗ Failed to send scheduling email to ${fellow.email}:`,
+            result.error,
+          )
+          return { fellowId: fellow.id, success: false, providerId: null }
+        }
+      } catch (err) {
+        console.error(`[v0] Exception sending scheduling email to ${fellow.email}:`, err)
+        return { fellowId: fellow.id, success: false, providerId: null }
+      }
+    })
+  )
+  console.log('[v0] Email sending completed')
 
   // Create in-app notifications for all fellows
+  console.log('[v0] Starting in-app notification creation')
   try {
     // First, create the notification entry
     const { data: notification, error: notifError } = await supabase
@@ -106,12 +126,22 @@ export async function createSchedulingNotification(
       return
     }
 
-    // Create notification_recipients for each fellow
-    const recipientInserts = fellows.map((fellow) => ({
-      notification_id: notification.id,
-      profile_id: fellow.id,
-      read_at: null,
-    }))
+    console.log(`[v0] Created notification with id: ${notification.id}`)
+
+    // Create notification_recipients for each fellow with email tracking
+    const recipientInserts = fellows.map((fellow) => {
+      const emailResult = emailResults.find((r) => r.fellowId === fellow.id)
+      const emailSuccess = emailResult?.success ?? false
+      
+      return {
+        notification_id: notification.id,
+        profile_id: fellow.id,
+        read_at: null,
+        email_status: emailSuccess ? 'sent' : 'failed',
+        email_provider_id: emailResult?.providerId || null,
+        email_sent_at: emailSuccess ? new Date().toISOString() : null,
+      }
+    })
 
     const { error: recipientError } = await supabase
       .from('notification_recipients')
@@ -121,7 +151,7 @@ export async function createSchedulingNotification(
       console.error('[v0] Error creating notification recipients:', recipientError)
     } else {
       console.log(
-        `[v0] Created in-app notifications for ${fellows.length} fellows for schedule: ${scheduleId}`,
+        `[v0] ✓ Created in-app notifications for ${fellows.length} fellows for schedule: ${scheduleId}`,
       )
     }
   } catch (err) {
@@ -129,7 +159,7 @@ export async function createSchedulingNotification(
   }
 
   console.log(
-    `[v0] Sent scheduling availability invitations to ${fellows.length} fellows for schedule: ${scheduleId}`,
+    `[v0] ✓ Completed scheduling notifications for ${fellows.length} fellows for schedule: ${scheduleId}`,
   )
 }
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Lora, Inter } from 'next/font/google'
+import { Cardo, Vollkorn, Alegreya_SC, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { UserProvider } from '@/lib/user-context'
 import { getCurrentUser } from '@/lib/auth-server'
@@ -9,15 +9,32 @@ import './globals.css'
 // Skip prerendering for the entire app since it requires Supabase which may not be available at build time
 export const dynamic = 'force-dynamic'
 
-const _serif = Lora({
+const _cardo = Cardo({
   subsets: ['latin'],
-  weight: ['400', '600', '700'],
-  variable: '--font-serif',
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-cardo',
+  display: 'swap',
 })
 
-const _sans = Inter({
+const _vollkorn = Vollkorn({
   subsets: ['latin'],
-  variable: '--font-sans',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-vollkorn',
+  display: 'swap',
+})
+
+const _alegreyaSC = Alegreya_SC({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-alegreya',
+  display: 'swap',
+})
+
+const _inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
@@ -51,16 +68,13 @@ export default async function RootLayout({
   const user = await getCurrentUser()
 
   return (
-    <html lang="en" className="bg-background">
-      {/* `suppressHydrationWarning` here is scoped to <body> only -
-          it silences the false-positive caused by browser extensions
-          (Grammarly, LastPass, etc.) that inject `data-gr-*` /
-          `data-lastpass-*` attributes after the server HTML is
-          delivered. Real hydration mismatches anywhere else in the
-          tree still surface as warnings. */}
+    <html
+      lang="en"
+      className={`${_cardo.variable} ${_vollkorn.variable} ${_alegreyaSC.variable} ${_inter.variable} bg-[var(--color-paper)]`}
+    >
       <body
         suppressHydrationWarning
-        className={`${_sans.variable} ${_serif.variable} font-sans antialiased`}
+        className="font-cardo text-[var(--color-ink)] antialiased"
       >
         <UserProvider initialUser={user}>
           {user?.preview && (

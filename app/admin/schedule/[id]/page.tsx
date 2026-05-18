@@ -76,7 +76,8 @@ export default async function AdminScheduleDetailPage({
       .single()
 
     if (scheduleError || !schedule) {
-      redirect('/admin/schedule')
+      // Re-throw redirect so it's not caught by catch block
+      return redirect('/admin/schedule')
     }
 
     // Fetch vote counts for each option
@@ -258,6 +259,10 @@ export default async function AdminScheduleDetailPage({
     )
   } catch (error) {
     console.error('[v0] Error loading schedule details:', error)
+    // Re-throw if it's a redirect
+    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
+      throw error
+    }
     redirect('/admin/schedule')
   }
 }
