@@ -37,14 +37,14 @@ function relativeTime(iso: string | null): string {
 }
 
 export default async function AdminHomePage() {
-  await requireAdmin()
+  const admin = await requireAdmin()
 
   return (
     <div className="flex flex-col gap-8">
       {/* Greeting */}
       <section>
         <h1 className="text-balance font-serif text-4xl text-foreground">
-          Welcome Back, Admin
+          Welcome Back, {admin.full_name}
         </h1>
       </section>
 
