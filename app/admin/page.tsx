@@ -44,7 +44,7 @@ export default async function AdminHomePage() {
       {/* Greeting */}
       <section>
         <h1 className="text-balance font-serif text-4xl text-foreground">
-          Welcome Back, {admin.full_name}
+          Welcome Back, {admin.fullName}
         </h1>
       </section>
 
