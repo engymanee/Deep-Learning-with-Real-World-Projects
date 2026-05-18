@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Settings, LogOut, User as UserIcon, Shield, Edit2, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -144,10 +145,17 @@ export function TopBar({ customPages: initialCustomPages = [] }: TopBarProps) {
     : '?'
 
   return (
-    <header className="sticky top-0 z-50 h-16 bg-primary border-b border-border flex items-center justify-between px-6 shadow-card">
-      {/* Left: Wordmark */}
-      <Link href="/dashboard" className="flex items-center gap-2">
-        <div className="text-2xl font-serif font-bold text-white">
+    <header className="sticky top-0 z-50 h-16 bg-color-navy border-b border-border flex items-center justify-between px-6 shadow-card">
+      {/* Left: AAI Logo and Wordmark */}
+      <Link href="/dashboard" className="flex items-center gap-3">
+        <Image 
+          src="/aai-logo.jpg" 
+          alt="Abigail Adams Institute" 
+          width={32} 
+          height={32}
+          className="h-8 w-auto rounded"
+        />
+        <div className="text-lg font-vollkorn font-semibold text-white hidden sm:block">
           WaW Fellows Portal
         </div>
       </Link>

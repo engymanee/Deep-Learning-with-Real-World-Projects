@@ -4,37 +4,47 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Brand palette
+  /* Abigail Adams Institute Brand Palette
      ---------------------------------------------------------------
-     Five-color system. Everything else (borders, neutrals, sidebar,
-     charts) is derived from these five so the UI never strays.
+     The WaW Learning Portal visual identity: calm, cool, collected.
+     Classical university press aesthetic for sustained reading/reflection.
+     ---------------------------------------------------------------
+  */
 
-       #264c83  primary           - the "main main" brand blue
-       #0c4a80  primary-light     - deeper press/hover variant
-       #bb4658  accent            - links, focus, destructive
-       #ddd4dc  bg-muted          - soft callouts, highlight surfaces
-       #000000  text              - body copy
-     --------------------------------------------------------------- */
-  --primary: #264c83;           /* primary actions, headers */
-  --primary-light: #0c4a80;     /* hover / pressed state */
-  --accent: #bb4658;            /* links, focus rings, destructive */
-  --bg: #ffffff;                /* page background */
-  --bg-subtle: #faf8fa;         /* cards, sidebar - barely off-white,
-                                   tuned to harmonise with bg-muted */
-  --bg-muted: #ddd4dc;          /* highlight blocks, callouts */
-  --text: #000000;              /* body text */
-  --text-muted: #5b5862;        /* metadata, timestamps - neutral
-                                   warm gray that pairs with #ddd4dc */
-  --border: #e5e3e7;            /* dividers, card borders - derived
-                                   neutral, slightly warm */
+  /* AAI Brand core */
+  --color-navy: #274d80;          /* primary — headers, buttons, links, key UI */
+  --color-paper: #fefefe;          /* main canvas background */
+  --color-parchment: #faf7f2;      /* content surface — cards, lesson body bg */
+  --color-ink: #1a2f4f;            /* body text, deeper than navy for reading */
+  --color-navy-muted: #6b86ad;     /* secondary text, inactive states, borders */
+  --color-navy-tint: #e8eef5;      /* subtle fills, hover states on light surfaces */
+  
+  /* Accent — use sparingly */
+  --color-crimson: #bb4658;        /* progress, current state, live indicators */
+  --color-crimson-soft: #f4e2e4;   /* crimson background fills (badges, highlights) */
 
-  /* Functional indicators - kept outside the brand 5 because they
-     carry semantic meaning (done / at-risk) that fellows expect to
-     read at a glance. */
-  --success: #10b981;
-  --warning: #f59e0b;
+  /* Functional colors */
+  --success: #4a7c59;
+  --warning: #c68b3c;
+  --error: #a13d3d;
 
-  /* Legacy tokens for shadcn compatibility */
+  /* Border weights */
+  --border-subtle: rgba(39, 77, 128, 0.12);
+  --border-default: rgba(39, 77, 128, 0.20);
+  --border-strong: rgba(39, 77, 128, 0.35);
+
+  /* Legacy/compatibility mapping — preserve existing token references */
+  --primary: var(--color-navy);
+  --primary-light: #1d3d66;
+  --accent: var(--color-crimson);
+  --bg: var(--color-paper);
+  --bg-subtle: var(--color-parchment);
+  --bg-muted: var(--color-crimson-soft);
+  --text: var(--color-ink);
+  --text-muted: var(--color-navy-muted);
+  --border: rgba(39, 77, 128, 0.15);
+
+  /* shadcn compatibility tokens */
   --background: var(--bg);
   --foreground: var(--text);
   --card: var(--bg-subtle);
@@ -49,21 +59,18 @@
   --muted-foreground: var(--text-muted);
   --accent-token: var(--accent);
   --accent-foreground: #ffffff;
-  /* Destructive uses the same rose as the accent so we don't introduce
-     a sixth brand colour for error states. */
   --destructive: var(--accent);
   --destructive-foreground: #ffffff;
   --border-token: var(--border);
   --input: var(--border);
   --ring: var(--accent);
-  /* Charts: brand-first ordering. Functional success/warning come
-     last so brand-coloured series dominate by default. */
-  --chart-1: #264c83;
-  --chart-2: #bb4658;
+
+  /* Chart colors: brand-first ordering */
+  --chart-1: var(--color-navy);
+  --chart-2: var(--color-crimson);
   --chart-3: #0c4a80;
-  --chart-4: #ddd4dc;
-  --chart-5: #10b981;
-  --radius: 0.5rem;
+  --chart-4: var(--color-navy-tint);
+  --chart-5: var(--success);
 
   /* Sidebar tokens */
   --sidebar: var(--bg-subtle);
@@ -74,6 +81,8 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: var(--border);
   --sidebar-ring: var(--accent);
+
+  --radius: 0.5rem;
 }
 
 @theme inline {
