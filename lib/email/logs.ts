@@ -31,32 +31,47 @@ export async function getRecentEmailLogs(
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
   try {
-    // Query both invitations and notification_recipients
-    const [invitations, notifications] = await Promise.all([
-      admin
-        .from('invitations')
-        .select('id, email, full_name, status, last_error, email_provider_id, last_sent_at, created_at')
-        .gte('created_at', oneWeekAgo)
-        .order('created_at', { ascending: false }),
-      admin
-        .from('notification_recipients')
-        .select(`
-          id, 
-          email, 
-          email_status, 
-          email_error, 
-          email_provider_id, 
-          email_sent_at, 
-          created_at,
-          notification_id,
-          notifications(kind, title, message)
-        `)
-        .gte('created_at', oneWeekAgo)
-        .order('created_at', { ascending: false }),
-    ])
+    // Query invitations separately 
+    const invitations = await admin
+      .from('invitations')
+      .select('id, email, full_name, status, last_error, email_provider_id, last_sent_at, created_at')
+      .gte('created_at', oneWeekAgo)
+      .order('created_at', { ascending: false })
 
-    if (invitations.error) throw invitations.error
-    if (notifications.error) throw notifications.error
+    if (invitations.error) {
+      console.error('[v0] Invitations query error:', invitations.error)
+      throw invitations.error
+    }
+
+    // Query notification recipients with their associated notifications
+    const notificationRecipients = await admin
+      .from('notification_recipients')
+      .select('id, email, email_status, email_error, email_provider_id, email_sent_at, created_at, notification_id, profile_id')
+      .gte('created_at', oneWeekAgo)
+      .order('created_at', { ascending: false })
+
+    if (notificationRecipients.error) {
+      console.error('[v0] Notification recipients query error:', notificationRecipients.error)
+      throw notificationRecipients.error
+    }
+
+    // Get notification details separately for the notifications we found
+    let notificationMap: { [key: string]: any } = {}
+    if (notificationRecipients.data && notificationRecipients.data.length > 0) {
+      const notificationIds = [...new Set(notificationRecipients.data.map(r => r.notification_id).filter(Boolean))]
+      if (notificationIds.length > 0) {
+        const notificationsData = await admin
+          .from('notifications')
+          .select('id, kind, title, message, email_subject')
+          .in('id', notificationIds)
+
+        if (notificationsData.data) {
+          notificationsData.data.forEach(n => {
+            notificationMap[n.id] = n
+          })
+        }
+      }
+    }
 
     const logs: EmailLogEntry[] = []
 
@@ -79,22 +94,25 @@ export async function getRecentEmailLogs(
     }
 
     // Map notification recipients
-    if (notifications.data) {
+    if (notificationRecipients.data) {
       logs.push(
-        ...notifications.data
+        ...notificationRecipients.data
           .filter((row: any) => row.email) // Only include entries with email addresses
-          .map((row: any) => ({
-            id: row.id,
-            type: 'notification' as const,
-            recipient_email: row.email,
-            recipient_name: null,
-            subject: row.notifications?.title || row.notifications?.kind || 'Notification',
-            status: (row.email_status === 'sent' ? 'sent' : row.email_status === 'failed' ? 'failed' : 'pending') as 'sent' | 'failed' | 'pending',
-            error_message: row.email_error,
-            provider_id: row.email_provider_id,
-            sent_at: row.email_sent_at,
-            created_at: row.created_at,
-          }))
+          .map((row: any) => {
+            const notification = notificationMap[row.notification_id]
+            return {
+              id: row.id,
+              type: 'notification' as const,
+              recipient_email: row.email,
+              recipient_name: null,
+              subject: notification?.email_subject || notification?.title || notification?.kind || 'Notification',
+              status: (row.email_status === 'sent' ? 'sent' : row.email_status === 'failed' ? 'failed' : 'pending') as 'sent' | 'failed' | 'pending',
+              error_message: row.email_error,
+              provider_id: row.email_provider_id,
+              sent_at: row.email_sent_at,
+              created_at: row.created_at,
+            }
+          })
       )
     }
 
@@ -126,35 +144,45 @@ export async function getFailedEmailsForRetry(limit: number = 50): Promise<Email
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
   try {
-    const [failedInvitations, failedNotifications] = await Promise.all([
-      admin
-        .from('invitations')
-        .select('id, email, full_name, status, last_error, email_provider_id, last_sent_at, created_at')
-        .eq('status', 'failed')
-        .gte('created_at', oneWeekAgo)
-        .order('last_sent_at', { ascending: true })
-        .limit(limit),
-      admin
-        .from('notification_recipients')
-        .select(`
-          id, 
-          email, 
-          email_status, 
-          email_error, 
-          email_provider_id, 
-          email_sent_at, 
-          created_at,
-          notification_id,
-          notifications(kind, title, message)
-        `)
-        .eq('email_status', 'failed')
-        .gte('created_at', oneWeekAgo)
-        .order('email_sent_at', { ascending: true })
-        .limit(limit),
-    ])
+    // Get failed invitations
+    const failedInvitations = await admin
+      .from('invitations')
+      .select('id, email, full_name, status, last_error, email_provider_id, last_sent_at, created_at')
+      .eq('status', 'failed')
+      .gte('created_at', oneWeekAgo)
+      .order('last_sent_at', { ascending: true })
+      .limit(limit)
 
     if (failedInvitations.error) throw failedInvitations.error
-    if (failedNotifications.error) throw failedNotifications.error
+
+    // Get failed notification recipients
+    const failedNotificationRecipients = await admin
+      .from('notification_recipients')
+      .select('id, email, email_status, email_error, email_provider_id, email_sent_at, created_at, notification_id')
+      .eq('email_status', 'failed')
+      .gte('created_at', oneWeekAgo)
+      .order('email_sent_at', { ascending: true })
+      .limit(limit)
+
+    if (failedNotificationRecipients.error) throw failedNotificationRecipients.error
+
+    // Get notification details for the failed recipients
+    let notificationMap: { [key: string]: any } = {}
+    if (failedNotificationRecipients.data && failedNotificationRecipients.data.length > 0) {
+      const notificationIds = [...new Set(failedNotificationRecipients.data.map(r => r.notification_id).filter(Boolean))]
+      if (notificationIds.length > 0) {
+        const notificationsData = await admin
+          .from('notifications')
+          .select('id, kind, title, message, email_subject')
+          .in('id', notificationIds)
+
+        if (notificationsData.data) {
+          notificationsData.data.forEach(n => {
+            notificationMap[n.id] = n
+          })
+        }
+      }
+    }
 
     const logs: EmailLogEntry[] = []
 
@@ -175,22 +203,25 @@ export async function getFailedEmailsForRetry(limit: number = 50): Promise<Email
       )
     }
 
-    if (failedNotifications.data) {
+    if (failedNotificationRecipients.data) {
       logs.push(
-        ...failedNotifications.data
-          .filter((row: any) => row.email) // Only include entries with email addresses
-          .map((row: any) => ({
-            id: row.id,
-            type: 'notification' as const,
-            recipient_email: row.email,
-            recipient_name: null,
-            subject: row.notifications?.title || row.notifications?.kind || 'Notification',
-            status: 'failed' as const,
-            error_message: row.email_error,
-            provider_id: row.email_provider_id,
-            sent_at: row.email_sent_at,
-            created_at: row.created_at,
-          }))
+        ...failedNotificationRecipients.data
+          .filter((row: any) => row.email)
+          .map((row: any) => {
+            const notification = notificationMap[row.notification_id]
+            return {
+              id: row.id,
+              type: 'notification' as const,
+              recipient_email: row.email,
+              recipient_name: null,
+              subject: notification?.email_subject || notification?.title || notification?.kind || 'Notification',
+              status: 'failed' as const,
+              error_message: row.email_error,
+              provider_id: row.email_provider_id,
+              sent_at: row.email_sent_at,
+              created_at: row.created_at,
+            }
+          })
       )
     }
 
