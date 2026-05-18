@@ -40,7 +40,17 @@ export async function getRecentEmailLogs(
         .order('created_at', { ascending: false }),
       admin
         .from('notification_recipients')
-        .select('id, email, email_status, email_error, email_provider_id, email_sent_at, created_at')
+        .select(`
+          id, 
+          email, 
+          email_status, 
+          email_error, 
+          email_provider_id, 
+          email_sent_at, 
+          created_at,
+          notification_id,
+          notifications(kind, title, message)
+        `)
         .gte('created_at', oneWeekAgo)
         .order('created_at', { ascending: false }),
     ])
@@ -71,18 +81,20 @@ export async function getRecentEmailLogs(
     // Map notification recipients
     if (notifications.data) {
       logs.push(
-        ...notifications.data.map((row: any) => ({
-          id: row.id,
-          type: 'notification' as const,
-          recipient_email: row.email,
-          recipient_name: null,
-          subject: 'Notification',
-          status: (row.email_status === 'sent' ? 'sent' : row.email_status === 'failed' ? 'failed' : 'pending') as 'sent' | 'failed' | 'pending',
-          error_message: row.email_error,
-          provider_id: row.email_provider_id,
-          sent_at: row.email_sent_at,
-          created_at: row.created_at,
-        }))
+        ...notifications.data
+          .filter((row: any) => row.email) // Only include entries with email addresses
+          .map((row: any) => ({
+            id: row.id,
+            type: 'notification' as const,
+            recipient_email: row.email,
+            recipient_name: null,
+            subject: row.notifications?.title || row.notifications?.kind || 'Notification',
+            status: (row.email_status === 'sent' ? 'sent' : row.email_status === 'failed' ? 'failed' : 'pending') as 'sent' | 'failed' | 'pending',
+            error_message: row.email_error,
+            provider_id: row.email_provider_id,
+            sent_at: row.email_sent_at,
+            created_at: row.created_at,
+          }))
       )
     }
 
@@ -124,7 +136,17 @@ export async function getFailedEmailsForRetry(limit: number = 50): Promise<Email
         .limit(limit),
       admin
         .from('notification_recipients')
-        .select('id, email, email_status, email_error, email_provider_id, email_sent_at, created_at')
+        .select(`
+          id, 
+          email, 
+          email_status, 
+          email_error, 
+          email_provider_id, 
+          email_sent_at, 
+          created_at,
+          notification_id,
+          notifications(kind, title, message)
+        `)
         .eq('email_status', 'failed')
         .gte('created_at', oneWeekAgo)
         .order('email_sent_at', { ascending: true })
@@ -155,18 +177,20 @@ export async function getFailedEmailsForRetry(limit: number = 50): Promise<Email
 
     if (failedNotifications.data) {
       logs.push(
-        ...failedNotifications.data.map((row: any) => ({
-          id: row.id,
-          type: 'notification' as const,
-          recipient_email: row.email,
-          recipient_name: null,
-          subject: 'Notification',
-          status: 'failed' as const,
-          error_message: row.email_error,
-          provider_id: row.email_provider_id,
-          sent_at: row.email_sent_at,
-          created_at: row.created_at,
-        }))
+        ...failedNotifications.data
+          .filter((row: any) => row.email) // Only include entries with email addresses
+          .map((row: any) => ({
+            id: row.id,
+            type: 'notification' as const,
+            recipient_email: row.email,
+            recipient_name: null,
+            subject: row.notifications?.title || row.notifications?.kind || 'Notification',
+            status: 'failed' as const,
+            error_message: row.email_error,
+            provider_id: row.email_provider_id,
+            sent_at: row.email_sent_at,
+            created_at: row.created_at,
+          }))
       )
     }
 

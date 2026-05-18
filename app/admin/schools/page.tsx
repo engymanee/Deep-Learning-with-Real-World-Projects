@@ -34,6 +34,11 @@ function initialsFor(name: string | null): string {
   return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || '?'
 }
 
+function cohortLabel(year: number): string {
+  const labels: { [key: number]: string } = { 1: 'A', 2: 'B', 3: 'C' }
+  return `Cohort ${labels[year] || '?'}`
+}
+
 export default async function AdminSchoolsPage() {
   const supabase = await createClient()
 
@@ -229,7 +234,7 @@ export default async function AdminSchoolsPage() {
                                 <div className="flex items-center gap-2">
                                   <h4 className="font-medium text-foreground">{cohort.name}</h4>
                                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                                    Year {cohort.current_year}
+                                    {cohortLabel(cohort.current_year)}
                                   </span>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">

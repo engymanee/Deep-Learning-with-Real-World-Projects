@@ -88,20 +88,20 @@ export function AddTeamForm({
 
         <div className="space-y-1.5">
           <Label htmlFor={yearId} className="text-sm font-medium">
-            Program year
+            Cohort level
           </Label>
           <Select value={year} onValueChange={setYear}>
             <SelectTrigger id={yearId} className="text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">Year 1 - Foundations</SelectItem>
-              <SelectItem value="2">Year 2 - Development</SelectItem>
-              <SelectItem value="3">Year 3 - Mastery</SelectItem>
+              <SelectItem value="1">Cohort A</SelectItem>
+              <SelectItem value="2">Cohort B</SelectItem>
+              <SelectItem value="3">Cohort C</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Select the current year in the program for this team.
+            Select the cohort level for this team.
           </p>
         </div>
         <input type="hidden" name="currentYear" value={year} />

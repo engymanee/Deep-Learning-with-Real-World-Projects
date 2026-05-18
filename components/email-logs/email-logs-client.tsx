@@ -140,7 +140,10 @@ export function EmailLogsClient({
     <div className="flex flex-col gap-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card>
+        <Card
+          className={`cursor-pointer transition-all ${statusFilter === 'all' ? 'ring-2 ring-primary' : 'hover:border-primary'}`}
+          onClick={() => setStatusFilter('all')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -151,7 +154,10 @@ export function EmailLogsClient({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={`cursor-pointer transition-all ${statusFilter === 'sent' ? 'ring-2 ring-green-600' : 'hover:border-green-600'}`}
+          onClick={() => setStatusFilter('sent')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -163,7 +169,10 @@ export function EmailLogsClient({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={`cursor-pointer transition-all ${statusFilter === 'failed' ? 'ring-2 ring-red-600' : 'hover:border-red-600'}`}
+          onClick={() => setStatusFilter('failed')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -175,7 +184,10 @@ export function EmailLogsClient({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={`cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-yellow-600' : 'hover:border-yellow-600'}`}
+          onClick={() => setStatusFilter('pending')}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -229,10 +241,10 @@ export function EmailLogsClient({
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="all">All Statuses ({totalLogs})</SelectItem>
+                <SelectItem value="sent">Sent ({sentCount})</SelectItem>
+                <SelectItem value="failed">Failed ({failedCount})</SelectItem>
+                <SelectItem value="pending">Pending ({pendingCount})</SelectItem>
               </SelectContent>
             </Select>
           </div>
