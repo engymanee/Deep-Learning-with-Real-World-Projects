@@ -256,7 +256,8 @@ export default async function AdminSchoolsPage() {
                             ) : (
                               <div className="space-y-2 mb-4">
                                 {cohortMembers.map((m) => {
-                                  const fullName = m.profiles?.[0]?.full_name ?? 'Unknown'
+                                  const fullName = m.profiles?.[0]?.full_name ?? '(Unnamed fellow)'
+                                  const isUnnamed = !m.profiles?.[0]?.full_name
                                   return (
                                     <div
                                       key={m.profile_id}
@@ -269,7 +270,7 @@ export default async function AdminSchoolsPage() {
                                           </AvatarFallback>
                                         </Avatar>
                                         <div className="min-w-0">
-                                          <p className="text-sm font-medium text-foreground truncate">
+                                          <p className={`text-sm font-medium truncate ${isUnnamed ? 'text-muted-foreground italic' : 'text-foreground'}`}>
                                             {fullName}
                                           </p>
                                           {m.profiles?.[0]?.title && (
