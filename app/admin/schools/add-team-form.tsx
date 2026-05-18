@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronDown, X } from 'lucide-react'
 import { createCohortAction } from './actions'
 
 export function AddTeamForm({
@@ -28,6 +28,7 @@ export function AddTeamForm({
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const nameId = useId()
+  const yearId = useId()
 
   const handle = (fd: FormData) => {
     setError(null)
@@ -50,10 +51,10 @@ export function AddTeamForm({
         variant="ghost"
         size="sm"
         onClick={() => setOpen(true)}
-        className="text-muted-foreground"
+        className="text-muted-foreground hover:text-foreground"
       >
-        <Plus className="mr-1 h-4 w-4" />
-        Add team
+        <Plus className="mr-1.5 h-4 w-4" />
+        Add new team
       </Button>
     )
   }
@@ -61,40 +62,66 @@ export function AddTeamForm({
   return (
     <form
       action={handle}
-      className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 md:flex-row md:items-end"
+      className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4"
     >
       <input type="hidden" name="schoolId" value={schoolId} />
-      <div className="flex flex-1 flex-col gap-1">
-        <Label htmlFor={nameId} className="text-xs">
-          Team name
-        </Label>
-        <Input
-          id={nameId}
-          name="name"
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <Label className="text-xs">Current year</Label>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">Year 1</SelectItem>
-            <SelectItem value="2">Year 2</SelectItem>
-            <SelectItem value="3">Year 3</SelectItem>
-          </SelectContent>
-        </Select>
+      
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor={nameId} className="text-sm font-medium">
+            Team name
+          </Label>
+          <Input
+            id={nameId}
+            name="name"
+            placeholder="e.g., Leadership Circle, Core Team..."
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            className="text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            Choose a name that reflects your team's purpose or focus area.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor={yearId} className="text-sm font-medium">
+            Program year
+          </Label>
+          <Select value={year} onValueChange={setYear}>
+            <SelectTrigger id={yearId} className="text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Year 1 - Foundations</SelectItem>
+              <SelectItem value="2">Year 2 - Development</SelectItem>
+              <SelectItem value="3">Year 3 - Mastery</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Select the current year in the program for this team.
+          </p>
+        </div>
         <input type="hidden" name="currentYear" value={year} />
       </div>
-      <div className="flex items-center gap-2">
-        <Button type="submit" size="sm" disabled={isPending || !name.trim()}>
-          {isPending ? <Spinner className="mr-1 h-3 w-3" /> : null}
-          Create
+
+      {error ? (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="flex gap-2">
+        <Button 
+          type="submit" 
+          size="sm" 
+          disabled={isPending || !name.trim()}
+          className="flex-1 sm:flex-none"
+        >
+          {isPending ? <Spinner className="mr-1.5 h-3 w-3" /> : null}
+          Create team
         </Button>
         <Button
           type="button"
@@ -103,17 +130,15 @@ export function AddTeamForm({
           onClick={() => {
             setOpen(false)
             setError(null)
+            setName(defaultName)
+            setYear('1')
           }}
           disabled={isPending}
         >
+          <X className="mr-1.5 h-4 w-4" />
           Cancel
         </Button>
       </div>
-      {error ? (
-        <p className="text-xs text-destructive md:ml-3" role="alert">
-          {error}
-        </p>
-      ) : null}
     </form>
   )
 }
