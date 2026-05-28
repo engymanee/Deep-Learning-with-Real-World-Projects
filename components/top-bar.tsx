@@ -146,21 +146,19 @@ export function TopBar({ customPages: initialCustomPages = [] }: TopBarProps) {
 
   return (
     <header 
-      className="sticky top-0 z-50 h-16 border-b border-border flex items-center justify-between px-6 shadow-card"
+      className="sticky top-0 z-50 h-20 border-b border-border flex items-center justify-between px-6 shadow-card"
       style={{ backgroundColor: '#274d80' }}
     >
-      {/* Left: PWP Logo and AAI Logo with WaW Portal Wordmark */}
-      <Link href="/dashboard" className="flex items-center gap-3">
+      {/* Left: Practical Wisdom Project Logo */}
+      <Link href="/dashboard" className="flex items-center">
         <Image 
-          src="/aai-logo.jpg" 
-          alt="Abigail Adams Institute" 
-          width={32} 
-          height={32}
-          className="h-8 w-auto rounded"
+          src="/pwp-logo.png" 
+          alt="Practical Wisdom Project - Abigail Adams Institute" 
+          width={140}
+          height={90}
+          className="h-16 w-auto"
+          priority
         />
-        <div className="text-lg font-vollkorn font-semibold text-white hidden sm:block">
-          WaW Fellows Portal
-        </div>
       </Link>
 
       {/* Center: Horizontal Nav */}
@@ -363,19 +361,10 @@ export function TopBar({ customPages: initialCustomPages = [] }: TopBarProps) {
         )}
       </nav>
 
-      {/* Right: PWP Logo, notifications bell + user menu. The bell shows an
+      {/* Right: notifications bell + user menu. The bell shows an
           unread badge driven by /api/notifications/unread-count and
           links to the full /notifications inbox. */}
       <div className="flex items-center gap-4">
-        {/* Practical Wisdom Project Logo */}
-        <Image 
-          src="/icon-light-32x32.png" 
-          alt="Practical Wisdom Project" 
-          width={32} 
-          height={32}
-          className="h-8 w-8 hidden sm:block opacity-90 hover:opacity-100 transition-opacity"
-          title="Practical Wisdom Project"
-        />
         {user ? <NotificationsBell /> : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
