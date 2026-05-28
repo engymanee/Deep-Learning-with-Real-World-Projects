@@ -149,8 +149,8 @@ export function TopBar({ customPages: initialCustomPages = [] }: TopBarProps) {
       className="sticky top-0 z-50 h-20 border-b border-border flex items-center justify-between px-6 shadow-card"
       style={{ backgroundColor: '#274d80' }}
     >
-      {/* Left: Practical Wisdom Project Logo */}
-      <Link href="/dashboard" className="flex items-center">
+      {/* Left: Practical Wisdom Project Logo + Portal Name */}
+      <Link href="/dashboard" className="flex items-center gap-3">
         <Image 
           src="/pwp-logo.png" 
           alt="Practical Wisdom Project - Abigail Adams Institute" 
@@ -159,6 +159,9 @@ export function TopBar({ customPages: initialCustomPages = [] }: TopBarProps) {
           className="h-16 w-auto"
           priority
         />
+        <div className="text-lg font-vollkorn font-semibold text-white hidden sm:block">
+          WaW Fellows Portal
+        </div>
       </Link>
 
       {/* Center: Horizontal Nav */}
