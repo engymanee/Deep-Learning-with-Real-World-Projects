@@ -12,17 +12,19 @@ export async function GET(request: Request) {
   const offset = (page - 1) * pageSize
 
   try {
-    // Load ALL draft labs (not published) - labs table
+    // Get all content items (labs) - these are curriculum items, not a separate "draft" table
+    // We'll fetch all items that could be cleaned up
     const { data: labs, count, error } = await supabase
       .from('labs')
-      .select('id, title, description, created_at, updated_at, is_published', {
+      .select('id, title, description, created_at, module_id', {
         count: 'exact',
       })
-      .is('is_published', false)
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
 
-    if (error) throw error
+    if (error) {
+      throw error
+    }
 
     return Response.json({
       items: labs || [],
