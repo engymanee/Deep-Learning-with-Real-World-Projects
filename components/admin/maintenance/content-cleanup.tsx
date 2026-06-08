@@ -49,7 +49,9 @@ export function ContentCleanupSection() {
     setError(null)
     try {
       const response = await fetch(`/api/admin/maintenance/content?page=1`)
-      if (!response.ok) throw new Error('Failed to load content')
+      if (!response.ok) {
+        throw new Error(`Failed to load content: ${response.status}`)
+      }
       const data = await response.json()
       setItems(data.items || [])
     } catch (err) {
