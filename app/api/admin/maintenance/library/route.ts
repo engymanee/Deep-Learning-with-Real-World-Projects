@@ -12,10 +12,9 @@ export async function GET(request: Request) {
   const offset = (page - 1) * pageSize
 
   try {
-    // Library resources - currently returns empty as the table may not have data
-    // In the future, this could be expanded to query actual library resources
+    // Fetch all resources from the library
     const { data: resources, count, error } = await supabase
-      .from('library_resources')
+      .from('resources')
       .select('id, title, resource_type, created_at, updated_at', {
         count: 'exact',
       })
@@ -69,7 +68,7 @@ export async function DELETE(request: Request) {
 
     if (resourceIds && resourceIds.length > 0) {
       const { count, error } = await supabase
-        .from('library_resources')
+        .from('resources')
         .delete()
         .in('id', resourceIds)
 
@@ -78,7 +77,7 @@ export async function DELETE(request: Request) {
 
     if (beforeDate) {
       const { count, error } = await supabase
-        .from('library_resources')
+        .from('resources')
         .delete()
         .lt('created_at', beforeDate)
 
@@ -89,9 +88,9 @@ export async function DELETE(request: Request) {
     if (adminId) {
       await logMaintenanceAction(adminId, {
         actionType: 'bulk_delete',
-        itemType: 'library_resources',
+        itemType: 'resources',
         itemId: resourceIds?.[0] || 'batch',
-        itemName: `${deletedCount} unassigned library resources`,
+        itemName: `${deletedCount} library resources`,
         details: {
           count: deletedCount,
           beforeDate,
