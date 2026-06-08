@@ -3,11 +3,18 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from '@hello-pangea/dnd'
+import {
   ExternalLink,
   FileText,
   Pencil,
   Plus,
   Trash2,
+  GripVertical,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -32,10 +39,10 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { CohortBadge } from '@/components/admin/cohort-access-field'
-import { getResourceType } from '@/lib/curriculum'
+import { getResourceType, CONTENT_CATEGORIES, type ContentCategory } from '@/lib/curriculum'
 import type { ContentRow } from './page'
 import { ContentItemForm } from './content-item-form'
-import { deleteContent } from '../../../actions'
+import { deleteContent, reorderContent } from '../../../actions'
 
 interface Props {
   phaseId: string
@@ -48,11 +55,11 @@ interface Props {
 }
 
 /**
- * Flat list of every content item in a module.
+ * Flat list grouped by content category, with drag-to-reorder within each category.
  *
- * Mirrors the previous phase-scoped list: a single ordered stream
- * with one "Add content" button at the top. Cohort inheritance is
- * now resolved through the module rather than the phase.
+ * Uses react-beautiful-dnd for accessible drag-and-drop reordering. Each category
+ * is a separate droppable zone so items can only be reordered within their category.
+ * Cohort inheritance is now resolved through the module rather than the phase.
  */
 export function ContentList({
   phaseId,
@@ -62,6 +69,56 @@ export function ContentList({
   items,
 }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
+  const [reordering, startReorder] = useTransition()
+  const router = useRouter()
+
+  // Group items by category
+  const itemsByCategory = new Map<ContentCategory, ContentRow[]>()
+  for (const item of items) {
+    if (!itemsByCategory.has(item.category)) {
+      itemsByCategory.set(item.category, [])
+    }
+    itemsByCategory.get(item.category)!.push(item)
+  }
+
+  // Get categories in display order
+  const categoriesInOrder = CONTENT_CATEGORIES.map(c => c.value as ContentCategory).filter(
+    cat => itemsByCategory.has(cat)
+  )
+
+  async function handleDragEnd(result: DropResult) {
+    const { source, destination, draggableId } = result
+
+    // No drop zone or dropped in same place
+    if (!destination) return
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    ) {
+      return
+    }
+
+    const category = source.droppableId as ContentCategory
+    const categoryItems = itemsByCategory.get(category) || []
+    
+    // Create new order by moving the item
+    const newOrder = Array.from(categoryItems)
+    const [movedItem] = newOrder.splice(source.index, 1)
+    newOrder.splice(destination.index, 0, movedItem)
+
+    // Optimistic update
+    itemsByCategory.set(category, newOrder)
+
+    // Server update
+    startReorder(async () => {
+      const orderedIds = newOrder.map(item => item.id)
+      const res = await reorderContent(phaseId, moduleId, category, orderedIds)
+      if (!res.ok) {
+        console.error('[v0] Reorder failed:', res.message)
+        router.refresh()
+      }
+    })
+  }
 
   return (
     <section className="rounded-lg border border-border bg-card">
@@ -69,8 +126,8 @@ export function ContentList({
         <div>
           <h3 className="font-serif text-lg text-foreground">Content</h3>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Every piece of fellow-facing content in this module, in display
-            order.
+            Every piece of fellow-facing content in this module, grouped by category and in display
+            order. Drag items to reorder within their category.
           </p>
         </div>
 
@@ -105,24 +162,84 @@ export function ContentList({
           item.
         </p>
       ) : (
-        <ul className="divide-y divide-border">
-          {items.map((item) => (
-            <ContentRowItem
-              key={item.id}
-              item={item}
-              phaseId={phaseId}
-              moduleId={moduleId}
-              moduleCohorts={moduleCohorts}
-              moduleEffectiveCohorts={moduleEffectiveCohorts}
-            />
-          ))}
-        </ul>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          {categoriesInOrder.map(category => {
+            const categoryItems = itemsByCategory.get(category) || []
+            const categoryConfig = CONTENT_CATEGORIES.find(c => c.value === category)
+
+            return (
+              <div key={category} className="border-b border-border last:border-b-0">
+                {/* Category Header */}
+                <div className="bg-muted/30 px-5 py-3">
+                  <h4 className="font-medium text-foreground">
+                    {categoryConfig?.label}
+                  </h4>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {categoryConfig?.description}
+                  </p>
+                </div>
+
+                {/* Droppable Zone for Category */}
+                <Droppable droppableId={category} type="CONTENT">
+                  {(provided, snapshot) => (
+                    <ul
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`divide-y divide-border ${snapshot.isDraggingOver ? 'bg-accent/5' : ''}`}
+                    >
+                      {categoryItems.map((item, index) => (
+                        <Draggable
+                          key={item.id}
+                          draggableId={item.id}
+                          index={index}
+                          isDragDisabled={reordering}
+                        >
+                          {(provided, snapshot) => (
+                            <li
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={`flex flex-wrap items-start gap-3 px-5 py-4 transition-colors ${
+                                snapshot.isDragging
+                                  ? 'bg-muted/50'
+                                  : snapshot.isDragging
+                                    ? 'bg-muted/30'
+                                    : ''
+                              }`}
+                            >
+                              {/* Drag Handle */}
+                              <div
+                                {...provided.dragHandleProps}
+                                className="flex shrink-0 cursor-grab items-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
+                                aria-label="Drag to reorder"
+                              >
+                                <GripVertical className="h-5 w-5" />
+                              </div>
+
+                              <ContentRowItemContent
+                                item={item}
+                                phaseId={phaseId}
+                                moduleId={moduleId}
+                                moduleCohorts={moduleCohorts}
+                                moduleEffectiveCohorts={moduleEffectiveCohorts}
+                              />
+                            </li>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </ul>
+                  )}
+                </Droppable>
+              </div>
+            )
+          })}
+        </DragDropContext>
       )}
     </section>
   )
 }
 
-function ContentRowItem({
+function ContentRowItemContent({
   item,
   phaseId,
   moduleId,
@@ -153,7 +270,7 @@ function ContentRowItem({
   }
 
   return (
-    <li className="flex flex-wrap items-start gap-3 px-5 py-4">
+    <>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -272,6 +389,6 @@ function ContentRowItem({
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </li>
+    </>
   )
 }
