@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { requireUser } from '@/lib/auth-server'
 import { StandalonePageTemplate } from '@/components/custom-pages/standalone-page-template'
+import { AdminPageContentSlotWrapper } from '@/components/admin/admin-page-content-slot-wrapper'
+import { getAdminPageContent } from '@/app/admin/actions'
 
 // Skip prerendering since this page requires authentication
 export const dynamic = 'force-dynamic'
@@ -13,13 +15,40 @@ export const metadata = {
 
 export default async function AboutPage() {
   await requireUser()
+  
+  // Fetch editable content slots
+  const headerContent = await getAdminPageContent('about', 'header')
+  const footerContent = await getAdminPageContent('about', 'footer')
+  
+  // Show edit features only if user is admin (indicated by successful fetch)
+  const isAdmin = headerContent.ok
 
   return (
     <StandalonePageTemplate>
-      {/* Welcome header section */}
+      {/* Edit header toggle - only show to admins */}
+      {isAdmin && (
+        <div className="mb-4 flex justify-end px-4">
+          <a href="/admin/about" className="text-sm underline hover:opacity-80">
+            Edit Page
+          </a>
+        </div>
+      )}
+
+      {/* Welcome header section with editable top slot */}
       <section className="border-b border-border bg-card">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
           <div className="space-y-6">
+            {/* Editable header slot */}
+            {isAdmin ? (
+              <AdminPageContentSlotWrapper
+                pageId="about"
+                slotName="header"
+                items={headerContent.ok ? headerContent.data : []}
+                isEditMode={true}
+              />
+            ) : null}
+
+            {/* Default header content */}
             <div>
               <h1 className="font-serif text-3xl sm:text-4xl text-foreground font-bold mb-4 text-center">
                 Welcome to the Wisdom at Work Fellows&apos; Portal
@@ -61,9 +90,22 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      {/* Foundation attribution section */}
+      {/* Foundation attribution section with editable footer slot */}
       <section className="border-t border-border bg-card">
         <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
+          {/* Editable footer slot */}
+          {isAdmin ? (
+            <div className="mb-8">
+              <AdminPageContentSlotWrapper
+                pageId="about"
+                slotName="footer"
+                items={footerContent.ok ? footerContent.data : []}
+                isEditMode={true}
+              />
+            </div>
+          ) : null}
+
+          {/* Default footer content */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
             <div className="sm:w-1/2">
               <p className="text-sm text-muted-foreground italic leading-relaxed">
