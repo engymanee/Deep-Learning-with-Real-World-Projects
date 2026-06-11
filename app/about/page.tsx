@@ -20,6 +20,9 @@ export default async function AboutPage() {
   const headerContent = await getAdminPageContent('about', 'header')
   const footerContent = await getAdminPageContent('about', 'footer')
   
+  console.log('[v0] About page - headerContent:', headerContent)
+  console.log('[v0] About page - footerContent:', footerContent)
+  
   // Show edit features only if user is admin (indicated by successful fetch)
   const isAdmin = headerContent.ok
 
