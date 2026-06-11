@@ -103,6 +103,17 @@ export default async function AboutPage() {
         </div>
       </section>
 
+      {/* Team discussion image */}
+      <section className="bg-background">
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
+          <img
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-f3pmyp3Y4Su3IunOJebJvDjlTXdzRP.png"
+            alt="Wisdom at Work Fellows in collaborative discussion"
+            className="w-full rounded-lg shadow-md"
+          />
+        </div>
+      </section>
+
       {/* Editable body content blocks */}
       {blocks.length > 0 && (
         <section className="bg-background">
@@ -111,6 +122,17 @@ export default async function AboutPage() {
           </div>
         </section>
       )}
+
+      {/* Curriculum structure section */}
+      <section className="bg-background">
+        <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
+          <img
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-b8MnjRcwfx4lrP2uHyE4GYgMWOaAas.png"
+            alt="Wisdom at Work Three-Year Curriculum Structure"
+            className="w-full rounded-lg shadow-md"
+          />
+        </div>
+      </section>
 
       {/* Foundation attribution section */}
       <section className="border-t border-border bg-card">
