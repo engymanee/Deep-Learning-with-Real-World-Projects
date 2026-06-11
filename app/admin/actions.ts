@@ -19,10 +19,8 @@ interface AdminPageContentItem {
  */
 export async function getAdminPageContent(pageId: string, slotName?: string) {
   const user = await getCurrentUser()
-  console.log('[v0] getAdminPageContent - user:', user?.email, 'role:', user?.role)
   
   if (!user || user.role !== 'admin') {
-    console.log('[v0] getAdminPageContent - NOT ADMIN, returning unauthorized')
     return { ok: false, message: 'Unauthorized', data: [] }
   }
 
@@ -45,7 +43,6 @@ export async function getAdminPageContent(pageId: string, slotName?: string) {
     return { ok: false, message: error.message, data: [] }
   }
 
-  console.log('[v0] getAdminPageContent - success, data count:', data?.length || 0)
   return { ok: true, data: data || [] }
 }
 
