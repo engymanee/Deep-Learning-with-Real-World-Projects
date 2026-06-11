@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { put } from '@vercel/blob'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth-server'
 
@@ -23,10 +24,34 @@ export async function createSchoolAction(formData: FormData): Promise<ActionResu
   try {
     await requireAdmin()
     const name = String(formData.get('name') ?? '').trim()
+    const iconFile = formData.get('icon') as File | null
     if (!name) return fail('Name is required')
 
+    let iconUrl: string | null = null
+    if (iconFile && iconFile.size > 0) {
+      try {
+        // Validate file size (5MB max)
+        if (iconFile.size > 5 * 1024 * 1024) {
+          return fail('Icon file must be less than 5 MB')
+        }
+
+        // Validate MIME type
+        const validTypes = ['image/png', 'image/jpeg', 'image/webp']
+        if (!validTypes.includes(iconFile.type)) {
+          return fail('Icon must be PNG, JPG, or WebP')
+        }
+
+        const blob = await put(`schools/${name}-${Date.now()}`, iconFile, {
+          access: 'public',
+        })
+        iconUrl = blob.url
+      } catch (blobErr) {
+        return fail(`Failed to upload icon: ${blobErr instanceof Error ? blobErr.message : 'Unknown error'}`)
+      }
+    }
+
     const admin = createAdminClient()
-    const { error } = await admin.from('schools').insert({ name })
+    const { error } = await admin.from('schools').insert({ name, icon_url: iconUrl })
     if (error) return fail(error.message)
 
     revalidatePath('/admin/schools')
