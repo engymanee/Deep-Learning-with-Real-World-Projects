@@ -1,28 +1,18 @@
-'use client'
-
 import Link from 'next/link'
 import { ArrowLeft, Pencil } from 'lucide-react'
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { FlexiblePageEditor } from '@/components/admin/flexible-page-editor'
+import { requireAdmin } from '@/lib/auth-server'
 import { getAdminPageContent } from '@/app/admin/actions'
+import { AdminAboutClient } from '@/components/admin/admin-about-client'
 
 export default async function AdminAboutPage() {
+  await requireAdmin()
+  
   const bodyContent = await getAdminPageContent('about', 'body')
 
   return (
-    <AdminAboutClient
-      bodyItems={bodyContent.ok ? bodyContent.data : []}
-    />
-  )
-}
-
-function AdminAboutClient({ bodyItems }: { bodyItems: any[] }) {
-  const [isEditing, setIsEditing] = useState(true)
-
-  return (
     <div className="flex flex-col gap-6">
-      {/* Header with back button and edit toggle */}
+      {/* Header with back button */}
       <div className="flex items-center justify-between border-b border-border pb-6">
         <div className="flex items-center gap-3">
           <Link href="/admin">
@@ -37,13 +27,6 @@ function AdminAboutClient({ bodyItems }: { bodyItems: any[] }) {
             </p>
           </div>
         </div>
-        <Button
-          variant={isEditing ? 'default' : 'outline'}
-          onClick={() => setIsEditing(!isEditing)}
-        >
-          <Pencil className="h-4 w-4 mr-2" />
-          {isEditing ? 'Done' : 'Edit'}
-        </Button>
       </div>
 
       {/* Main content section with flexible editor */}
@@ -52,11 +35,10 @@ function AdminAboutClient({ bodyItems }: { bodyItems: any[] }) {
         <p className="text-sm text-muted-foreground mb-6">
           Add, edit, and reorder content blocks (text, images, or both) that appear in the main body of the about page. Drag blocks to rearrange them.
         </p>
-        <FlexiblePageEditor
+        <AdminAboutClient
           pageId="about"
           slotName="body"
-          items={bodyItems}
-          isEditMode={isEditing}
+          initialItems={bodyContent.ok ? bodyContent.data : []}
         />
       </section>
     </div>
