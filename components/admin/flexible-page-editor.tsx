@@ -7,7 +7,7 @@ import {
   Draggable,
   type DropResult,
 } from '@hello-pangea/dnd'
-import { Plus, Trash2, GripVertical, Image as ImageIcon, Type, Zap } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Image as ImageIcon, Type, Zap, Upload, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -78,7 +78,52 @@ export function FlexiblePageEditor({
   const [newContent, setNewContent] = useState('')
   const [newImageUrl, setNewImageUrl] = useState('')
   const [newImageAlt, setNewImageAlt] = useState('')
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null)
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
+  const [newImageUploading, setNewImageUploading] = useState(false)
+  const [editImageUploading, setEditImageUploading] = useState(false)
   const [reordering, startReorder] = useTransition()
+
+  async function uploadImage(file: File, isEdit = false) {
+    try {
+      if (isEdit) {
+        setEditImageUploading(true)
+      } else {
+        setNewImageUploading(true)
+      }
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/admin/upload-image', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Upload failed')
+      }
+
+      const { url } = await res.json()
+
+      if (isEdit) {
+        setEditImageUrl(url)
+        setEditImagePreview(url)
+      } else {
+        setNewImageUrl(url)
+        setNewImagePreview(url)
+      }
+    } catch (error) {
+      alert(`Image upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      if (isEdit) {
+        setEditImageUploading(false)
+      } else {
+        setNewImageUploading(false)
+      }
+    }
+  }
 
   async function handleDragEnd(result: DropResult) {
     const { source, destination } = result
@@ -245,16 +290,57 @@ export function FlexiblePageEditor({
               </div>
             )}
 
-            {/* Image URL */}
+            {/* Image Upload */}
             {blockTypeToCreate !== 'text' && (
               <>
                 <div>
-                  <label className="text-sm font-medium">Image URL</label>
-                  <Input
-                    placeholder="https://example.com/image.jpg"
-                    value={newImageUrl}
-                    onChange={e => setNewImageUrl(e.target.value)}
-                  />
+                  <label className="text-sm font-medium block mb-2">Image</label>
+                  <div className="flex gap-2">
+                    <label className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                        disabled={newImageUploading}
+                        onChange={e => {
+                          const file = e.currentTarget.files?.[0]
+                          if (file) {
+                            uploadImage(file, false)
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full cursor-pointer"
+                        disabled={newImageUploading}
+                        asChild
+                      >
+                        <span>
+                          {newImageUploading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Choose Image
+                            </>
+                          )}
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
+                  {newImagePreview && (
+                    <div className="mt-2">
+                      <img
+                        src={newImagePreview}
+                        alt="Preview"
+                        className="w-full rounded-lg max-h-40 object-cover"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-medium">Alt Text</label>
@@ -361,15 +447,57 @@ export function FlexiblePageEditor({
                                   </div>
                                 )}
 
-                                {/* Image URL */}
+                                {/* Image Upload */}
                                 {editBlockType !== 'text' && (
                                   <>
                                     <div>
-                                      <label className="text-sm font-medium">Image URL</label>
-                                      <Input
-                                        value={editImageUrl}
-                                        onChange={e => setEditImageUrl(e.target.value)}
-                                      />
+                                      <label className="text-sm font-medium block mb-2">Image</label>
+                                      <div className="flex gap-2">
+                                        <label className="flex-1">
+                                          <input
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                                            disabled={editImageUploading}
+                                            onChange={e => {
+                                              const file = e.currentTarget.files?.[0]
+                                              if (file) {
+                                                uploadImage(file, true)
+                                              }
+                                            }}
+                                            className="hidden"
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full cursor-pointer"
+                                            disabled={editImageUploading}
+                                            asChild
+                                          >
+                                            <span>
+                                              {editImageUploading ? (
+                                                <>
+                                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                  Uploading...
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Upload className="h-4 w-4 mr-2" />
+                                                  Choose Image
+                                                </>
+                                              )}
+                                            </span>
+                                          </Button>
+                                        </label>
+                                      </div>
+                                      {(editImagePreview || editImageUrl) && (
+                                        <div className="mt-2">
+                                          <img
+                                            src={editImagePreview || editImageUrl}
+                                            alt="Preview"
+                                            className="w-full rounded-lg max-h-40 object-cover"
+                                          />
+                                        </div>
+                                      )}
                                     </div>
                                     <div>
                                       <label className="text-sm font-medium">Alt Text</label>
