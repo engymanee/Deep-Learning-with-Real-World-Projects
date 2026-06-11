@@ -9,8 +9,11 @@ interface AdminPageContentItem {
   page_id: string
   slot_name: string
   order_index: number
+  block_type: 'text' | 'image' | 'text_image'
   title: string | null
   content: string
+  image_url: string | null
+  image_alt: string | null
   created_at: string
 }
 
@@ -52,8 +55,11 @@ export async function getAdminPageContent(pageId: string, slotName?: string) {
 export async function createAdminPageContent(payload: {
   page_id: string
   slot_name: string
+  block_type?: 'text' | 'image' | 'text_image'
   title?: string
   content: string
+  image_url?: string
+  image_alt?: string
 }) {
   const user = await getCurrentUser()
   if (!user || user.role !== 'admin') {
@@ -76,8 +82,11 @@ export async function createAdminPageContent(payload: {
   const { error } = await supabase.from('admin_page_content').insert({
     page_id: payload.page_id,
     slot_name: payload.slot_name,
+    block_type: payload.block_type || 'text',
     title: payload.title || null,
     content: payload.content,
+    image_url: payload.image_url || null,
+    image_alt: payload.image_alt || null,
     order_index,
     created_by: user.id,
   })
@@ -97,8 +106,11 @@ export async function createAdminPageContent(payload: {
 export async function updateAdminPageContent(
   id: string,
   updates: {
+    block_type?: 'text' | 'image' | 'text_image'
     title?: string
     content?: string
+    image_url?: string
+    image_alt?: string
   }
 ) {
   const user = await getCurrentUser()

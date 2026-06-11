@@ -1,23 +1,23 @@
 'use client'
 
-import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Pencil } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { AdminPageContentSlotWrapper } from '@/components/admin/admin-page-content-slot-wrapper'
-
-type Props = {
-  headerItems: any[]
-  footerItems: any[]
-}
+import { FlexiblePageEditor } from '@/components/admin/flexible-page-editor'
+import { getAdminPageContent } from '@/app/admin/actions'
 
 export default async function AdminAboutPage() {
+  const bodyContent = await getAdminPageContent('about', 'body')
+
   return (
-    <AdminAboutClient headerItems={[]} footerItems={[]} />
+    <AdminAboutClient
+      bodyItems={bodyContent.ok ? bodyContent.data : []}
+    />
   )
 }
 
-function AdminAboutClient({ headerItems, footerItems }: Props) {
+function AdminAboutClient({ bodyItems }: { bodyItems: any[] }) {
   const [isEditing, setIsEditing] = useState(true)
 
   return (
@@ -33,7 +33,7 @@ function AdminAboutClient({ headerItems, footerItems }: Props) {
           <div>
             <h1 className="font-serif text-2xl text-foreground">About Page</h1>
             <p className="text-sm text-muted-foreground">
-              Manage editable content sections on the public about page
+              Manage editable content blocks on the public about page
             </p>
           </div>
         </div>
@@ -46,30 +46,16 @@ function AdminAboutClient({ headerItems, footerItems }: Props) {
         </Button>
       </div>
 
-      {/* Header section */}
+      {/* Main content section with flexible editor */}
       <section className="rounded-lg border border-border bg-card p-6">
-        <h2 className="font-serif text-lg text-foreground mb-4">Header Content</h2>
+        <h2 className="font-serif text-lg text-foreground mb-4">Page Content</h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Add, edit, or reorder text blocks that appear at the top of the about page above the main welcome section.
+          Add, edit, and reorder content blocks (text, images, or both) that appear in the main body of the about page. Drag blocks to rearrange them.
         </p>
-        <AdminPageContentSlotWrapper
+        <FlexiblePageEditor
           pageId="about"
-          slotName="header"
-          items={headerItems}
-          isEditMode={isEditing}
-        />
-      </section>
-
-      {/* Footer section */}
-      <section className="rounded-lg border border-border bg-card p-6">
-        <h2 className="font-serif text-lg text-foreground mb-4">Footer Content</h2>
-        <p className="text-sm text-muted-foreground mb-6">
-          Add, edit, or reorder text blocks that appear at the bottom of the about page below the foundation attribution.
-        </p>
-        <AdminPageContentSlotWrapper
-          pageId="about"
-          slotName="footer"
-          items={footerItems}
+          slotName="body"
+          items={bodyItems}
           isEditMode={isEditing}
         />
       </section>
