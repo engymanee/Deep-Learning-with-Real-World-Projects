@@ -19,6 +19,7 @@ interface AdminPageContentItem {
  */
 export async function getAdminPageContent(pageId: string, slotName?: string) {
   const user = await getCurrentUser()
+  
   if (!user || user.role !== 'admin') {
     return { ok: false, message: 'Unauthorized', data: [] }
   }
