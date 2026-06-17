@@ -98,6 +98,7 @@ export async function loadReflectionFeed(options?: {
 
   console.log('[v0] loadReflectionFeed - error:', error)
   console.log('[v0] loadReflectionFeed - raw count:', raw?.length)
+  console.log('[v0] loadReflectionFeed - raw data:', JSON.stringify(raw, null, 2))
   if (error || !raw) {
     console.log('[v0] loadReflectionFeed - returning empty due to error or no data')
     return []
@@ -157,7 +158,7 @@ export async function loadReflectionFeed(options?: {
     }
   }
 
-  return raw.map((r) => ({
+  const result = raw.map((r) => ({
     id: r.id,
     body: r.body,
     visibility: r.visibility,
@@ -178,6 +179,11 @@ export async function loadReflectionFeed(options?: {
     ),
     user_reactions: Array.from(userReactionsByReflection.get(r.id) ?? []),
   }))
+  
+  console.log('[v0] loadReflectionFeed - final result count:', result.length)
+  console.log('[v0] loadReflectionFeed - final result:', JSON.stringify(result, null, 2))
+  
+  return result
 }
 
 /** Wire shape returned by loadComments(). */
