@@ -12,11 +12,8 @@
  * reflections, wins, and questions.
  */
 import {
-  Bell,
   BookOpen,
   Building2,
-  MessageCircle,
-  Trophy,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -91,22 +88,6 @@ export const COMMUNITY_SECTIONS: CommunitySection[] = [
     composerCta: '',
   },
   {
-    id: 'whats-new',
-    slug: 'whats-new',
-    label: "What's New?",
-    description:
-      'Announcements, program updates, and newly added resources from the team.',
-    icon: Bell,
-    postKinds: ['announcement'],
-    writeKind: 'announcement',
-    staffOnly: true,
-    emptyTitle: 'No announcements yet',
-    emptyCopy: 'Program updates from the team will be posted here.',
-    composerTitlePlaceholder: 'New cohort cohort kickoff…',
-    composerBodyPlaceholder: 'What should the community know?',
-    composerCta: 'Post announcement',
-  },
-  {
     id: 'reflections',
     slug: 'reflections',
     label: 'Fellow Reflections',
@@ -128,41 +109,6 @@ export const COMMUNITY_SECTIONS: CommunitySection[] = [
     composerTitlePlaceholder: '',
     composerBodyPlaceholder: '',
     composerCta: '',
-  },
-  {
-    id: 'wins',
-    slug: 'wins',
-    label: 'Wins & Progress',
-    description:
-      'Share a win about applying one of the Practical Wisdom Framework protocols.',
-    icon: Trophy,
-    postKinds: ['win'],
-    writeKind: 'win',
-    staffOnly: false,
-    emptyTitle: 'No wins shared yet',
-    emptyCopy:
-      'Be the first to share a moment of progress - momentum starts here.',
-    composerTitlePlaceholder: '',
-    composerBodyPlaceholder: '',
-    composerCta: 'Share a win',
-  },
-  {
-    id: 'ask',
-    slug: 'ask',
-    label: 'Ask the Community',
-    description:
-      'Questions, challenges, and peer support from fellows and facilitators.',
-    icon: MessageCircle,
-    postKinds: ['question'],
-    writeKind: 'question',
-    staffOnly: false,
-    emptyTitle: 'No questions yet',
-    emptyCopy:
-      'Stuck on something? Ask the community - someone has been there.',
-    composerTitlePlaceholder: 'How are you handling…',
-    composerBodyPlaceholder:
-      'Give a little context so others can answer well.',
-    composerCta: 'Ask the community',
   },
 ]
 
