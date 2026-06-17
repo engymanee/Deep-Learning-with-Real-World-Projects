@@ -118,6 +118,8 @@ export async function getDashboardData(): Promise<DashboardData> {
   // visibility through the full Phase -> Module -> Content cascade.
   const countsByPhase = new Map<string, number>()
   for (const item of itemRows ?? []) {
+    // Skip items without a category (they won't render in the UI anyway).
+    // If you want to show items even without a category, change this logic.
     if (!item.category) continue
     if (!item.module_id) continue
     const moduleCohorts = moduleCohortById.get(item.module_id) ?? null
