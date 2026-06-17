@@ -74,6 +74,8 @@ export async function loadReflectionFeed(options?: {
   /** Limit how many reflections come back. Defaults to 50. */
   limit?: number
 }): Promise<ReflectionFeedItem[]> {
+  console.log('[v0] loadReflectionFeed called with options:', options)
+  
   const supabase = await createClient()
   const limit = Math.max(1, Math.min(options?.limit ?? 50, 200))
 
@@ -104,8 +106,10 @@ export async function loadReflectionFeed(options?: {
       }>
     >()
 
+  console.log('[v0] loadReflectionFeed - fetched raw reflections:', raw?.length, 'error:', error)
+  
   if (error || !raw) {
-    console.log('[v0] loadReflectionFeed - error:', error)
+    console.log('[v0] loadReflectionFeed - error occurred, returning empty')
     return []
   }
 
@@ -224,6 +228,8 @@ export async function loadReflectionFeed(options?: {
     }
   })
 
+  console.log('[v0] loadReflectionFeed - returning result with count:', result.length)
+  
   return result
 }
 
