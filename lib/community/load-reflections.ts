@@ -48,34 +48,27 @@ interface RawReflectionRow {
   body: string
   visibility: 'public' | 'cohort' | 'private'
   submitted_at: string
-  lab: {
-    id: string
-    title: string | null
-    year_id: string | null
-    reflection_prompt: string | null
-  } | null
   author: {
     id: string
     full_name: string | null
     email: string | null
     avatar_url: string | null
   } | null
+  content: {
+    id: string
+    title: string | null
+    year_id: string | null
+    reflection_prompt: string | null
+  } | null
 }
 
 /**
  * Load the public/cohort reflections feed.
- *
- * Three queries:
- *   1. Pull the top N reflections + lab + author in one round trip.
- *   2. Aggregate per-reflection comment counts in a single grouped query.
- *   3. Fetch all reactions for these reflections (with current user's reactions).
  */
 export async function loadReflectionFeed(options?: {
   /** Limit how many reflections come back. Defaults to 50. */
   limit?: number
 }): Promise<ReflectionFeedItem[]> {
-  console.log('[v0] loadReflectionFeed called with options:', options)
-  
   const supabase = await createClient()
   const limit = Math.max(1, Math.min(options?.limit ?? 50, 200))
 
@@ -84,70 +77,39 @@ export async function loadReflectionFeed(options?: {
   } = await supabase.auth.getUser()
   const currentUserId = user?.id
 
+  // Fetch reflections with author and content in one query
   const { data: raw, error } = await supabase
     .from('user_content_reflections')
     .select(
       `
-      id, response as body, visibility, submitted_at,
-      profile_id, content_id
+      id,
+      response as body,
+      visibility,
+      submitted_at,
+      author:profile_id (
+        id,
+        full_name,
+        email,
+        avatar_url
+      ),
+      content:content_id (
+        id,
+        title,
+        year_id,
+        reflection_prompt
+      )
       `,
     )
     .neq('visibility', 'private')
     .order('submitted_at', { ascending: false })
     .limit(limit)
-    .returns<
-      Array<{
-        id: string
-        body: string
-        visibility: 'public' | 'cohort' | 'private'
-        submitted_at: string
-        profile_id: string
-        content_id: string
-      }>
-    >()
+    .returns<RawReflectionRow[]>()
 
-  console.log('[v0] loadReflectionFeed - fetched raw reflections:', raw?.length, 'error:', error)
-  
   if (error || !raw) {
-    console.log('[v0] loadReflectionFeed - error occurred, returning empty')
     return []
   }
 
-  // Now fetch the author and content details separately
-  const profileIds = [...new Set(raw.map((r) => r.profile_id))]
-  const contentIds = [...new Set(raw.map((r) => r.content_id))]
-
-  const [profilesRes, contentsRes] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id, full_name, email, avatar_url')
-      .in('id', profileIds)
-      .returns<
-        Array<{
-          id: string
-          full_name: string | null
-          email: string | null
-          avatar_url: string | null
-        }>
-      >(),
-    supabase
-      .from('labs')
-      .select('id, title, year_id, reflection_prompt')
-      .in('id', contentIds)
-      .returns<
-        Array<{
-          id: string
-          title: string | null
-          year_id: string | null
-          reflection_prompt: string | null
-        }>
-      >(),
-  ])
-
-  const profilesById = new Map(profilesRes.data?.map((p) => [p.id, p]) ?? [])
-  const contentsById = new Map(contentsRes.data?.map((c) => [c.id, c]) ?? [])
-
-  // Aggregate comment counts per reflection.
+  // Aggregate comment counts per reflection
   const ids = raw.map((r) => r.id)
   const counts = new Map<string, number>()
 
@@ -165,12 +127,11 @@ export async function loadReflectionFeed(options?: {
     }
   }
 
-  // Fetch reactions: count by kind for each reflection, and the current user's reactions.
+  // Fetch reactions
   const reactionsByReflection = new Map<string, Map<string, number>>()
   const userReactionsByReflection = new Map<string, Set<string>>()
 
   if (ids.length > 0) {
-    // All reactions on these reflections
     const { data: reactions } = await supabase
       .from('community_reflection_reactions')
       .select('reflection_id, kind, profile_id')
@@ -184,14 +145,12 @@ export async function loadReflectionFeed(options?: {
       >()
 
     for (const reaction of reactions ?? []) {
-      // Count by kind
       if (!reactionsByReflection.has(reaction.reflection_id)) {
         reactionsByReflection.set(reaction.reflection_id, new Map())
       }
       const kindMap = reactionsByReflection.get(reaction.reflection_id)!
       kindMap.set(reaction.kind, (kindMap.get(reaction.kind) ?? 0) + 1)
 
-      // Track current user's reactions
       if (reaction.profile_id === currentUserId) {
         if (!userReactionsByReflection.has(reaction.reflection_id)) {
           userReactionsByReflection.set(reaction.reflection_id, new Set())
@@ -201,36 +160,27 @@ export async function loadReflectionFeed(options?: {
     }
   }
 
-  const result = raw.map((r) => {
-    const author = profilesById.get(r.profile_id)
-    const content = contentsById.get(r.content_id)
-
-    return {
-      id: r.id,
-      body: r.body,
-      visibility: r.visibility,
-      created_at: r.submitted_at,
-      updated_at: null,
-      content: content
-        ? {
-            id: content.id,
-            title: content.title,
-            year_id: content.year_id,
-            prompt: content.reflection_prompt,
-          }
-        : null,
-      author: author ?? null,
-      comment_count: counts.get(r.id) ?? 0,
-      reactions: Array.from(reactionsByReflection.get(r.id)?.entries() ?? []).map(
-        ([kind, count]) => ({ kind, count }),
-      ),
-      user_reactions: Array.from(userReactionsByReflection.get(r.id) ?? []),
-    }
-  })
-
-  console.log('[v0] loadReflectionFeed - returning result with count:', result.length)
-  
-  return result
+  return raw.map((r) => ({
+    id: r.id,
+    body: r.body,
+    visibility: r.visibility,
+    created_at: r.submitted_at,
+    updated_at: null,
+    content: r.content
+      ? {
+          id: r.content.id,
+          title: r.content.title,
+          year_id: r.content.year_id,
+          prompt: r.content.reflection_prompt,
+        }
+      : null,
+    author: r.author,
+    comment_count: counts.get(r.id) ?? 0,
+    reactions: Array.from(reactionsByReflection.get(r.id)?.entries() ?? []).map(
+      ([kind, count]) => ({ kind, count }),
+    ),
+    user_reactions: Array.from(userReactionsByReflection.get(r.id) ?? []),
+  }))
 }
 
 /** Wire shape returned by loadComments(). */
