@@ -87,22 +87,61 @@ export async function loadReflectionFeed(options?: {
     .select(
       `
       id, response as body, visibility, submitted_at,
-      lab:content_id ( id, title, year_id, reflection_prompt ),
-      author:profile_id ( id, full_name, email, avatar_url )
+      profile_id, content_id
       `,
     )
     .neq('visibility', 'private')
     .order('submitted_at', { ascending: false })
     .limit(limit)
-    .returns<RawReflectionRow[]>()
+    .returns<
+      Array<{
+        id: string
+        body: string
+        visibility: 'public' | 'cohort' | 'private'
+        submitted_at: string
+        profile_id: string
+        content_id: string
+      }>
+    >()
 
-  console.log('[v0] loadReflectionFeed - error:', error)
-  console.log('[v0] loadReflectionFeed - raw count:', raw?.length)
-  console.log('[v0] loadReflectionFeed - raw data:', JSON.stringify(raw, null, 2))
   if (error || !raw) {
-    console.log('[v0] loadReflectionFeed - returning empty due to error or no data')
+    console.log('[v0] loadReflectionFeed - error:', error)
     return []
   }
+
+  // Now fetch the author and content details separately
+  const profileIds = [...new Set(raw.map((r) => r.profile_id))]
+  const contentIds = [...new Set(raw.map((r) => r.content_id))]
+
+  const [profilesRes, contentsRes] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, avatar_url')
+      .in('id', profileIds)
+      .returns<
+        Array<{
+          id: string
+          full_name: string | null
+          email: string | null
+          avatar_url: string | null
+        }>
+      >(),
+    supabase
+      .from('labs')
+      .select('id, title, year_id, reflection_prompt')
+      .in('id', contentIds)
+      .returns<
+        Array<{
+          id: string
+          title: string | null
+          year_id: string | null
+          reflection_prompt: string | null
+        }>
+      >(),
+  ])
+
+  const profilesById = new Map(profilesRes.data?.map((p) => [p.id, p]) ?? [])
+  const contentsById = new Map(contentsRes.data?.map((c) => [c.id, c]) ?? [])
 
   // Aggregate comment counts per reflection.
   const ids = raw.map((r) => r.id)
@@ -158,31 +197,33 @@ export async function loadReflectionFeed(options?: {
     }
   }
 
-  const result = raw.map((r) => ({
-    id: r.id,
-    body: r.body,
-    visibility: r.visibility,
-    created_at: r.submitted_at,
-    updated_at: null,
-    content: r.lab
-      ? {
-          id: r.lab.id,
-          title: r.lab.title,
-          year_id: r.lab.year_id,
-          prompt: r.lab.reflection_prompt,
-        }
-      : null,
-    author: r.author,
-    comment_count: counts.get(r.id) ?? 0,
-    reactions: Array.from(reactionsByReflection.get(r.id)?.entries() ?? []).map(
-      ([kind, count]) => ({ kind, count }),
-    ),
-    user_reactions: Array.from(userReactionsByReflection.get(r.id) ?? []),
-  }))
-  
-  console.log('[v0] loadReflectionFeed - final result count:', result.length)
-  console.log('[v0] loadReflectionFeed - final result:', JSON.stringify(result, null, 2))
-  
+  const result = raw.map((r) => {
+    const author = profilesById.get(r.profile_id)
+    const content = contentsById.get(r.content_id)
+
+    return {
+      id: r.id,
+      body: r.body,
+      visibility: r.visibility,
+      created_at: r.submitted_at,
+      updated_at: null,
+      content: content
+        ? {
+            id: content.id,
+            title: content.title,
+            year_id: content.year_id,
+            prompt: content.reflection_prompt,
+          }
+        : null,
+      author: author ?? null,
+      comment_count: counts.get(r.id) ?? 0,
+      reactions: Array.from(reactionsByReflection.get(r.id)?.entries() ?? []).map(
+        ([kind, count]) => ({ kind, count }),
+      ),
+      user_reactions: Array.from(userReactionsByReflection.get(r.id) ?? []),
+    }
+  })
+
   return result
 }
 
