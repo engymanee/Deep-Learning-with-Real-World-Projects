@@ -117,11 +117,33 @@ export async function getDashboardData(): Promise<DashboardData> {
   // Tally a per-phase content count, applying per-fellow cohort
   // visibility through the full Phase -> Module -> Content cascade.
   const countsByPhase = new Map<string, number>()
+  console.log('[v0] Phase count:', phaseRows?.length)
+  console.log('[v0] Module count:', moduleRows?.length)
+  console.log('[v0] Item count:', itemRows?.length)
+  console.log('[v0] modulePhaseById:', Object.fromEntries(modulePhaseById))
+  
   for (const item of itemRows ?? []) {
+    // Skip items without a category (they won't render in the UI anyway).
+    // If you want to show items even without a category, change this logic.
     if (!item.category) continue
-    if (!item.module_id) continue
+    if (!item.module_id) {
+      console.log('[v0] Item has no module_id:', item.id)
+      continue
+    }
+    
+    // Get the phase ID from the module
+    const phaseId = modulePhaseById.get(item.module_id)
+    console.log('[v0] Lab:', item.id, 'module_id:', item.module_id, 'phaseId from module:', phaseId, 'item.year_id:', item.year_id)
+    
+    // Use phaseId from module, but fall back to item.year_id for backward compat
+    const targetPhaseId = phaseId ?? item.year_id
+    if (!targetPhaseId) {
+      console.log('[v0] No phase found for item:', item.id)
+      continue
+    }
+    
     const moduleCohorts = moduleCohortById.get(item.module_id) ?? null
-    const phaseCohorts = phaseCohortById.get(item.year_id) ?? null
+    const phaseCohorts = phaseCohortById.get(targetPhaseId) ?? null
     if (isFellow) {
       if (
         !canFellowSeeContent(
@@ -134,8 +156,9 @@ export async function getDashboardData(): Promise<DashboardData> {
         continue
       }
     }
-    countsByPhase.set(item.year_id, (countsByPhase.get(item.year_id) ?? 0) + 1)
+    countsByPhase.set(targetPhaseId, (countsByPhase.get(targetPhaseId) ?? 0) + 1)
   }
+  console.log('[v0] Final countsByPhase:', Object.fromEntries(countsByPhase))
 
   // Build the phase list, hiding phases the fellow can't see at all.
   const phases: DashboardPhase[] = []
