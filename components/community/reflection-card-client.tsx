@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ReflectionVisibilityToggle } from '@/components/community/reflection-visibility-toggle'
+import { ReflectionReactions } from '@/components/community/reflection-reactions'
 import { CommentThread } from '@/components/community/comment-thread'
 import { initialsFor } from '@/lib/types/profile'
 import type {
@@ -126,6 +127,11 @@ export function ReflectionCardClient({
         </p>
 
         <footer className="flex items-center gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
+          <ReflectionReactions
+            reflectionId={reflection.id}
+            reactions={reflection.reactions}
+            userReactions={reflection.user_reactions}
+          />
           <span className="inline-flex items-center gap-1">
             <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
             {comments.filter((c) => !c.is_deleted).length}{' '}
