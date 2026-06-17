@@ -28,6 +28,11 @@ export default async function CommunityOverviewPage() {
         .in('role', ['fellow', 'facilitator'])
         .is('deactivated_at', null)
     }
+    if (s.slug === 'schools') {
+      return supabase
+        .from('cohorts')
+        .select('id', { count: 'exact', head: true })
+    }
     if (s.slug === 'reflections') {
       return supabase
         .from('user_content_reflections')
@@ -48,13 +53,13 @@ export default async function CommunityOverviewPage() {
     count: countResults[i].count ?? 0,
   }))
 
-  // Highlight featured sections (Wins and Reflections)
+  // Highlight featured sections (Reflections)
   const featuredSections = counts.filter((c) => 
-    c.section.slug === 'wins' || c.section.slug === 'reflections'
+    c.section.slug === 'reflections'
   )
   
   const otherSections = counts.filter((c) => 
-    c.section.slug !== 'wins' && c.section.slug !== 'reflections'
+    c.section.slug !== 'reflections'
   )
 
   return (
@@ -82,15 +87,16 @@ export default async function CommunityOverviewPage() {
         </Link>
       </header>
 
-      {/* Featured Sections - Wins & Reflections */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="font-serif text-xl text-foreground">
-            Featured sections
-          </h2>
-        </div>
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {featuredSections.map(({ section, count }) => {
+      {/* Featured Sections */}
+      {featuredSections.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="font-serif text-xl text-foreground">
+              Featured sections
+            </h2>
+          </div>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {featuredSections.map(({ section, count }) => {
             const Icon = section.icon
             return (
               <li key={section.id}>
@@ -121,9 +127,10 @@ export default async function CommunityOverviewPage() {
                 </Link>
               </li>
             )
-          })}
-        </ul>
-      </section>
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* All Sections Grid */}
       <section className="flex flex-col gap-3">
