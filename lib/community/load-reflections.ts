@@ -96,7 +96,12 @@ export async function loadReflectionFeed(options?: {
     .limit(limit)
     .returns<RawReflectionRow[]>()
 
-  if (error || !raw) return []
+  console.log('[v0] loadReflectionFeed - error:', error)
+  console.log('[v0] loadReflectionFeed - raw count:', raw?.length)
+  if (error || !raw) {
+    console.log('[v0] loadReflectionFeed - returning empty due to error or no data')
+    return []
+  }
 
   // Aggregate comment counts per reflection.
   const ids = raw.map((r) => r.id)
