@@ -34,6 +34,13 @@ export interface ReflectionFeedItem {
   } | null
   /** Number of non-deleted comments attached to this reflection. */
   comment_count: number
+  /** Reaction counts by kind. */
+  reactions: {
+    kind: string
+    count: number
+  }[]
+  /** Current user's reactions (kinds they've reacted with). */
+  user_reactions: string[]
 }
 
 interface RawReflectionRow {
@@ -59,14 +66,10 @@ interface RawReflectionRow {
 /**
  * Load the public/cohort reflections feed.
  *
- * Two queries:
+ * Three queries:
  *   1. Pull the top N reflections + lab + author in one round trip.
- *   2. Aggregate per-reflection comment counts in a single grouped
- *      query, then fold back into the rows.
- *
- * We deliberately keep `private` reflections out of the feed at the
- * query level (RLS would also enforce that, but filtering early
- * keeps the query payload small).
+ *   2. Aggregate per-reflection comment counts in a single grouped query.
+ *   3. Fetch all reactions for these reflections (with current user's reactions).
  */
 export async function loadReflectionFeed(options?: {
   /** Limit how many reflections come back. Defaults to 50. */
@@ -74,6 +77,11 @@ export async function loadReflectionFeed(options?: {
 }): Promise<ReflectionFeedItem[]> {
   const supabase = await createClient()
   const limit = Math.max(1, Math.min(options?.limit ?? 50, 200))
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const currentUserId = user?.id
 
   const { data: raw, error } = await supabase
     .from('user_content_reflections')
@@ -91,8 +99,7 @@ export async function loadReflectionFeed(options?: {
 
   if (error || !raw) return []
 
-  // Aggregate comment counts per reflection. We use a single SELECT
-  // with subject filter; Postgres groups + counts in one pass.
+  // Aggregate comment counts per reflection.
   const ids = raw.map((r) => r.id)
   const counts = new Map<string, number>()
 
@@ -107,6 +114,42 @@ export async function loadReflectionFeed(options?: {
 
     for (const row of commentRows ?? []) {
       counts.set(row.subject_id, (counts.get(row.subject_id) ?? 0) + 1)
+    }
+  }
+
+  // Fetch reactions: count by kind for each reflection, and the current user's reactions.
+  const reactionsByReflection = new Map<string, Map<string, number>>()
+  const userReactionsByReflection = new Map<string, Set<string>>()
+
+  if (ids.length > 0) {
+    // All reactions on these reflections
+    const { data: reactions } = await supabase
+      .from('community_reflection_reactions')
+      .select('reflection_id, kind, profile_id')
+      .in('reflection_id', ids)
+      .returns<
+        Array<{
+          reflection_id: string
+          kind: string
+          profile_id: string
+        }>
+      >()
+
+    for (const reaction of reactions ?? []) {
+      // Count by kind
+      if (!reactionsByReflection.has(reaction.reflection_id)) {
+        reactionsByReflection.set(reaction.reflection_id, new Map())
+      }
+      const kindMap = reactionsByReflection.get(reaction.reflection_id)!
+      kindMap.set(reaction.kind, (kindMap.get(reaction.kind) ?? 0) + 1)
+
+      // Track current user's reactions
+      if (reaction.profile_id === currentUserId) {
+        if (!userReactionsByReflection.has(reaction.reflection_id)) {
+          userReactionsByReflection.set(reaction.reflection_id, new Set())
+        }
+        userReactionsByReflection.get(reaction.reflection_id)!.add(reaction.kind)
+      }
     }
   }
 
@@ -126,6 +169,10 @@ export async function loadReflectionFeed(options?: {
       : null,
     author: r.author,
     comment_count: counts.get(r.id) ?? 0,
+    reactions: Array.from(reactionsByReflection.get(r.id)?.entries() ?? []).map(
+      ([kind, count]) => ({ kind, count }),
+    ),
+    user_reactions: Array.from(userReactionsByReflection.get(r.id) ?? []),
   }))
 }
 

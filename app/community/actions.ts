@@ -306,6 +306,17 @@ export async function setAskStatus(input: {
  * we'd let any comment id be linked, which is a data-integrity bug
  * waiting to happen.
  */
+
+/**
+ * Mark a single comment as the accepted answer for an ask. Setting
+ * the comment id also flips the ask's status to 'answered' so the
+ * lifecycle filter stays accurate. Pass `null` to clear.
+ *
+ * Only the post author or staff can mark/unmark the accepted answer.
+ * The comment must belong to the post (subject_id match) - otherwise
+ * we'd let any comment id be linked, which is a data-integrity bug
+ * waiting to happen.
+ */
 export async function setAcceptedAnswer(input: {
   postId: string
   commentId: string | null
@@ -394,4 +405,71 @@ export async function setAcceptedAnswer(input: {
   revalidatePath('/community/ask')
   revalidatePath(`/community/stories/${input.postId}`)
   return { ok: true }
+}
+
+/**
+ * Add a reaction to a reflection
+ */
+export async function addReactionToReflection(
+  reflectionId: string,
+  kind: string = 'cheer',
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const user = await requireUser()
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('community_reflection_reactions')
+      .insert({
+        reflection_id: reflectionId,
+        profile_id: user.id,
+        kind,
+      })
+
+    if (error) {
+      if (error.code === '23505') {
+        // Unique constraint violation - user already reacted with this kind
+        return { ok: false, message: 'Already reacted' }
+      }
+      throw error
+    }
+
+    revalidatePath('/community/reflections')
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Failed to add reaction.',
+    }
+  }
+}
+
+/**
+ * Remove a reaction from a reflection
+ */
+export async function removeReactionFromReflection(
+  reflectionId: string,
+  kind: string = 'cheer',
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const user = await requireUser()
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('community_reflection_reactions')
+      .delete()
+      .eq('reflection_id', reflectionId)
+      .eq('profile_id', user.id)
+      .eq('kind', kind)
+
+    if (error) throw error
+
+    revalidatePath('/community/reflections')
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'Failed to remove reaction.',
+    }
+  }
 }
