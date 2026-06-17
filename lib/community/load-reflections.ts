@@ -47,8 +47,7 @@ interface RawReflectionRow {
   id: string
   body: string
   visibility: 'public' | 'cohort' | 'private'
-  created_at: string
-  updated_at: string | null
+  submitted_at: string
   lab: {
     id: string
     title: string | null
@@ -87,13 +86,13 @@ export async function loadReflectionFeed(options?: {
     .from('user_content_reflections')
     .select(
       `
-      id, response as body, visibility, created_at, updated_at,
+      id, response as body, visibility, submitted_at,
       lab:content_id ( id, title, year_id, reflection_prompt ),
       author:profile_id ( id, full_name, email, avatar_url )
       `,
     )
     .neq('visibility', 'private')
-    .order('created_at', { ascending: false })
+    .order('submitted_at', { ascending: false })
     .limit(limit)
     .returns<RawReflectionRow[]>()
 
@@ -157,8 +156,8 @@ export async function loadReflectionFeed(options?: {
     id: r.id,
     body: r.body,
     visibility: r.visibility,
-    created_at: r.created_at,
-    updated_at: r.updated_at,
+    created_at: r.submitted_at,
+    updated_at: null,
     content: r.lab
       ? {
           id: r.lab.id,
