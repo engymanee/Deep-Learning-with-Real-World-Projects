@@ -5,10 +5,8 @@ import { AdminBreadcrumb } from '@/components/admin/admin-breadcrumb'
 import { getMenuCustomPages } from '@/lib/custom-pages/menu'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  // requireAdmin always evaluates the real underlying account, ignoring
-  // any active "preview as fellow" cookie. This keeps the admin console
-  // reachable even while the admin is currently previewing the platform
-  // as a fellow on other surfaces.
+  // Middleware blocks all /admin routes when preview cookie is set,
+  // so this check is only reached when the admin is NOT in preview mode.
   await requireAdmin()
   const customPages = await getMenuCustomPages()
 
