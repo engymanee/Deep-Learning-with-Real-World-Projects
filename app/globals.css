@@ -167,7 +167,7 @@
   }
   
   a {
-    @apply text-accent hover:text-primary-light transition-colors underline decoration-2 underline-offset-2;
+    @apply text-accent hover:text-primary-light transition-colors;
   }
   
   a:focus-visible {
