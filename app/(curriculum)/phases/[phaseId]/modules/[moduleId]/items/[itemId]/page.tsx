@@ -218,7 +218,7 @@ export default async function ContentItemPage({
         {(resource || duration) && (
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {resource && (
-              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 font-medium uppercase tracking-wider">
+              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 font-medium tracking-wider">
                 {resource.label}
               </span>
             )}

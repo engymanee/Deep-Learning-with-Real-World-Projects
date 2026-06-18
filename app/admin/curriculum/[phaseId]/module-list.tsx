@@ -147,13 +147,13 @@ function ModuleRowItem({
         className="group min-w-0 flex-1"
       >
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium tracking-wider text-muted-foreground">
             <BookOpen className="h-3 w-3" aria-hidden="true" />
             {count} {count === 1 ? 'item' : 'items'}
           </span>
           {inherits ? (
             <span
-              className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+              className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium tracking-wider text-muted-foreground"
               title="Inherits cohort access from the phase"
             >
               Inherits phase

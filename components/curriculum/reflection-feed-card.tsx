@@ -55,7 +55,7 @@ export function ReflectionFeedCard({
         {/* Header */}
         <div className="mb-3 flex items-start justify-between">
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">
+            <p className="text-xs text-muted-foreground tracking-wider">
               {reflection.contentTitle}
             </p>
             <p className="font-medium text-foreground">{reflection.title}</p>

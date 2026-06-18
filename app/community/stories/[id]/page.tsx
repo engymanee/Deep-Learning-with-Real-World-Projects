@@ -161,11 +161,11 @@ export default async function StoryPage({
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="text-[10px] uppercase">
+            <Badge variant="outline" className="text-[10px]">
               {kindLabel}
             </Badge>
             {!data.published_at && (
-              <Badge variant="secondary" className="text-[10px] uppercase">
+              <Badge variant="secondary" className="text-[10px]">
                 Draft
               </Badge>
             )}

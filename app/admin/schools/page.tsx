@@ -117,7 +117,7 @@ export default async function AdminSchoolsPage() {
                 <Building2 className="h-5 w-5" />
               </span>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <p className="text-xs font-medium tracking-wider text-muted-foreground">
                   Schools
                 </p>
                 <p className="text-2xl font-semibold text-foreground">{schoolList.length}</p>
@@ -131,7 +131,7 @@ export default async function AdminSchoolsPage() {
                 <Users className="h-5 w-5" />
               </span>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <p className="text-xs font-medium tracking-wider text-muted-foreground">
                   Teams
                 </p>
                 <p className="text-2xl font-semibold text-foreground">{cohortList.length}</p>
@@ -145,7 +145,7 @@ export default async function AdminSchoolsPage() {
                 <Users className="h-5 w-5" />
               </span>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <p className="text-xs font-medium tracking-wider text-muted-foreground">
                   Total Members
                 </p>
                 <p className="text-2xl font-semibold text-foreground">{memberList.length}</p>

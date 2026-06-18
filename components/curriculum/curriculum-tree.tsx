@@ -11,7 +11,7 @@ import { getCategory, type ContentCategory } from '@/lib/curriculum'
 
 /**
  * Categories that map to the lab session structure. Items in these
- * buckets get a small uppercase eyebrow heading inside the module.
+ * buckets get a small eyebrow heading inside the module.
  * Order here is the order they're rendered.
  */
 const LAB_CATEGORIES: readonly ContentCategory[] = [
@@ -320,7 +320,7 @@ export function CurriculumTree({ phases }: Props) {
 
 /**
  * Inner body of an open module. Splits items into Before / During /
- * After Lab groups (each with an uppercase eyebrow heading) and a
+ * After Lab groups (each with an eyebrow heading) and a
  * trailing flat list for any other category. Empty groups are
  * skipped so headings only appear when there are items beneath them.
  */
@@ -354,7 +354,7 @@ function ModuleBody({
         <div key={group.category} className="flex flex-col">
           {/* Use the rose accent (`#bb4658`) so the lab phases pop
               against the otherwise navy/neutral tree. */}
-          <p className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-accent">
+          <p className="px-3 pb-1 pt-1 text-[11px] font-semibold tracking-wider text-accent">
             {getCategory(group.category).label}
           </p>
           <ul className="flex flex-col">

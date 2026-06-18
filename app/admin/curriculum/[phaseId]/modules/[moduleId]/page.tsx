@@ -101,7 +101,7 @@ export default async function AdminModuleDetailPage({
           <ArrowLeft className="h-4 w-4" />
           Back to {phase.title}
         </Link>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">
+        <p className="text-xs tracking-wider text-muted-foreground">
           {phase.title}
         </p>
       </div>

@@ -98,7 +98,7 @@ export default async function NotificationsInboxPage() {
       <TopBar />
       <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:py-10">
         <header className="flex flex-col gap-2 border-b border-border pb-6">
-          <p className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="inline-flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground">
             <Bell className="h-3.5 w-3.5" aria-hidden />
             Inbox
           </p>

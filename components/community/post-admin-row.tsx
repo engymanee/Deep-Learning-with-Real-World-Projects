@@ -64,7 +64,7 @@ export function PostAdminRow({ postId, isFeatured, isArchived }: Props) {
       className="mt-1 flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border/60 bg-muted/20 px-3 py-1.5 text-[11px] text-muted-foreground"
       aria-label="Admin moderation controls"
     >
-      <span className="font-semibold uppercase tracking-wide">Staff</span>
+      <span className="font-semibold tracking-wide">Staff</span>
       <Button
         type="button"
         size="sm"

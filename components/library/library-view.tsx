@@ -617,7 +617,7 @@ function GridCard({
         )}
         <Badge
           variant="secondary"
-          className="absolute left-2 top-2 bg-card/95 text-[10px] uppercase tracking-wide backdrop-blur"
+          className="absolute left-2 top-2 bg-card/95 text-[10px] tracking-wide backdrop-blur"
         >
           <Icon className="mr-1 h-3 w-3" aria-hidden="true" />
           {meta.label}
@@ -636,7 +636,7 @@ function GridCard({
               identity, not as metadata. Hidden when the row predates
               migration 043 and has no author recorded. */}
           {resource.author && (
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">
               by {resource.author}
             </p>
           )}
@@ -710,7 +710,7 @@ function ListRow({
             <h3 className="font-serif text-base leading-snug text-foreground group-hover:text-primary">
               {resource.title}
             </h3>
-            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+            <Badge variant="outline" className="text-[10px] tracking-wide">
               {meta.label}
             </Badge>
             {showCohort && <CohortBadgeRow resource={resource} compact />}

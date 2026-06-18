@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
-import { Cardo, Vollkorn, Alegreya_SC, Inter } from 'next/font/google'
-import { Lora } from 'next/font/google'
+import { Cardo, Vollkorn, Lora, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { UserProvider } from '@/lib/user-context'
 import { getCurrentUser } from '@/lib/auth-server'
@@ -27,10 +26,10 @@ const vollkorn = Vollkorn({
   display: 'swap',
 })
 
-const alegreyaSC = Alegreya_SC({
+const lora = Lora({
   subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  variable: '--font-alegreya-sc',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-lora',
   display: 'swap',
 })
 
@@ -87,7 +86,7 @@ export default async function RootLayout({
       lang="en" 
       className="bg-background"
       style={{
-        fontFamily: `${cardo.style.fontFamily}, ${vollkorn.style.fontFamily}, ${alegreyaSC.style.fontFamily}, ${interFont.style.fontFamily}`,
+        fontFamily: `${cardo.style.fontFamily}, ${vollkorn.style.fontFamily}, ${lora.style.fontFamily}, ${interFont.style.fontFamily}`,
       }}
     >
       {/* `suppressHydrationWarning` here is scoped to <body> only -
@@ -98,7 +97,7 @@ export default async function RootLayout({
           tree still surface as warnings. */}
       <body
         suppressHydrationWarning
-        className={`${_sans.variable} ${_serif.variable} ${cardo.variable} ${vollkorn.variable} ${alegreyaSC.variable} ${interFont.variable} font-sans antialiased`}
+        className={`${_sans.variable} ${_serif.variable} ${cardo.variable} ${vollkorn.variable} ${lora.variable} ${interFont.variable} font-sans antialiased`}
       >
         <SkipNav />
         <UserProvider initialUser={user}>

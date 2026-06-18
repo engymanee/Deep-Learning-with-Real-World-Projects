@@ -148,7 +148,7 @@ function EventCard({ ev }: { ev: EventRow }) {
           <div className="flex items-center gap-2">
             <CardTitle className="font-serif text-base">{ev.title}</CardTitle>
             {isPast && (
-              <Badge variant="secondary" className="text-[10px] uppercase">
+              <Badge variant="secondary" className="text-[10px]">
                 Past
               </Badge>
             )}
@@ -340,7 +340,7 @@ function PostCard({ post }: { post: PostRow }) {
             </Badge>
             <Badge
               variant={published ? 'default' : 'outline'}
-              className="text-[10px] uppercase"
+              className="text-[10px]"
             >
               {published ? 'Published' : 'Draft'}
             </Badge>
@@ -537,7 +537,7 @@ function ResourceCard({ resource }: { resource: ResourceRow }) {
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             {resource.category && (
-              <Badge variant="outline" className="text-[10px] uppercase">
+              <Badge variant="outline" className="text-[10px]">
                 {resource.category}
               </Badge>
             )}

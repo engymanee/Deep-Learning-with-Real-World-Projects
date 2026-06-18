@@ -57,7 +57,7 @@ export function TeamDirectory({ members, showCohort = false }: Props) {
           role="group"
           aria-label="Filter team by cohort"
         >
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="text-xs font-medium tracking-wide text-muted-foreground">
             Cohort
           </span>
           <FilterPill

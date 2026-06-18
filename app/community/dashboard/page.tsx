@@ -41,7 +41,7 @@ export default async function CommunityDashboardPage() {
       <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-sm font-medium tracking-wide text-muted-foreground">
             Community
           </p>
           <h1 className="mt-1 font-serif text-3xl text-balance text-foreground">
@@ -387,7 +387,7 @@ function StatTile({
           : 'border-border hover:border-primary/40',
       ].join(' ')}
     >
-      <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <span className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground">
         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
         {label}
       </span>

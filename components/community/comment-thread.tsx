@@ -240,7 +240,7 @@ export function CommentThread({
 
   return (
     <section className="flex flex-col gap-3" aria-label="Comments">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground">
         {comments.filter((c) => !c.is_deleted).length === 0
           ? 'Comments'
           : `Comments (${comments.filter((c) => !c.is_deleted).length})`}
