@@ -65,12 +65,13 @@ export default async function AdminUsersPage({
     .order('name', { ascending: true })
 
   // Profiles (DB is source of truth for name/role/title/cohort).
-  const { data: profiles } = await supabase
+    const { data: profiles } = await supabase
     .from('profiles')
     .select(
       `
-        id, full_name, email, title, role, cohort, deactivated_at,
-        cohort_members ( cohort_id, cohorts ( id, name ) )
+        id, full_name, email, title, role, cohort, deactivated_at, school_team_id,
+        cohort_members ( cohort_id, cohorts ( id, name ) ),
+        school_teams ( id, cohort_id, cohorts ( id, name ) )
       `,
     )
     .order('full_name', { ascending: true, nullsFirst: false })

@@ -193,31 +193,32 @@ export async function deleteCohortAction(formData: FormData): Promise<ActionResu
 export async function addMemberAction(formData: FormData): Promise<ActionResult> {
   try {
     await requireAdmin()
-    const cohortId = String(formData.get('cohortId') ?? '')
+    const schoolTeamId = String(formData.get('schoolTeamId') ?? '')
     const profileId = String(formData.get('profileId') ?? '')
-    if (!cohortId || !profileId) return fail('Missing cohort or profile')
+    if (!schoolTeamId || !profileId) return fail('Missing school team or profile')
 
     const admin = createAdminClient()
 
-    // Also ensure the profile's school_id matches the cohort's school, so the
-    // Team column + cohort-scoped queries stay consistent.
-    const { data: cohort, error: cErr } = await admin
-      .from('cohorts')
-      .select('school_id')
-      .eq('id', cohortId)
+    // Phase 2: Resolve school_team to get cohort_id and school_id
+    const { data: schoolTeam, error: stErr } = await admin
+      .from('school_teams')
+      .select('id, cohort_id, school_id')
+      .eq('id', schoolTeamId)
       .single()
-    if (cErr || !cohort) return fail(cErr?.message ?? 'Team not found')
+    if (stErr || !schoolTeam) return fail(stErr?.message ?? 'Team not found')
 
+    // Add to cohort_members for curriculum queries to work
     const { error: memErr } = await admin
       .from('cohort_members')
-      .insert({ cohort_id: cohortId, profile_id: profileId })
+      .insert({ cohort_id: schoolTeam.cohort_id, profile_id: profileId })
     if (memErr && !memErr.message.toLowerCase().includes('duplicate')) {
       return fail(memErr.message)
     }
 
+    // Set school_team_id on profile (and school_id for backward compatibility)
     const { error: profErr } = await admin
       .from('profiles')
-      .update({ school_id: cohort.school_id })
+      .update({ school_team_id: schoolTeam.id, school_id: schoolTeam.school_id })
       .eq('id', profileId)
     if (profErr) return fail(profErr.message)
 

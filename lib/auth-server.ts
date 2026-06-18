@@ -14,10 +14,12 @@ export interface ProfileRow {
   avatar_url: string | null
   role: UserRole
   school_id: string | null
+  school_team_id: string | null
   deactivated_at: string | null
   cohort: string | null
-  // Embedded school via FK relationship - one extra join, no extra round-trip.
+  // Embedded school + cohort via FK relationship through school_teams
   schools: { name: string | null } | null
+  school_teams: { id: string; school_id: string; cohort_id: string } | null
 }
 
 function buildUserFromProfile(
@@ -25,16 +27,20 @@ function buildUserFromProfile(
   fallbackEmail: string,
   preview?: PreviewMeta,
 ): CurrentUser {
+  // Resolve school name and team ID via school_teams if available (Phase 2),
+  // fall back to direct school_id and schools join (Phase 1 compatibility)
+  const schoolName = profile.school_teams
+    ? profile.schools?.name ?? ''
+    : profile.schools?.name ?? ''
+  const schoolTeamId = profile.school_team_id ?? profile.school_id ?? undefined
+
   return {
     id: profile.id,
     email: profile.email ?? fallbackEmail ?? '',
     fullName: profile.full_name ?? fallbackEmail ?? 'Unknown User',
     role: profile.role,
-    schoolName: profile.schools?.name ?? '',
-    // The "school team" the rest of the app keys off of - same as the
-    // profile's school assignment. Without this, /team never finds a
-    // team for any fellow and falls into the unassigned empty state.
-    schoolTeamId: profile.school_id ?? undefined,
+    schoolName,
+    schoolTeamId,
     profileImageUrl: profile.avatar_url ?? undefined,
     bio: profile.title ?? undefined,
     cohort: isCohort(profile.cohort) ? profile.cohort : null,
@@ -68,7 +74,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     const { data: profile } = await supabase
       .from('profiles')
       .select(
-        'id, full_name, email, title, avatar_url, role, school_id, deactivated_at, cohort, schools(name)',
+        'id, full_name, email, title, avatar_url, role, school_id, school_team_id, deactivated_at, cohort, schools(name), school_teams(id, school_id, cohort_id)',
       )
       .eq('id', user.id)
       .maybeSingle<ProfileRow>()
@@ -99,7 +105,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
           const { data: target } = await supabase
             .from('profiles')
             .select(
-              'id, full_name, email, title, avatar_url, role, school_id, deactivated_at, cohort, schools(name)',
+              'id, full_name, email, title, avatar_url, role, school_id, school_team_id, deactivated_at, cohort, schools(name), school_teams(id, school_id, cohort_id)',
             )
             .eq('id', preview.fellowId)
             .maybeSingle<ProfileRow>()

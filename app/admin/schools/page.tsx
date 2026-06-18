@@ -10,6 +10,12 @@ import { TeamMenu } from './team-menu'
 import { SchoolMenu } from './school-menu'
 
 type SchoolRow = { id: string; name: string }
+type SchoolTeamRow = {
+  id: string
+  school_id: string
+  cohort_id: string
+  name: string
+}
 type CohortRow = {
   id: string
   school_id: string
@@ -25,7 +31,7 @@ type FellowRow = {
   id: string
   full_name: string | null
   title: string | null
-  school_id: string | null
+  school_team_id: string | null
 }
 
 function initialsFor(name: string | null): string {
@@ -42,32 +48,32 @@ function cohortLabel(year: number): string {
 export default async function AdminSchoolsPage() {
   const supabase = await createClient()
 
-  const [{ data: schools }, { data: cohorts }, { data: members }, { data: fellows }] =
+  const [{ data: schools }, { data: schoolTeams }, { data: members }, { data: fellows }] =
     await Promise.all([
       supabase.from('schools').select('id, name').order('name'),
-      supabase.from('cohorts').select('id, school_id, name, current_year').order('name'),
+      supabase.from('school_teams').select('id, school_id, cohort_id, name').order('name'),
       supabase
         .from('cohort_members')
         .select('cohort_id, profile_id, profiles:profiles(id, full_name, title)'),
       supabase
         .from('profiles')
-        .select('id, full_name, title, school_id')
+        .select('id, full_name, title, school_team_id')
         .eq('role', 'fellow')
         .is('deactivated_at', null)
         .order('full_name', { ascending: true, nullsFirst: false }),
     ])
 
   const schoolList = (schools ?? []) as SchoolRow[]
-  const cohortList = (cohorts ?? []) as CohortRow[]
+  const schoolTeamList = (schoolTeams ?? []) as SchoolTeamRow[]
   const memberList = (members ?? []) as MemberRow[]
   const fellowList = (fellows ?? []) as FellowRow[]
 
-  // Index structures
-  const cohortsBySchool = new Map<string, CohortRow[]>()
-  for (const c of cohortList) {
-    const arr = cohortsBySchool.get(c.school_id) ?? []
-    arr.push(c)
-    cohortsBySchool.set(c.school_id, arr)
+  // Index structures - now based on school_teams instead of cohorts
+  const teamsBySchool = new Map<string, SchoolTeamRow[]>()
+  for (const st of schoolTeamList) {
+    const arr = teamsBySchool.get(st.school_id) ?? []
+    arr.push(st)
+    teamsBySchool.set(st.school_id, arr)
   }
 
   const membersByCohort = new Map<string, MemberRow[]>()
@@ -80,14 +86,14 @@ export default async function AdminSchoolsPage() {
   }
 
   const membersBySchool = new Map<string, number>()
-  for (const c of cohortList) {
-    const count = (membersByCohort.get(c.id) ?? []).length
-    membersBySchool.set(c.school_id, (membersBySchool.get(c.school_id) ?? 0) + count)
+  for (const st of schoolTeamList) {
+    const count = (membersByCohort.get(st.cohort_id) ?? []).length
+    membersBySchool.set(st.school_id, (membersBySchool.get(st.school_id) ?? 0) + count)
   }
 
-  // Fellows available to add to a team: anyone not already in a cohort.
+  // Fellows available to add to a team: anyone not already assigned to a school team
   const unassignedFellows = fellowList
-    .filter((f) => !assignedProfileIds.has(f.id))
+    .filter((f) => !f.school_team_id)
     .map((f) => ({
       id: f.id,
       label: f.full_name
@@ -134,7 +140,7 @@ export default async function AdminSchoolsPage() {
                 <p className="text-xs font-medium tracking-wider text-muted-foreground">
                   Teams
                 </p>
-                <p className="text-2xl font-semibold text-foreground">{cohortList.length}</p>
+                <p className="text-2xl font-semibold text-foreground">{schoolTeamList.length}</p>
               </div>
             </CardContent>
           </Card>
@@ -181,7 +187,7 @@ export default async function AdminSchoolsPage() {
       ) : (
         <div className="flex flex-col gap-6">
           {schoolList.map((school) => {
-            const cohortsForSchool = cohortsBySchool.get(school.id) ?? []
+            const teamsForSchool = teamsBySchool.get(school.id) ?? []
             const totalMembers = membersBySchool.get(school.id) ?? 0
 
             return (
@@ -196,7 +202,7 @@ export default async function AdminSchoolsPage() {
                       <div>
                         <CardTitle className="text-lg font-serif">{school.name}</CardTitle>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {cohortsForSchool.length} team{cohortsForSchool.length === 1 ? '' : 's'} ·{' '}
+                          {teamsForSchool.length} team{teamsForSchool.length === 1 ? '' : 's'} ·{' '}
                           {totalMembers} member{totalMembers === 1 ? '' : 's'}
                         </p>
                       </div>
@@ -211,7 +217,7 @@ export default async function AdminSchoolsPage() {
 
                 {/* Teams Section */}
                 <CardContent className="p-0">
-                  {cohortsForSchool.length === 0 ? (
+                  {teamsForSchool.length === 0 ? (
                     <div className="px-6 py-8 text-center">
                       <p className="text-sm text-muted-foreground mb-4">
                         No teams yet. Create your first team to get started.
@@ -223,44 +229,41 @@ export default async function AdminSchoolsPage() {
                     </div>
                   ) : (
                     <div className="divide-y divide-border">
-                      {cohortsForSchool.map((cohort) => {
-                        const cohortMembers = membersByCohort.get(cohort.id) ?? []
+                      {teamsForSchool.map((team) => {
+                        const teamMembers = membersByCohort.get(team.cohort_id) ?? []
 
                         return (
-                          <div key={cohort.id} className="p-6">
+                          <div key={team.id} className="p-6">
                             {/* Team Header */}
                             <div className="flex items-start justify-between gap-3 mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <h4 className="font-medium text-foreground">{cohort.name}</h4>
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                                    {cohortLabel(cohort.current_year)}
-                                  </span>
+                                  <h4 className="font-medium text-foreground">{team.name}</h4>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {cohortMembers.length} member{cohortMembers.length === 1 ? '' : 's'}
+                                  {teamMembers.length} member{teamMembers.length === 1 ? '' : 's'}
                                 </p>
                               </div>
                               <TeamMenu
-                                cohortId={cohort.id}
-                                initialName={cohort.name}
-                                initialYear={cohort.current_year}
-                                memberCount={cohortMembers.length}
+                                cohortId={team.cohort_id}
+                                initialName={team.name}
+                                initialYear={1}
+                                memberCount={teamMembers.length}
                               />
                             </div>
 
                             {/* Team Members */}
-                            {cohortMembers.length === 0 ? (
+                            {teamMembers.length === 0 ? (
                               <div className="text-center py-6 text-sm text-muted-foreground">
                                 <p className="mb-3">No members yet</p>
                                 <AddMemberForm
-                                  cohortId={cohort.id}
+                                  cohortId={team.cohort_id}
                                   fellows={unassignedFellows}
                                 />
                               </div>
                             ) : (
                               <div className="space-y-2 mb-4">
-                                {cohortMembers.map((m) => {
+                                {teamMembers.map((m) => {
                                   const fullName = m.profiles?.[0]?.full_name ?? '(Unnamed fellow)'
                                   const isUnnamed = !m.profiles?.[0]?.full_name
                                   return (
@@ -286,7 +289,7 @@ export default async function AdminSchoolsPage() {
                                         </div>
                                       </div>
                                       <RemoveMemberButton
-                                        cohortId={cohort.id}
+                                        cohortId={team.cohort_id}
                                         profileId={m.profile_id}
                                         label={fullName}
                                       />
@@ -300,7 +303,7 @@ export default async function AdminSchoolsPage() {
                             {unassignedFellows.length > 0 && (
                               <div className="mt-3">
                                 <AddMemberForm
-                                  cohortId={cohort.id}
+                                  cohortId={team.cohort_id}
                                   fellows={unassignedFellows}
                                 />
                               </div>
