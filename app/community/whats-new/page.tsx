@@ -27,7 +27,6 @@ export default async function WhatsNewPage() {
       <div className="flex flex-col">
       <SectionHeader
         section={section}
-        count={posts.length}
         canPost={canPost}
       />
       <PostFeed

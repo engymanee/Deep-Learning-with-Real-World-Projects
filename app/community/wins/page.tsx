@@ -58,7 +58,6 @@ export default async function WinsPage({ searchParams }: PageProps) {
       <div className="flex flex-col gap-8">
       <SectionHeader
         section={section}
-        count={posts.length}
         canPost={true}
         frameworks={frameworks}
         requireStarRating

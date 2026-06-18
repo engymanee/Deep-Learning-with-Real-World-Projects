@@ -59,7 +59,6 @@ export default async function AskPage({ searchParams }: PageProps) {
       <div className="flex flex-col">
       <SectionHeader
         section={section}
-        count={posts.length}
         canPost={true}
         requireAskCategory
       />

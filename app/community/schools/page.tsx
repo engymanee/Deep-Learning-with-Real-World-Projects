@@ -35,7 +35,6 @@ export default async function CommunitySchoolsPage() {
       <div className="flex flex-col gap-6">
         <SectionHeader
           section={section}
-          count={schools?.length ?? 0}
           canPost={false}
         />
 

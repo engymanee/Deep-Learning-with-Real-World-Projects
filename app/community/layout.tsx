@@ -1,8 +1,6 @@
 import { TopBar } from '@/components/top-bar'
 import { CommunitySidebar } from '@/components/community/community-sidebar'
 import { requireUser } from '@/lib/auth-server'
-import { createClient } from '@/lib/supabase/server'
-import { COMMUNITY_SECTIONS } from '@/lib/community/sections'
 import { getMenuCustomPages } from '@/lib/custom-pages/menu'
 
 export const metadata = {
@@ -16,17 +14,12 @@ export const metadata = {
  *
  * Renders:
  *   1. TopBar (same as the rest of the app)
- *   2. The Community sidebar (Overview + 5 sections), with counts
+ *   2. The Community sidebar (Overview + sections)
  *   3. The active route's content as `children`
  *
- * Counts are computed once at the layout level so each section page
- * doesn't have to re-query "how many wins exist?". They surface as
- * the small numeric pills next to each sidebar entry.
- *
- * Caching note: requireUser() and the Supabase client are both
- * request-scoped, so calling requireUser() here AND in each child
- * page costs only one round-trip thanks to React's per-request
- * cache().
+ * Caching note: requireUser() is request-scoped, so calling
+ * requireUser() here AND in each child page costs only one
+ * round-trip thanks to React's per-request cache().
  */
 export default async function CommunityLayout({
   children,
@@ -34,49 +27,16 @@ export default async function CommunityLayout({
   children: React.ReactNode
 }) {
   await requireUser()
-  const supabase = await createClient()
 
-  // Bios count = active fellows + facilitators.
-  const biosPromise = supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .in('role', ['fellow', 'facilitator'])
-    .is('deactivated_at', null)
-
-  // Per-section published-post counts. Each section's `postKinds`
-  // covers any legacy aliases (e.g. reflections includes 'story').
-  const postSections = COMMUNITY_SECTIONS.filter((s) => s.postKinds !== null)
-  const postCountPromises = postSections.map((s) =>
-    supabase
-      .from('community_posts')
-      .select('id', { count: 'exact', head: true })
-      .in('kind', s.postKinds as string[])
-      .not('published_at', 'is', null),
-  )
-
-  const [biosRes, ...allRes] = await Promise.all([
-    biosPromise,
-    ...postCountPromises,
-    getMenuCustomPages(),
-  ])
-
-  // Extract custom pages from the last item in the promise array
-  const customPagesResult = allRes[allRes.length - 1]
-  const customPages = Array.isArray(customPagesResult) ? customPagesResult : []
-  const postRes = allRes.slice(0, -1)
-  
-  const counts: Record<string, number> = { bios: biosRes.count ?? 0 }
-  postSections.forEach((s, i) => {
-    const res = postRes[i] as any
-    counts[s.id] = res?.count ?? 0
-  })
+  // Fetch custom pages for the menu
+  const customPages = await getMenuCustomPages()
 
   return (
     <div className="min-h-screen bg-background">
       <TopBar customPages={customPages} />
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:py-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-          <CommunitySidebar counts={counts} />
+          <CommunitySidebar />
           <main className="min-w-0 flex-1">{children}</main>
         </div>
       </div>
