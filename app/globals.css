@@ -86,8 +86,8 @@
 }
 
 @theme inline {
-  --font-serif: 'Lora', 'Playfair Display', serif;
-  --font-sans: 'Inter', 'Geist', 'Geist Fallback', sans-serif;
+  --font-serif: 'Vollkorn', serif;
+  --font-sans: 'Alegreya SC', serif;
   --font-mono: 'JetBrains Mono', 'Geist Mono', 'Geist Mono Fallback', monospace;
   
   --color-background: var(--background);
@@ -139,7 +139,7 @@
   }
   
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans leading-relaxed;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -147,23 +147,31 @@
   }
   
   h1 {
-    @apply text-4xl leading-tight;
+    @apply text-4xl leading-snug;
   }
   
   h2 {
-    @apply text-3xl leading-tight;
+    @apply text-3xl leading-snug;
   }
   
   h3 {
-    @apply text-2xl leading-tight;
+    @apply text-2xl leading-snug;
   }
   
   h4 {
-    @apply text-xl leading-tight;
+    @apply text-xl leading-snug;
+  }
+  
+  h5, h6 {
+    @apply text-lg leading-snug;
   }
   
   a {
-    @apply text-accent hover:text-primary-light transition-colors;
+    @apply text-accent hover:text-primary-light transition-colors underline decoration-2 underline-offset-2;
+  }
+  
+  a:focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary rounded;
   }
 }
 
