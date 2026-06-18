@@ -1,18 +1,19 @@
 /**
  * Parsers for the bulk-invite flow.
  *
- * Both pasted entries and uploaded CSVs use the same positional
- * column order:
+ * Both pasted entries and uploaded CSVs support the same column set:
  *
- *     School Name, First Name, Last Name, Title, Email Address
+ *     First Name, Last Name, Email Address, Title, School Name,
+ *     School Description, School Location, School Contact Email, School Website URL
  *
  * Required per row: First Name, Last Name, Email Address.
- * Optional per row: School Name, Title.
+ * Optional per row: Title, School Name, School Description, School Location,
+ *                   School Contact Email, School Website URL.
  *
  * For CSV uploads, the file MUST start with a header row containing
- * (at minimum) those five column names. The order of columns in the
- * file is flexible because we resolve them by name; pasted entries
- * are strictly positional.
+ * (at minimum) the three required column names. The order of columns in the
+ * file is flexible because we resolve them by name; pasted entries are
+ * strictly positional, so all commas must be present even for empty fields.
  */
 
 export type ParsedInvite = {
@@ -22,6 +23,10 @@ export type ParsedInvite = {
   full_name: string
   title?: string
   school_name?: string
+  school_description?: string
+  school_location?: string
+  school_contact_email?: string
+  school_website_url?: string
 }
 
 export type ParsedInviteRow = {
@@ -42,11 +47,18 @@ export type CsvParseResult = {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const REQUIRED_HEADERS = [
-  'school name',
   'first name',
   'last name',
-  'title',
   'email address',
+] as const
+
+const OPTIONAL_HEADERS = [
+  'school name',
+  'title',
+  'school description',
+  'school location',
+  'school contact email',
+  'school website url',
 ] as const
 
 const REQUIRED_PER_ROW = ['first name', 'last name', 'email address'] as const
@@ -54,7 +66,7 @@ const REQUIRED_PER_ROW = ['first name', 'last name', 'email address'] as const
 /** Exact header row that the "Download CSV Template" button writes
  * out, and that the spec requires admins to see in the upload UI. */
 export const CSV_TEMPLATE_HEADER =
-  'School Name,First Name,Last Name,Title,Email Address'
+  'First Name,Last Name,Email Address,Title,School Name,School Description,School Location,School Contact Email,School Website URL'
 
 export const CSV_TEMPLATE_CONTENT = `${CSV_TEMPLATE_HEADER}\n`
 
@@ -106,31 +118,35 @@ function splitCsvLine(line: string): string[] {
 
 /**
  * Parse a single positional row (paste mode) of the form
- *   School Name, First Name, Last Name, Title, Email Address
+ *   First Name, Last Name, Email Address, Title, School Name, School Description, School Location, School Contact Email, School Website URL
  *
- * The five fields are required to all be present (as commas) even
- * when the optional values are blank. We deliberately don't try to
- * be clever about fewer-than-5 columns because that's how the email
- * silently lands in the wrong field.
+ * Required fields: First Name, Last Name, Email Address (positions 0-2).
+ * Optional fields: Title, School Name, School Description, School Location, School Contact Email, School Website URL (positions 3-8).
+ * Fields can be empty but commas must be present for proper alignment.
  */
 function parsePositionalLine(raw: string, line: number): ParsedInviteRow {
   const trimmed = raw.trim()
   if (!trimmed) return { line, raw, ok: false, error: 'empty row' }
 
   const cols = splitCsvLine(trimmed)
-  if (cols.length !== 5) {
+  if (cols.length < 3) {
     return {
       line,
       raw,
       ok: false,
-      error: `expected 5 fields (School Name, First Name, Last Name, Title, Email Address) but got ${cols.length}`,
+      error: `expected at least 3 fields (First Name, Last Name, Email Address) but got ${cols.length}`,
     }
   }
 
-  const [schoolNameRaw, firstNameRaw, lastNameRaw, titleRaw, emailRaw] = cols
-  const firstName = firstNameRaw.trim()
-  const lastName = lastNameRaw.trim()
-  const email = normalizeEmail(emailRaw)
+  const firstName = cols[0]?.trim() ?? ''
+  const lastName = cols[1]?.trim() ?? ''
+  const email = normalizeEmail(cols[2] ?? '')
+  const titleRaw = cols[3] ?? ''
+  const schoolNameRaw = cols[4] ?? ''
+  const schoolDescriptionRaw = cols[5] ?? ''
+  const schoolLocationRaw = cols[6] ?? ''
+  const schoolContactEmailRaw = cols[7] ?? ''
+  const schoolWebsiteUrlRaw = cols[8] ?? ''
 
   if (!firstName) return { line, raw, ok: false, error: 'First Name is required' }
   if (!lastName) return { line, raw, ok: false, error: 'Last Name is required' }
@@ -150,6 +166,10 @@ function parsePositionalLine(raw: string, line: number): ParsedInviteRow {
       full_name: joinName(firstName, lastName),
       title: emptyToUndefined(titleRaw),
       school_name: emptyToUndefined(schoolNameRaw),
+      school_description: emptyToUndefined(schoolDescriptionRaw),
+      school_location: emptyToUndefined(schoolLocationRaw),
+      school_contact_email: emptyToUndefined(schoolContactEmailRaw),
+      school_website_url: emptyToUndefined(schoolWebsiteUrlRaw),
     },
   }
 }
@@ -182,11 +202,15 @@ export function parseCsv(input: string): CsvParseResult {
   }
 
   const colIdx = (name: string) => header.indexOf(name)
-  const schoolIdx = colIdx('school name')
   const firstIdx = colIdx('first name')
   const lastIdx = colIdx('last name')
-  const titleIdx = colIdx('title')
   const emailIdx = colIdx('email address')
+  const titleIdx = colIdx('title')
+  const schoolIdx = colIdx('school name')
+  const schoolDescIdx = colIdx('school description')
+  const schoolLocIdx = colIdx('school location')
+  const schoolContactIdx = colIdx('school contact email')
+  const schoolWebIdx = colIdx('school website url')
 
   const rows: ParsedInviteRow[] = []
   for (let i = 1; i < lines.length; i++) {
@@ -225,6 +249,10 @@ export function parseCsv(input: string): CsvParseResult {
         full_name: joinName(firstName, lastName),
         title: emptyToUndefined(cols[titleIdx]),
         school_name: emptyToUndefined(cols[schoolIdx]),
+        school_description: emptyToUndefined(cols[schoolDescIdx]),
+        school_location: emptyToUndefined(cols[schoolLocIdx]),
+        school_contact_email: emptyToUndefined(cols[schoolContactIdx]),
+        school_website_url: emptyToUndefined(cols[schoolWebIdx]),
       },
     })
   }

@@ -49,6 +49,12 @@ export async function inviteUserAction(formData: FormData): Promise<ActionResult
     // stored on profiles.cohort - only valid for fellows.
     const schoolTeamId = String(formData.get('cohortId') ?? '')
     const cohortLetterRaw = String(formData.get('cohortLetter') ?? '')
+    // School profile fields (optional)
+    const schoolDescription = String(formData.get('schoolDescription') ?? '').trim()
+    const schoolLocation = String(formData.get('schoolLocation') ?? '').trim()
+    const schoolContactEmail = String(formData.get('schoolContactEmail') ?? '').trim()
+    const schoolWebsiteUrl = String(formData.get('schoolWebsiteUrl') ?? '').trim()
+    const schoolLogoUrl = String(formData.get('schoolLogoUrl') ?? '').trim()
 
     if (!firstName) return fail('First Name is required')
     if (!lastName) return fail('Last Name is required')
@@ -79,6 +85,11 @@ export async function inviteUserAction(formData: FormData): Promise<ActionResult
         cohortLetter,
         invitedByName,
         cohortLabel: cohortLetter ? `Cohort ${cohortLetter}` : null,
+        schoolDescription: schoolDescription || null,
+        schoolLocation: schoolLocation || null,
+        schoolContactEmail: schoolContactEmail || null,
+        schoolWebsiteUrl: schoolWebsiteUrl || null,
+        schoolLogoUrl: schoolLogoUrl || null,
       },
       me.id,
     )
@@ -190,6 +201,11 @@ export async function bulkInviteAction(formData: FormData): Promise<BulkInviteRe
         cohortLetter: defaultCohort,
         invitedByName,
         cohortLabel: defaultCohort ? `Cohort ${defaultCohort}` : null,
+        schoolName: row.data.school_name ?? null,
+        schoolDescription: row.data.school_description ?? null,
+        schoolLocation: row.data.school_location ?? null,
+        schoolContactEmail: row.data.school_contact_email ?? null,
+        schoolWebsiteUrl: row.data.school_website_url ?? null,
       }
 
       const result = await sendBrandedInvite(payload, me.id)
