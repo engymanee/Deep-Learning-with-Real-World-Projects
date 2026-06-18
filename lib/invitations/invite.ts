@@ -261,6 +261,32 @@ async function applyProfileEnrichment(
 ) {
   const admin = createAdminClient()
 
+  // Phase 2: Resolve school_team_id from the schoolTeamId (which is now a school_teams.id from the UI).
+  // Then set both school_team_id on profiles AND add to cohort_members for curriculum/session queries.
+  let schoolTeamId: string | null = null
+
+  if (payload.schoolTeamId) {
+    // Query school_teams to get the cohort_id for cohort_members insert
+    const { data: schoolTeam, error: stErr } = await admin
+      .from('school_teams')
+      .select('id, cohort_id')
+      .eq('id', payload.schoolTeamId)
+      .maybeSingle<{ id: string; cohort_id: string }>()
+
+    if (stErr) throw stErr
+    if (schoolTeam) {
+      schoolTeamId = schoolTeam.id
+
+      // Add to cohort_members so curriculum queries still work
+      const { error: memErr } = await admin
+        .from('cohort_members')
+        .insert({ cohort_id: schoolTeam.cohort_id, profile_id: userId })
+      if (memErr && !/duplicate/i.test(memErr.message)) {
+        throw memErr
+      }
+    }
+  }
+
   const { error: profErr } = await admin
     .from('profiles')
     .update({
@@ -268,18 +294,10 @@ async function applyProfileEnrichment(
       title: payload.title ?? null,
       role: payload.role,
       cohort: payload.role === 'fellow' ? payload.cohortLetter ?? null : null,
+      school_team_id: schoolTeamId,
     })
     .eq('id', userId)
   if (profErr) throw profErr
-
-  if (payload.schoolTeamId) {
-    const { error: memErr } = await admin
-      .from('cohort_members')
-      .insert({ cohort_id: payload.schoolTeamId, profile_id: userId })
-    if (memErr && !/duplicate/i.test(memErr.message)) {
-      throw memErr
-    }
-  }
 }
 
 /**

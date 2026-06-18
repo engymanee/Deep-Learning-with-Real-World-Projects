@@ -7,10 +7,9 @@ import { requireUser } from '@/lib/auth-server'
  *  - the team's most recent reflections
  *  - per-teammate "last active" timestamps
  *
- * "Team" === fellows in the same school as the current user. We
- * intentionally use `school_id` rather than cohort membership here
- * because the school grouping is what fellows see as "my team" in
- * the rest of the app, and it survives cohort changes year to year.
+ * "Team" === fellows in the same school team (via school_teams) as the current user.
+ * We query via `school_team_id` (Phase 2), which links profiles to the (school, cohort) pair.
+ * This ensures all teammates share the same school AND cohort.
  */
 
 export interface UpcomingSession {
@@ -70,13 +69,13 @@ export async function loadTeamSidebar(): Promise<TeamSidebarData> {
     }
   }
 
-  // Resolve teammates (same school, active fellows/facilitators).
-  // We need the IDs to scope the reflection query, and the
-  // updated_at to populate the "last active" cell.
+  // Resolve teammates (same school team via school_teams, active fellows/facilitators).
+  // We need the IDs to scope the reflection query, and the updated_at to populate the "last active" cell.
+  // Query: profiles where school_team_id matches the user's school_team_id
   const { data: teamRows } = await supabase
     .from('profiles')
     .select('id, updated_at')
-    .eq('school_id', user.schoolTeamId)
+    .eq('school_team_id', user.schoolTeamId)
     .in('role', ['fellow', 'facilitator'])
     .is('deactivated_at', null)
     .returns<Array<{ id: string; updated_at: string | null }>>()
