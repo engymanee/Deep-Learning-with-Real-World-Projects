@@ -87,7 +87,7 @@
 
 @theme inline {
   --font-serif: 'Vollkorn', serif;
-  --font-sans: 'Alegreya SC', serif;
+  --font-sans: 'Lora', serif;
   --font-mono: 'JetBrains Mono', 'Geist Mono', 'Geist Mono Fallback', monospace;
   
   --color-background: var(--background);
