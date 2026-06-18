@@ -187,12 +187,12 @@ export function Sidebar({
     >
       <div className="space-y-2 p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-text">
+          <h3 className="text-sm font-semibold tracking-wide text-text">
             Curriculum
           </h3>
           {isAdmin && (
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent"
+              className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-accent"
               title="Admin privileges active"
             >
               <ShieldCheck className="h-3 w-3" aria-hidden="true" />

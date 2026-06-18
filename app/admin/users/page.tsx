@@ -210,7 +210,7 @@ export default async function AdminUsersPage({
               <Users className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs font-medium tracking-wider text-muted-foreground">
                 Total Fellows
               </p>
               <p className="text-2xl font-semibold text-foreground">{totalFellows}</p>
@@ -224,7 +224,7 @@ export default async function AdminUsersPage({
               <CheckCircle2 className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs font-medium tracking-wider text-muted-foreground">
                 Active
               </p>
               <p className="text-2xl font-semibold text-foreground">{activeFellows}</p>
@@ -238,7 +238,7 @@ export default async function AdminUsersPage({
               <Building2 className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs font-medium tracking-wider text-muted-foreground">
                 School Teams
               </p>
               <p className="text-2xl font-semibold text-foreground">{uniqueSchoolTeams}</p>
@@ -252,7 +252,7 @@ export default async function AdminUsersPage({
               <BarChart3 className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs font-medium tracking-wider text-muted-foreground">
                 Cohorts
               </p>
               <p className="text-2xl font-semibold text-foreground">{uniqueCohorts}</p>
@@ -267,7 +267,7 @@ export default async function AdminUsersPage({
       {/* Users List */}
       <Card>
         <CardContent className="p-0">
-          <div className="hidden grid-cols-12 gap-4 border-b border-border px-5 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground md:grid">
+          <div className="hidden grid-cols-12 gap-4 border-b border-border px-5 py-3 text-xs font-medium tracking-wider text-muted-foreground md:grid">
             <div className="col-span-3">Name</div>
             <div className="col-span-2">Role</div>
             <div className="col-span-3">School Team</div>

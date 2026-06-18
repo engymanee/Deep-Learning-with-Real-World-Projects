@@ -67,7 +67,7 @@ export default async function CommunityOverviewPage() {
       <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs font-medium tracking-wider text-muted-foreground">
             Community of Practice
           </p>
           <h1 className="font-serif text-3xl text-foreground sm:text-4xl">

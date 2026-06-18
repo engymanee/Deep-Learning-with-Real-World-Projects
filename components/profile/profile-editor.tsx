@@ -338,7 +338,7 @@ export function ProfileEditor({ initial }: Props) {
           the Community directory.
         */}
         <fieldset className="mt-2 flex flex-col gap-4 rounded-lg border border-border bg-muted/20 p-4">
-          <legend className="-mt-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <legend className="-mt-1 px-1 text-xs font-semibold tracking-wide text-muted-foreground">
             Community profile
           </legend>
           <p className="-mt-2 text-xs text-muted-foreground">

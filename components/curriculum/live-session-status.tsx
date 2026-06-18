@@ -376,7 +376,7 @@ function PhaseLabel({ phase }: { phase: Phase }) {
     return (
       <>
         Starting soon
-        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-primary">
+        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold tracking-wider text-primary">
           Open
         </span>
       </>
@@ -386,7 +386,7 @@ function PhaseLabel({ phase }: { phase: Phase }) {
     return (
       <>
         Live now
-        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-primary-foreground">
+        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold tracking-wider text-primary-foreground">
           Live
         </span>
       </>

@@ -78,7 +78,7 @@ export function PhaseDetailsForm({ phase }: Props) {
   return (
     <section className="rounded-lg border border-border bg-card p-6">
       <header className="mb-5">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="text-xs font-medium tracking-wider text-muted-foreground">
           Phase details
         </p>
         <h2 className="mt-1 font-serif text-xl text-foreground">

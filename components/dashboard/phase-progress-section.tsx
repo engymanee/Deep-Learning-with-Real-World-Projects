@@ -83,7 +83,7 @@ function PhaseCard({
         {/* Teammates list. Hidden when the user is solo. */}
         {phase.teammates.length > 0 && (
           <div className="space-y-3 border-t border-border pt-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground">
               Your team
             </p>
             <ul className="space-y-3">

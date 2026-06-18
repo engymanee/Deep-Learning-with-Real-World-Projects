@@ -273,12 +273,12 @@ function ContentRowItemContent({
     <>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium tracking-wider text-muted-foreground">
             {resource.label}
           </span>
           {inherits ? (
             <span
-              className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+              className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium tracking-wider text-muted-foreground"
               title="Inherits cohort access from the module"
             >
               Inherits module

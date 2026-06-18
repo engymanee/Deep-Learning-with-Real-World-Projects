@@ -170,7 +170,7 @@ function EventCard({ event }: { event: CommunityEvent }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline" className="text-[10px] uppercase">
+            <Badge variant="outline" className="text-[10px]">
               {typeLabel}
             </Badge>
             <span className="inline-flex items-center gap-1">

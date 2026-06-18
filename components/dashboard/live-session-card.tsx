@@ -55,7 +55,7 @@ export function LiveSessionCard({ session }: { session: DashboardSession }) {
                   <span className="absolute inline-flex w-full h-full rounded-full bg-red-500 opacity-75 animate-ping" />
                   <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-red-500" />
                 </span>
-                <span className="text-xs font-medium text-red-600 uppercase tracking-wide">
+                <span className="text-xs font-medium text-red-600 tracking-wide">
                   Live now
                 </span>
               </div>

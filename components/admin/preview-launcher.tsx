@@ -265,13 +265,13 @@ function TabButton({
 function CohortPill({ cohort }: { cohort: Cohort | null }) {
   if (!cohort) {
     return (
-      <span className="shrink-0 rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className="shrink-0 rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] tracking-wider text-muted-foreground">
         Unassigned
       </span>
     )
   }
   return (
-    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wider text-primary">
       Cohort {cohort}
     </span>
   )

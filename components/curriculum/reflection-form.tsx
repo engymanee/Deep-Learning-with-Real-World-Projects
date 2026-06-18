@@ -100,7 +100,7 @@ export function ReflectionForm({
       <div className="flex items-start gap-2">
         <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs font-semibold tracking-wider text-muted-foreground">
             Reflection
           </p>
           <p className="text-pretty text-sm leading-relaxed text-foreground">

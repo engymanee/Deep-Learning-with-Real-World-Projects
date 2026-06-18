@@ -485,7 +485,7 @@ function PreviewStep(props: {
 
       <div className="max-h-[420px] overflow-auto rounded-md border border-border">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
+          <thead className="sticky top-0 bg-muted text-xs tracking-wider text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">School Name</th>
@@ -570,7 +570,7 @@ function BulkSummary({ summary }: { summary: BulkInviteSummary }) {
       </div>
       <div className="max-h-72 overflow-auto rounded-md border border-border">
         <table className="w-full text-left text-sm">
-          <thead className="bg-muted text-xs uppercase tracking-wider text-muted-foreground">
+          <thead className="bg-muted text-xs tracking-wider text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Email</th>
               <th className="px-3 py-2 font-medium">Status</th>

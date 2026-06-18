@@ -113,7 +113,7 @@ export default async function AdminCurriculumPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          <span className="text-xs font-medium tracking-wider text-muted-foreground">
                             Phase {idx + 1}
                           </span>
                           <CohortBadge cohorts={phase.cohorts} />

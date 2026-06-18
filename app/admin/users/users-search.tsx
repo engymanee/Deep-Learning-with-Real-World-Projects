@@ -91,7 +91,7 @@ export function UsersSearch({
         {/* Filters */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <label className="text-xs font-medium tracking-wider text-muted-foreground">
               Role
             </label>
             <select
@@ -108,7 +108,7 @@ export function UsersSearch({
           </div>
 
           <div className="flex-1">
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <label className="text-xs font-medium tracking-wider text-muted-foreground">
               School Team
             </label>
             <select
@@ -126,7 +126,7 @@ export function UsersSearch({
           </div>
 
           <div className="flex-1">
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <label className="text-xs font-medium tracking-wider text-muted-foreground">
               Cohort
             </label>
             <select

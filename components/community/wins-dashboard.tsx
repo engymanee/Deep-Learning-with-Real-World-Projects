@@ -148,7 +148,7 @@ function StatCard({ icon: Icon, label, value, description }: StatCardProps) {
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div className="flex flex-col gap-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">
               {label}
             </p>
             <p className="font-serif text-2xl text-foreground">{value}</p>
