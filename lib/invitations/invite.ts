@@ -17,6 +17,13 @@ export interface InvitePayload {
   invitedByName?: string | null
   /** Optional cohort label shown in the invite email body. */
   cohortLabel?: string | null
+  /** School profile fields to upsert when creating invitation. */
+  schoolName?: string | null
+  schoolDescription?: string | null
+  schoolLocation?: string | null
+  schoolContactEmail?: string | null
+  schoolWebsiteUrl?: string | null
+  schoolLogoUrl?: string | null
 }
 
 export interface InviteResult {

@@ -136,11 +136,10 @@ export default async function CommunityBiosPage() {
   return (
     <>
       <div className="flex flex-col">
-      <SectionHeader
-        section={section}
-        count={profiles.length}
-        canPost={false}
-      />
+        <SectionHeader
+          section={section}
+          canPost={false}
+        />
 
       {profiles.length === 0 ? (
         <p className="rounded-md border border-dashed border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">

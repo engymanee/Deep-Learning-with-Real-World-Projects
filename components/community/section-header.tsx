@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge'
 import { PostComposer } from '@/components/community/post-composer'
 import type { CommunitySection } from '@/lib/community/sections'
 
@@ -14,8 +13,6 @@ interface FrameworkOption {
 
 interface Props {
   section: CommunitySection
-  /** Total items in the section (posts or, for bios, profiles). */
-  count: number
   /** Whether the current viewer can compose in this section. */
   canPost: boolean
   /**
@@ -48,7 +45,6 @@ interface Props {
  */
 export function SectionHeader({
   section,
-  count,
   canPost,
   frameworks,
   requireAskCategory = false,
@@ -58,14 +54,9 @@ export function SectionHeader({
   return (
     <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="font-serif text-2xl text-foreground sm:text-3xl">
-            {section.label}
-          </h1>
-          <Badge variant="outline" className="text-xs tabular-nums">
-            {count}
-          </Badge>
-        </div>
+        <h1 className="font-serif text-2xl text-foreground sm:text-3xl">
+          {section.label}
+        </h1>
         <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
           {section.description}
         </p>

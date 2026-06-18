@@ -6,23 +6,12 @@ import { Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { COMMUNITY_SECTIONS } from '@/lib/community/sections'
 
-interface Props {
-  /**
-   * Map keyed by section id (`bios`, `whats-new`, `reflections`,
-   * `wins`, `ask`) of how many items live in that section. Used to
-   * render the small numeric pill on each row. Counts of 0 are
-   * suppressed so empty sections don't read as "0 unread".
-   */
-  counts: Record<string, number>
-}
-
 /**
  * Persistent left-rail navigation for /community.
  *
  * Renders two faces:
- *   - Desktop (lg+): a sticky 14rem column with grouped links and a
- *     count badge on each row. Active row gets the muted-accent
- *     surface so the user always knows where they are.
+ *   - Desktop (lg+): a sticky 14rem column with grouped links. Active row
+ *     gets the muted-accent surface so the user always knows where they are.
  *   - Mobile: a horizontal scrollable pill row above the main column.
  *     Same routes, denser packaging.
  *
@@ -30,7 +19,7 @@ interface Props {
  * descendant route (e.g. /community/bios/abc) as "still under bios"
  * so the row stays highlighted while you drill in.
  */
-export function CommunitySidebar({ counts }: Props) {
+export function CommunitySidebar() {
   const pathname = usePathname()
   const overviewActive = pathname === '/community'
 
@@ -68,14 +57,13 @@ export function CommunitySidebar({ counts }: Props) {
                 const href = `/community/${s.slug}`
                 const active = isActive(href)
                 const Icon = s.icon
-                const count = counts[s.id] ?? 0
 
                 return (
                   <li key={s.id}>
                     <Link
                       href={href}
                       className={cn(
-                        'group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                        'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
                         active
                           ? 'bg-muted font-medium text-foreground'
                           : 'text-foreground/80 hover:bg-muted/60 hover:text-foreground',
@@ -83,18 +71,6 @@ export function CommunitySidebar({ counts }: Props) {
                     >
                       <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                       <span className="flex-1 truncate">{s.label}</span>
-                      {count > 0 && (
-                        <span
-                          className={cn(
-                            'rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums',
-                            active
-                              ? 'bg-background text-foreground'
-                              : 'bg-muted text-muted-foreground group-hover:bg-background',
-                          )}
-                        >
-                          {count > 99 ? '99+' : count}
-                        </span>
-                      )}
                     </Link>
                   </li>
                 )

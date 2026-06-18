@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { UserProvider } from '@/lib/user-context'
 import { getCurrentUser } from '@/lib/auth-server'
 import { AdminPreviewBanner } from '@/components/admin/preview-banner'
+import { SkipNav } from '@/components/skip-nav'
 import './globals.css'
 
 // Skip prerendering for the entire app since it requires Supabase which may not be available at build time
@@ -99,6 +100,7 @@ export default async function RootLayout({
         suppressHydrationWarning
         className={`${_sans.variable} ${_serif.variable} ${cardo.variable} ${vollkorn.variable} ${alegreyaSC.variable} ${interFont.variable} font-sans antialiased`}
       >
+        <SkipNav />
         <UserProvider initialUser={user}>
           {user?.preview && (
             <AdminPreviewBanner
@@ -107,7 +109,9 @@ export default async function RootLayout({
               actualAdminName={user.preview.actualAdminName}
             />
           )}
-          {children}
+          <main id="main-content">
+            {children}
+          </main>
         </UserProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

@@ -97,7 +97,6 @@ export default async function ReflectionsPage() {
       */}
       <SectionHeader
         section={section}
-        count={reflections.length}
         canPost={false}
       />
 
